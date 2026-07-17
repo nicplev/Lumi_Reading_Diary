@@ -1,5 +1,12 @@
 import '../models/remote_message.dart';
 
+enum ForceUpdateDecision {
+  allow,
+  checking,
+  updateRequired,
+  supportRequired,
+}
+
 /// Pure logic for the force-update gate — no Flutter/Firebase imports so it
 /// unit-tests directly.
 ///
@@ -59,4 +66,61 @@ bool shouldForceUpdate({
     if (!normalized.contains(platform.toLowerCase())) return false;
   }
   return isVersionBelow(currentVersion, min);
+}
+
+/// Release-safe decision for the app-wide gate.
+///
+/// A release never silently treats a missing endpoint, an unreachable first
+/// fetch, an unreadable version or malformed minimum version as permission to
+/// continue against a potentially incompatible backend. Those cases enter a
+/// support screen. Callers may offer an explicit offline-only escape only for
+/// the network-unreachable case; build misconfiguration and malformed policy
+/// remain blocked.
+ForceUpdateDecision evaluateForceUpdate({
+  required bool requireVersionConfig,
+  required bool configConfigured,
+  required bool? configAvailable,
+  required RemoteMessage? message,
+  required String? currentVersion,
+  required String platform,
+}) {
+  if (requireVersionConfig && !configConfigured) {
+    return ForceUpdateDecision.supportRequired;
+  }
+  if (requireVersionConfig && configAvailable == null) {
+    return ForceUpdateDecision.checking;
+  }
+  if (requireVersionConfig && configAvailable == false) {
+    return ForceUpdateDecision.supportRequired;
+  }
+  if (message == null) {
+    return requireVersionConfig
+        ? ForceUpdateDecision.supportRequired
+        : ForceUpdateDecision.allow;
+  }
+
+  final min = message.minAppVersion;
+  if (min == null || min.trim().isEmpty) return ForceUpdateDecision.allow;
+
+  final platforms = message.platforms;
+  if (platforms != null && platforms.isNotEmpty) {
+    final normalized = platforms.map((p) => p.trim().toLowerCase());
+    if (!normalized.contains(platform.toLowerCase())) {
+      return ForceUpdateDecision.allow;
+    }
+  }
+
+  if (currentVersion == null || currentVersion.trim().isEmpty) {
+    return requireVersionConfig
+        ? ForceUpdateDecision.supportRequired
+        : ForceUpdateDecision.allow;
+  }
+  if (parseVersion(currentVersion) == null || parseVersion(min) == null) {
+    return requireVersionConfig
+        ? ForceUpdateDecision.supportRequired
+        : ForceUpdateDecision.allow;
+  }
+  return isVersionBelow(currentVersion, min)
+      ? ForceUpdateDecision.updateRequired
+      : ForceUpdateDecision.allow;
 }

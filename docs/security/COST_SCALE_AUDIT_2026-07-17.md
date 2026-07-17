@@ -3,10 +3,10 @@
 **Date:** 17 July 2026
 **Scope:** Firestore reads/writes, teacher dashboard queries, parent/teacher
 history queries, listeners, document IDs, counters and service-health probes.
-**Outcome:** Conditional pass for the current demo/pilot volume. The login-path
-collection-group scan is removed and the tested rules remain authorised at
-1,000 students, but long histories and the optional multi-week calendar still
-need bounded pagination or materialised summaries before a large-school pilot.
+**Outcome:** Pass for the tested 30/100/1,000-student profiles. The login-path
+collection-group scan is removed, all-time mobile histories use bounded cursor
+pagination, and the calendar/teacher-home aggregate paths use server-owned,
+transaction-safe daily summary shards instead of raw multi-week log scans.
 
 ## TL;DR
 
@@ -15,10 +15,16 @@ need bounded pagination or materialised summaries before a large-school pilot.
 - The unbounded UID-to-school resolver was replaced by a server-owned index.
   The production backfill converged at 38 memberships with zero conflicts.
 - A Rules-backed emulator profile passed at 30, 100 and 1,000 students.
-- The normal weekly dashboard query grows linearly: seven logs per student are
-  210, 700 and 7,000 reads respectively. The recent-activity query stays at 15.
-- The optional 12-week raw-log calendar would read 2,520, 8,400 and 84,000
-  documents in those profiles. It is unsuitable for a 1,000-student class.
+- The retained detailed weekly query grows linearly only when an optional card
+  needs raw sentiment/group detail: 210, 700 and 7,000 logs. Recent activity
+  remains capped at 15.
+- Calendar, weekly chart, hero intelligence and teacher home-widget refresh now
+  read at most eight shards per active day. The scale profile read 56 weekly
+  shards at every school size; a 12-week view is capped at 672 reads rather than
+  2,520, 8,400 or 84,000 raw logs.
+- Parent All-time/Bookshelf and teacher student-history requests load 30 logs
+  per page with a stable date/document-ID cursor. Partial totals and search
+  results are clearly labelled until older pages are explicitly loaded.
 - Every manually owned snapshot subscription inspected has a cancellation path.
 - The foreground service-health probe was relaxed from every 180 seconds to
   every 600 seconds while retaining connectivity, resume, explicit-retry and
@@ -30,14 +36,23 @@ The test in `functions/test/dashboard_scale.integration.test.js` seeds one
 completed reading log per student per day for seven days, authenticates as the
 assigned teacher and runs the real Firestore Rules.
 
-| Students | Weekly documents | Weekly emulator time | Recent documents | Recent emulator time | Projected 12-week calendar documents |
+| Students | Raw weekly logs | Weekly summary shards | Recent documents | Raw 12-week projection | Summary 12-week maximum |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 30 | 210 | 159 ms | 15 | 27 ms | 2,520 |
-| 100 | 700 | 90 ms | 15 | 39 ms | 8,400 |
-| 1,000 | 7,000 | 877 ms | 15 | 325 ms | 84,000 |
+| 30 | 210 | 56 | 15 | 2,520 | 672 |
+| 100 | 700 | 56 | 15 | 8,400 | 672 |
+| 1,000 | 7,000 | 56 | 15 | 84,000 | 672 |
 
 Emulator timings are diagnostic, not production latency promises. Document
 counts are the useful billing/scaling signal.
+
+Production deployment evidence: Firestore Rules and the `classDailyReading`
+composite index are live; the index reports `READY`. Both the idempotent
+Eventarc synchronizer and Melbourne weekly reconciler report `ACTIVE` on the
+pinned `lumi-functions-runtime` identity. Eventarc retries transient failures,
+and the scheduler's OIDC identity is limited to that same runtime account. An
+aggregate-only production reconciliation verified **697 eligible logs** and
+**12,857 minutes** exactly across **459 summary shards**, with zero inconsistent
+shards. No error-level service logs appeared after the final deployment.
 
 Production baseline measured over the preceding 30 days:
 
@@ -65,21 +80,32 @@ Production baseline measured over the preceding 30 days:
 - Reading-log IDs are random 128-bit identifiers, not sequential IDs.
 - Student and class totals use incremental aggregation with reconciliation,
   rather than re-reading every historic log on ordinary writes.
+- Parent and teacher all-time student histories are capped at 30 records per
+  request. The Firestore document-snapshot cursor includes the ordered date and
+  implicit document-ID tie-breaker. A 65-log identical-timestamp emulator case
+  returned 30 + 30 + 5 unique records with no gap or duplicate.
+- `classDailyReading` uses eight deterministic shards per class/day. A student's
+  logs always use the same shard, keeping unique-reader counts exact while
+  avoiding a single hot class counter. Only the Admin SDK writes summaries;
+  Rules require an assigned class for teacher queries and deny parents,
+  unrelated teachers and all client writes.
+- The per-log `readingLogSummaryState` projection makes writes idempotent and
+  event-order safe. The transaction reads the current authoritative log, so
+  duplicate or reordered create/validation/update/delete events converge. A
+  weekly reconciler rebuilds summaries from projection state; an emulator test
+  repaired deliberately corrupted totals and removed a stale shard.
 - The service-health controller's periodic server-source probe is now 600
   seconds. Event-driven probes still run when connectivity returns, the app
   resumes, the user retries, or the offline queue reports a failure.
 
-### Open before a large-school pilot
+### Remaining pilot measurements
 
-1. Parent **All time** activity and Bookshelf still derive from an unbounded
-   history stream.
-2. Teacher per-student reading history still streams the full history before
-   applying local filters.
-3. The optional reading calendar streams every raw log in its selected
-   4–24-week window. At 1,000 students, the default 12-week profile projects
-   84,000 documents for one initial view, before live-listener updates.
-4. Teacher home-widget refresh reads 41 days of raw class logs. It is bounded
-   by date but remains linear in class activity.
+1. Measure real production listener concurrency after schools begin using the
+   new mobile build and tune billing alerts from observed traffic.
+2. Optional detailed sentiment/group/top-reader cards retain one bounded
+   current-week raw-log fetch because their source attributes are intentionally
+   absent from the minimised daily summary. Revisit only if pilot volume makes
+   that seven-day detail query material.
 
 ## Listener ownership audit
 
@@ -92,15 +118,8 @@ Flutter. No orphaned listener was found in this static audit.
 Repeat the audit whenever a new manual `.listen()` is introduced; the pull
 request security gate calls this out explicitly.
 
-## Required remediation
+## Required follow-up
 
-- Paginate parent and teacher all-time histories with a stable `(date,
-  documentId)` cursor. Do not replace them with a silent flat cap that makes
-  totals or Bookshelf data incorrect.
-- Materialise teacher calendar/home summaries before a school whose class can
-  generate thousands of logs per week is onboarded. Prefer a bounded,
-  server-owned per-class/day summary design with sharding or transaction-safe
-  reconciliation; avoid turning one daily document into a write hotspot.
 - Add production pilot profiles for realistic numbers of logs per child,
   comments and concurrent listeners, then tune alert thresholds from measured
   behaviour.
@@ -112,7 +131,7 @@ request security gate calls this out explicitly.
 
 - **Current demo/small pilot:** pass with monitoring.
 - **Normal 30-student class:** pass; retain alerts and measure real use.
-- **100-student class:** conditional; hide or replace long calendar ranges and
-  complete history pagination first.
-- **1,000-student synthetic profile:** no-go for the raw-log calendar and
-  unbounded history views until summaries/pagination are shipped and retested.
+- **100-student class:** pass for tested query shapes; measure concurrency.
+- **1,000-student synthetic profile:** pass for pagination and summary query
+  shapes. This is a query-scale result, not a claim that one 1,000-student class
+  is an intended product configuration.

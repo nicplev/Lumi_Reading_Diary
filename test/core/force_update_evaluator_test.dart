@@ -124,4 +124,83 @@ void main() {
       );
     });
   });
+
+  group('evaluateForceUpdate', () {
+    ForceUpdateDecision decide({
+      bool required = true,
+      bool configured = true,
+      bool? available = true,
+      RemoteMessage? message,
+      String? version = '1.0.0',
+      String platform = 'ios',
+    }) {
+      return evaluateForceUpdate(
+        requireVersionConfig: required,
+        configConfigured: configured,
+        configAvailable: available,
+        message: message,
+        currentVersion: version,
+        platform: platform,
+      );
+    }
+
+    test('release enters support mode when version config is missing', () {
+      expect(
+        decide(configured: false),
+        ForceUpdateDecision.supportRequired,
+      );
+      expect(
+        decide(available: false),
+        ForceUpdateDecision.supportRequired,
+      );
+    });
+
+    test('release waits while the first version check is pending', () {
+      expect(decide(available: null), ForceUpdateDecision.checking);
+    });
+
+    test('valid empty policy permits the app', () {
+      expect(decide(message: msg()), ForceUpdateDecision.allow);
+    });
+
+    test('older build requires update', () {
+      expect(
+        decide(message: msg(minAppVersion: '2.0.0')),
+        ForceUpdateDecision.updateRequired,
+      );
+    });
+
+    test('malformed policy or unknown installed version enters support mode',
+        () {
+      expect(
+        decide(message: msg(minAppVersion: 'broken')),
+        ForceUpdateDecision.supportRequired,
+      );
+      expect(
+        decide(message: msg(minAppVersion: '2.0.0'), version: null),
+        ForceUpdateDecision.supportRequired,
+      );
+    });
+
+    test('a policy for another platform permits the app', () {
+      expect(
+        decide(
+          message: msg(minAppVersion: '2.0.0', platforms: ['android']),
+        ),
+        ForceUpdateDecision.allow,
+      );
+    });
+
+    test('non-release ambiguity retains fail-open developer behaviour', () {
+      expect(
+        decide(
+          required: false,
+          configured: false,
+          available: false,
+          message: null,
+        ),
+        ForceUpdateDecision.allow,
+      );
+    });
+  });
 }

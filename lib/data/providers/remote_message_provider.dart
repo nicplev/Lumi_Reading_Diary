@@ -15,13 +15,36 @@ const String _statusWorkerUrl = String.fromEnvironment(
 
 bool get isRemoteMessageConfigured => _statusWorkerUrl.isNotEmpty;
 
+/// Parsed endpoint shared by bootstrap and Riverpod. Bootstrap must create
+/// and initialize the singleton before the widget tree mounts; otherwise the
+/// provider would create an inert controller after startup had already tried
+/// (and failed) to read [RemoteMessageController.instance].
+Uri? get remoteMessageEndpoint {
+  if (_statusWorkerUrl.isEmpty) return null;
+  return Uri.tryParse(_statusWorkerUrl);
+}
+
 final remoteMessageControllerProvider =
     Provider<RemoteMessageController?>((ref) {
-  if (!isRemoteMessageConfigured) return null;
-  final controller =
-      RemoteMessageController.ensureInstance(Uri.parse(_statusWorkerUrl));
+  final endpoint = remoteMessageEndpoint;
+  if (endpoint == null) return null;
+  final controller = RemoteMessageController.ensureInstance(endpoint);
   ref.onDispose(controller.dispose);
   return controller;
+});
+
+/// Whether the independent status/version endpoint is usable. A cached
+/// response counts as available during a transient outage because it still
+/// carries the last known minimum-version policy.
+final remoteMessageConfigStateProvider =
+    StreamProvider<RemoteMessageConfigState>((ref) async* {
+  final controller = ref.watch(remoteMessageControllerProvider);
+  if (controller == null) {
+    yield RemoteMessageConfigState.unavailable;
+    return;
+  }
+  yield controller.configState;
+  yield* controller.configStateStream;
 });
 
 /// Live remote message stream for the UI. Emits `null` when the controller

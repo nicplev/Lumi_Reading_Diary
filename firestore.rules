@@ -817,6 +817,24 @@ service cloud.firestore {
         }
       }
 
+      // Server-owned, sharded class/day aggregates. Teachers must constrain
+      // list queries to a class they teach; no client can alter projections or
+      // totals. `readingLogSummaryState` is internal idempotency state and is
+      // never exposed, including to school admins.
+      match /classDailyReading/{summaryId} {
+        allow get, list: if isSchoolAdmin(schoolId) ||
+            isDevImpersonatingSchool(schoolId);
+
+        allow get, list: if isTeacher(schoolId) &&
+            teacherTeachesClass(schoolId, resource.data.classId);
+
+        allow create, update, delete: if false;
+      }
+
+      match /readingLogSummaryState/{logId} {
+        allow read, write: if false;
+      }
+
       match /allocations/{allocationId} {
         allow get, list: if isSchoolAdmin(schoolId) ||
             (isTeacher(schoolId) &&

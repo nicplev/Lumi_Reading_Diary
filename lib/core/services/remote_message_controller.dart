@@ -7,6 +7,8 @@ import 'package:http/http.dart' as http;
 
 import '../models/remote_message.dart';
 
+enum RemoteMessageConfigState { checking, available, unavailable }
+
 /// Polls the Cloudflare status worker for an out-of-band message that the
 /// app can render even when Firebase is down.
 ///
@@ -82,18 +84,35 @@ class RemoteMessageController with WidgetsBindingObserver {
       StreamController<RemoteMessage?>.broadcast();
   Stream<RemoteMessage?> get stream => _output.stream;
 
+  final StreamController<RemoteMessageConfigState> _configStateOutput =
+      StreamController<RemoteMessageConfigState>.broadcast();
+  Stream<RemoteMessageConfigState> get configStateStream =>
+      _configStateOutput.stream;
+
   Timer? _pollTimer;
   bool _foregrounded = true;
   bool _initialized = false;
   RemoteMessage? _current;
   RemoteMessage? get current => _current;
+  RemoteMessageConfigState _configState = RemoteMessageConfigState.checking;
+  RemoteMessageConfigState get configState => _configState;
+
+  void _setConfigState(RemoteMessageConfigState value) {
+    if (_configState == value) return;
+    _configState = value;
+    if (!_configStateOutput.isClosed) _configStateOutput.add(value);
+  }
 
   Future<void> initialize() async {
     if (_initialized) return;
+    try {
+      _cacheBox = await Hive.openBox<Map>(_cacheBoxName);
+      _dismissalsBox = await Hive.openBox<bool>(_dismissalsBoxName);
+    } catch (_) {
+      _setConfigState(RemoteMessageConfigState.unavailable);
+      rethrow;
+    }
     _initialized = true;
-
-    _cacheBox = await Hive.openBox<Map>(_cacheBoxName);
-    _dismissalsBox = await Hive.openBox<bool>(_dismissalsBoxName);
 
     // Emit any cached message immediately so we don't show a stale
     // "everything is fine" UI for the first ~60s after launch when there
@@ -101,8 +120,8 @@ class RemoteMessageController with WidgetsBindingObserver {
     final cached = _cacheBox.get('current');
     if (cached != null) {
       try {
-        _current =
-            RemoteMessage.fromCache(Map<String, dynamic>.from(cached));
+        _current = RemoteMessage.fromCache(Map<String, dynamic>.from(cached));
+        _setConfigState(RemoteMessageConfigState.available);
         _output.add(_current);
       } catch (e) {
         debugPrint('RemoteMessageController: cache decode failed: $e');
@@ -111,7 +130,14 @@ class RemoteMessageController with WidgetsBindingObserver {
 
     WidgetsBinding.instance.addObserver(this);
     _startPolling();
-    unawaited(refresh());
+    // With no cache, wait for one bounded request so release startup can make
+    // an explicit allow/update/support decision. With a cache, render at once
+    // and refresh opportunistically in the background.
+    if (_current == null) {
+      await refresh();
+    } else {
+      unawaited(refresh());
+    }
   }
 
   @override
@@ -137,15 +163,25 @@ class RemoteMessageController with WidgetsBindingObserver {
 
   /// Fetches once. Failures silently fall back to the cached message.
   Future<RemoteMessage?> refresh() async {
+    if (_current == null) {
+      _setConfigState(RemoteMessageConfigState.checking);
+    }
     try {
       final resp = await _http.get(_endpoint).timeout(_requestTimeout);
       if (resp.statusCode < 200 || resp.statusCode >= 300) {
+        _setConfigState(_current == null
+            ? RemoteMessageConfigState.unavailable
+            : RemoteMessageConfigState.available);
         return _current;
       }
       final json = jsonDecode(resp.body);
-      if (json is! Map<String, dynamic>) return _current;
-      final fresh =
-          RemoteMessage.fromJson(json, fetchedAt: DateTime.now());
+      if (json is! Map<String, dynamic>) {
+        _setConfigState(_current == null
+            ? RemoteMessageConfigState.unavailable
+            : RemoteMessageConfigState.available);
+        return _current;
+      }
+      final fresh = RemoteMessage.fromJson(json, fetchedAt: DateTime.now());
       // Persist before emitting so a crash mid-emit doesn't lose state.
       await _cacheBox.put('current', fresh.toJson());
       if (_current == null ||
@@ -156,11 +192,25 @@ class RemoteMessageController with WidgetsBindingObserver {
       } else {
         _current = fresh;
       }
+      _setConfigState(RemoteMessageConfigState.available);
       return fresh;
     } catch (e) {
       debugPrint('RemoteMessageController: refresh failed: $e');
+      _setConfigState(_current == null
+          ? RemoteMessageConfigState.unavailable
+          : RemoteMessageConfigState.available);
       return _current;
     }
+  }
+
+  /// User-initiated recovery from the support screen. This also retries Hive
+  /// initialization if bootstrap could not open the local policy cache.
+  Future<RemoteMessage?> retry() async {
+    if (!_initialized) {
+      await initialize();
+      return _current;
+    }
+    return refresh();
   }
 
   bool isDismissed(RemoteMessage message) {
@@ -177,5 +227,6 @@ class RemoteMessageController with WidgetsBindingObserver {
     _pollTimer?.cancel();
     _http.close();
     await _output.close();
+    await _configStateOutput.close();
   }
 }

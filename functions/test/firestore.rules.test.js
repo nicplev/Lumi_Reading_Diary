@@ -3383,3 +3383,66 @@ test('comments: allowed for both roles when school messaging is explicitly enabl
   await assertSucceeds(commentRef(authDb('parent_1'), 'p_on').set(parentComment));
   await assertSucceeds(commentRef(authDb('teacher_1'), 't_on').set(teacherCommentDoc));
 });
+
+test('classDailyReading: assigned teacher can query only their class; clients cannot write', async () => {
+  await seedData(async (db) => {
+    const school = db.collection('schools').doc('school_1');
+    await school.set({name: 'Summary School'});
+    await school.collection('users').doc('teacher_1').set({
+      role: 'teacher', schoolId: 'school_1',
+    });
+    await school.collection('users').doc('teacher_other').set({
+      role: 'teacher', schoolId: 'school_1',
+    });
+    await school.collection('users').doc('admin_1').set({
+      role: 'schoolAdmin', schoolId: 'school_1',
+    });
+    await school.collection('parents').doc('parent_1').set({
+      role: 'parent', schoolId: 'school_1', linkedChildren: ['student_1'],
+    });
+    await school.collection('classes').doc('class_1').set({
+      teacherId: 'teacher_1', teacherIds: ['teacher_1'], studentIds: ['student_1'],
+    });
+    await school.collection('classDailyReading').doc('summary_1').set({
+      schemaVersion: 1,
+      classId: 'class_1',
+      localDate: '2026-07-17',
+      shard: 0,
+      logCount: 1,
+      totalMinutes: 20,
+      teacherLogCount: 0,
+      activeStudentCount: 1,
+      students: {student_1: {logs: 1, minutes: 20, teacherLogs: 0}},
+    });
+    await school.collection('readingLogSummaryState').doc('log_1').set({
+      classId: 'class_1', studentId: 'student_1', localDate: '2026-07-17', shard: 0,
+    });
+  });
+
+  const assigned = authDb('teacher_1')
+    .collection('schools').doc('school_1').collection('classDailyReading');
+  await assertSucceeds(
+    assigned
+      .where('classId', '==', 'class_1')
+      .where('localDate', '>=', '2026-07-01')
+      .orderBy('localDate')
+      .get(),
+  );
+  await assertFails(assigned.where('localDate', '>=', '2026-07-01').get());
+  await assertFails(
+    authDb('teacher_other')
+      .collection('schools').doc('school_1').collection('classDailyReading')
+      .where('classId', '==', 'class_1').get(),
+  );
+  await assertFails(
+    authDb('parent_1')
+      .collection('schools').doc('school_1').collection('classDailyReading')
+      .where('classId', '==', 'class_1').get(),
+  );
+  await assertFails(assigned.doc('summary_1').update({totalMinutes: 9999}));
+  await assertFails(
+    authDb('admin_1')
+      .collection('schools').doc('school_1')
+      .collection('readingLogSummaryState').doc('log_1').get(),
+  );
+});

@@ -1,6 +1,5 @@
 import 'dart:math';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/inline_stream_error.dart';
@@ -11,8 +10,7 @@ import '../../../../theme/lumi_tokens.dart';
 import '../../../../theme/lumi_typography.dart';
 import '../../../../core/widgets/lumi_mascot.dart';
 import '../../../../data/models/class_model.dart';
-import '../../../../data/models/reading_log_model.dart';
-import '../../../../services/firebase_service.dart';
+import '../../../../services/class_daily_reading_service.dart';
 
 /// Dashboard Weekly Chart
 ///
@@ -35,7 +33,9 @@ class DashboardWeeklyChart extends StatefulWidget {
 class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
   static const String _offsetPrefsKey = 'dashboard_week_offset';
 
-  late Stream<QuerySnapshot> _weeklyStream;
+  final ClassDailyReadingService _dailyReadingService =
+      ClassDailyReadingService();
+  late Stream<List<ClassDailyReadingSummary>> _weeklyStream;
   late DateTime _startOfWeek;
 
   /// Monday-anchored week being shown: 0 = this week, -1 = last week. The
@@ -95,14 +95,12 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
         now.year, now.month, now.day - (now.weekday - 1) + 7 * _weekOffset);
     final endOfWeek = _startOfWeek.add(const Duration(days: 7));
 
-    _weeklyStream = FirebaseService.instance.firestore
-        .collection('schools')
-        .doc(widget.schoolId)
-        .collection('readingLogs')
-        .where('classId', isEqualTo: widget.classModel.id)
-        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(_startOfWeek))
-        .where('date', isLessThan: Timestamp.fromDate(endOfWeek))
-        .snapshots();
+    _weeklyStream = _dailyReadingService.watchRange(
+      schoolId: widget.schoolId,
+      classId: widget.classModel.id,
+      startInclusive: _startOfWeek,
+      endInclusive: endOfWeek.subtract(const Duration(days: 1)),
+    );
   }
 
   /// Fetch the week *before* the displayed one, for the trend footer.
@@ -115,32 +113,21 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
       final startOfPrevWeek =
           startOfShownWeek.subtract(const Duration(days: 7));
 
-      final snapshot = await FirebaseService.instance.firestore
-          .collection('schools')
-          .doc(widget.schoolId)
-          .collection('readingLogs')
-          .where('classId', isEqualTo: widget.classModel.id)
-          .where('date',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfPrevWeek))
-          .where('date', isLessThan: Timestamp.fromDate(startOfShownWeek))
-          .get();
+      final summaries = await _dailyReadingService.fetchRange(
+        schoolId: widget.schoolId,
+        classId: widget.classModel.id,
+        startInclusive: startOfPrevWeek,
+        endInclusive: startOfShownWeek.subtract(const Duration(days: 1)),
+      );
 
       // A stale response for a different offset must not clobber the footer.
       if (!mounted || requestOffset != _weekOffset) return;
 
-      final logs = snapshot.docs
-          .map((doc) => ReadingLogModel.fromFirestore(doc))
-          .toList();
-
-      // Count unique students per day, then sum
-      final Map<int, Set<String>> studentsByDay = {};
-      for (final log in logs) {
-        final dayIndex = log.date.weekday - 1;
-        studentsByDay.putIfAbsent(dayIndex, () => {}).add(log.studentId);
-      }
-      final total =
-          studentsByDay.values.fold<int>(0, (acc, s) => acc + s.length);
-      final daysWithData = studentsByDay.keys.length;
+      final total = summaries.fold<int>(
+        0,
+        (sum, summary) => sum + summary.activeStudentCount,
+      );
+      final daysWithData = summaries.length;
 
       setState(() {
         _prevWeekTotal = total;
@@ -192,7 +179,7 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
             style: LumiType.caption.copyWith(color: LumiTokens.muted),
           ),
           const SizedBox(height: 16),
-          StreamBuilder<QuerySnapshot>(
+          StreamBuilder<List<ClassDailyReadingSummary>>(
             stream: _weeklyStream,
             builder: (context, snapshot) {
               if (snapshot.hasError) {
@@ -208,29 +195,20 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
                   !snapshot.hasData) {
                 return _buildLoadingState();
               }
-              final logs = snapshot.data?.docs
-                      .map((doc) => ReadingLogModel.fromFirestore(doc))
-                      .toList() ??
-                  [];
-
-              final Map<int, Set<String>> studentsByDay = {};
+              final summaries = snapshot.data ?? const [];
+              final Map<int, int> completionByDay = {};
               for (int i = 0; i < 7; i++) {
-                studentsByDay[i] = {};
+                completionByDay[i] = 0;
               }
-              for (final log in logs) {
-                final date = log.date;
+              for (final summary in summaries) {
+                final date = summary.date;
                 final dayIndex = _startOfWeek
                     .difference(DateTime(date.year, date.month, date.day))
                     .inDays
                     .abs();
                 if (dayIndex >= 0 && dayIndex < 7) {
-                  studentsByDay[dayIndex]!.add(log.studentId);
+                  completionByDay[dayIndex] = summary.activeStudentCount;
                 }
-              }
-
-              final Map<int, int> completionByDay = {};
-              for (int i = 0; i < 7; i++) {
-                completionByDay[i] = studentsByDay[i]!.length;
               }
 
               // Past weeks are complete — every day counts, none is "today".

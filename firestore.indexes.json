@@ -195,6 +195,20 @@
       ]
     },
     {
+      "collectionGroup": "classDailyReading",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "classId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "localDate",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "readingLogs",
       "queryScope": "COLLECTION",
       "fields": [

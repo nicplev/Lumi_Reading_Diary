@@ -12,6 +12,7 @@ import '../../data/providers/school_settings_provider.dart';
 import '../../services/book_lookup_service.dart';
 import '../../services/book_metadata_resolver.dart';
 import '../../services/firebase_service.dart';
+import '../../services/reading_history_service.dart';
 import 'library/book_cover.dart';
 import 'library/book_detail_sheet.dart';
 import 'library/book_history_item.dart';
@@ -72,7 +73,16 @@ class ReadingHistoryScreen extends StatefulWidget {
 
 class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
   final FirebaseService _firebaseService = FirebaseService.instance;
+  late final ReadingHistoryService _readingHistoryService =
+      ReadingHistoryService(firestore: _firebaseService.firestore);
   BookMetadataResolver? _metadataResolverInstance;
+
+  final List<ReadingLogModel> _pagedHistory = [];
+  ReadingHistoryCursor? _historyCursor;
+  bool _historyHasMore = true;
+  bool _historyLoading = false;
+  Object? _historyError;
+  int _historyGeneration = 0;
 
   _LibraryTab _tab = _LibraryTab.activity;
   _Range _range = _Range.week;
@@ -106,10 +116,15 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
   void didUpdateWidget(covariant ReadingHistoryScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     final scopeChanged = oldWidget.schoolId != widget.schoolId ||
-        oldWidget.parentId != widget.parentId;
+        oldWidget.parentId != widget.parentId ||
+        oldWidget.studentId != widget.studentId;
     if (!scopeChanged) return;
     _disposeMetadataResolver();
     _metadataResolver;
+    _resetPagedHistory();
+    if (_range == _Range.all || _tab == _LibraryTab.books) {
+      _loadNextHistoryPage();
+    }
   }
 
   void _onMetadataUpdated() {
@@ -129,6 +144,53 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
     resolver.removeListener(_onMetadataUpdated);
     resolver.dispose();
     _metadataResolverInstance = null;
+  }
+
+  void _resetPagedHistory() {
+    _historyGeneration++;
+    _pagedHistory.clear();
+    _historyCursor = null;
+    _historyHasMore = true;
+    _historyLoading = false;
+    _historyError = null;
+  }
+
+  Future<void> _loadNextHistoryPage() async {
+    if (_historyLoading || !_historyHasMore) return;
+    final generation = _historyGeneration;
+    setState(() {
+      _historyLoading = true;
+      _historyError = null;
+    });
+    try {
+      final page = await _readingHistoryService.fetchStudentPage(
+        schoolId: widget.schoolId,
+        studentId: widget.studentId,
+        startAfter: _historyCursor,
+      );
+      if (!mounted || generation != _historyGeneration) return;
+      setState(() {
+        final existingIds = _pagedHistory.map((log) => log.id).toSet();
+        _pagedHistory.addAll(
+          page.logs.where((log) => existingIds.add(log.id)),
+        );
+        _historyCursor = page.nextCursor;
+        _historyHasMore = page.hasMore;
+        _historyLoading = false;
+      });
+    } catch (error) {
+      if (!mounted || generation != _historyGeneration) return;
+      setState(() {
+        _historyLoading = false;
+        _historyError = error;
+      });
+    }
+  }
+
+  void _showPagedHistory() {
+    if (_pagedHistory.isEmpty && !_historyLoading) {
+      _loadNextHistoryPage();
+    }
   }
 
   Query<Map<String, dynamic>> get _logsCollection => _firebaseService.firestore
@@ -156,7 +218,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
             .orderBy('date', descending: true)
             .snapshots();
       case _Range.all:
-        return _logsCollection.orderBy('date', descending: true).snapshots();
+        throw StateError('All-time history uses bounded cursor pagination.');
     }
   }
 
@@ -201,8 +263,10 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
           _SegmentedTabs(
             selectedIndex: _tab.index,
             labels: const ['Activity', 'Bookshelf'],
-            onChanged: (i) =>
-                setState(() => _tab = _LibraryTab.values[i]),
+            onChanged: (i) {
+              setState(() => _tab = _LibraryTab.values[i]);
+              if (_tab == _LibraryTab.books) _showPagedHistory();
+            },
           ),
         ],
       ),
@@ -216,46 +280,93 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
       children: [
         _buildRangeFilter(),
         Expanded(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: _activityStream(),
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return _ErrorState(onRetry: () => setState(() {}));
-              }
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(
-                  child: CircularProgressIndicator(color: LumiTokens.yellow),
-                );
-              }
+          child: _range == _Range.all
+              ? _buildPagedActivity()
+              : StreamBuilder<QuerySnapshot>(
+                  stream: _activityStream(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return _ErrorState(onRetry: () => setState(() {}));
+                    }
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child:
+                            CircularProgressIndicator(color: LumiTokens.yellow),
+                      );
+                    }
 
-              final logs = snapshot.data?.docs
-                      .map((doc) => ReadingLogModel.fromFirestore(doc))
-                      .toList() ??
-                  const <ReadingLogModel>[];
+                    final logs = snapshot.data?.docs
+                            .map((doc) => ReadingLogModel.fromFirestore(doc))
+                            .toList() ??
+                        const <ReadingLogModel>[];
 
-              if (logs.isEmpty) {
-                return const _EmptyState(
-                  icon: Icons.auto_stories_outlined,
-                  title: 'No reading yet',
-                  message: 'Reading sessions for this period will appear here.',
-                );
-              }
+                    if (logs.isEmpty) {
+                      return const _EmptyState(
+                        icon: Icons.auto_stories_outlined,
+                        title: 'No reading yet',
+                        message:
+                            'Reading sessions for this period will appear here.',
+                      );
+                    }
 
-              return ListView(
-                padding: const EdgeInsets.fromLTRB(
-                  LumiTokens.space4,
-                  LumiTokens.space2,
-                  LumiTokens.space4,
-                  _kNavClearance,
+                    return ListView(
+                      padding: const EdgeInsets.fromLTRB(
+                        LumiTokens.space4,
+                        LumiTokens.space2,
+                        LumiTokens.space4,
+                        _kNavClearance,
+                      ),
+                      children: [
+                        _SummaryStrip(logs: logs),
+                        const SizedBox(height: LumiTokens.space5),
+                        ..._buildDayGroups(logs),
+                      ],
+                    );
+                  },
                 ),
-                children: [
-                  _SummaryStrip(logs: logs),
-                  const SizedBox(height: LumiTokens.space5),
-                  ..._buildDayGroups(logs),
-                ],
-              );
-            },
-          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPagedActivity() {
+    if (_pagedHistory.isEmpty && _historyLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: LumiTokens.yellow),
+      );
+    }
+    if (_pagedHistory.isEmpty && _historyError != null) {
+      return _ErrorState(onRetry: _loadNextHistoryPage);
+    }
+    if (_pagedHistory.isEmpty) {
+      return const _EmptyState(
+        icon: Icons.auto_stories_outlined,
+        title: 'No reading yet',
+        message: 'Reading sessions will appear here.',
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        LumiTokens.space4,
+        LumiTokens.space2,
+        LumiTokens.space4,
+        _kNavClearance,
+      ),
+      children: [
+        _SummaryStrip(logs: _pagedHistory),
+        const SizedBox(height: LumiTokens.space2),
+        _LoadedHistoryNotice(
+          count: _pagedHistory.length,
+          complete: !_historyHasMore,
+        ),
+        const SizedBox(height: LumiTokens.space5),
+        ..._buildDayGroups(_pagedHistory),
+        _HistoryPaginationFooter(
+          hasMore: _historyHasMore,
+          loading: _historyLoading,
+          error: _historyError,
+          onLoadMore: _loadNextHistoryPage,
         ),
       ],
     );
@@ -333,7 +444,10 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
               _FilterChip(
                 label: 'All time',
                 selected: _range == _Range.all,
-                onTap: () => setState(() => _range = _Range.all),
+                onTap: () {
+                  setState(() => _range = _Range.all);
+                  _showPagedHistory();
+                },
               ),
             ],
           ),
@@ -345,8 +459,8 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
                 _StepperButton(
                   icon: Icons.chevron_left,
                   onTap: () => setState(() {
-                    _selectedMonth = DateTime(
-                        _selectedMonth.year, _selectedMonth.month - 1);
+                    _selectedMonth =
+                        DateTime(_selectedMonth.year, _selectedMonth.month - 1);
                   }),
                 ),
                 Text(
@@ -379,116 +493,115 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
   // ── Books tab: slim shelf (grid + Recent/A-Z sort + optional search) ──
 
   Widget _buildBooksTab() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: _logsCollection.orderBy('date', descending: true).snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return _ErrorState(onRetry: () => setState(() {}));
-        }
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(color: LumiTokens.yellow),
+    if (_pagedHistory.isEmpty && _historyLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: LumiTokens.yellow),
+      );
+    }
+    if (_pagedHistory.isEmpty && _historyError != null) {
+      return _ErrorState(onRetry: _loadNextHistoryPage);
+    }
+
+    final books = <String, BookHistoryItem>{};
+    for (final log in _pagedHistory) {
+      for (final title in log.bookTitles) {
+        final key = title.trim();
+        if (key.isEmpty) continue;
+        final existing = books[key];
+        if (existing == null) {
+          books[key] = BookHistoryItem(
+            title: key,
+            totalMinutes: log.minutesRead,
+            sessions: 1,
+            lastReadAt: log.date,
+            firstReadAt: log.date,
+          );
+        } else {
+          books[key] = existing.copyWith(
+            totalMinutes: existing.totalMinutes + log.minutesRead,
+            sessions: existing.sessions + 1,
+            lastReadAt: existing.lastReadAt.isAfter(log.date)
+                ? existing.lastReadAt
+                : log.date,
+            firstReadAt: existing.firstReadAt.isBefore(log.date)
+                ? existing.firstReadAt
+                : log.date,
           );
         }
+      }
+    }
 
-        final logs = snapshot.data?.docs
-                .map((doc) => ReadingLogModel.fromFirestore(doc))
-                .toList() ??
-            const <ReadingLogModel>[];
+    if (books.isEmpty) {
+      return const _EmptyState(
+        icon: Icons.menu_book_outlined,
+        title: 'No books yet',
+        message: 'Books you log reading will be collected here.',
+      );
+    }
 
-        final books = <String, BookHistoryItem>{};
-        for (final log in logs) {
-          for (final title in log.bookTitles) {
-            final key = title.trim();
-            if (key.isEmpty) continue;
-            final existing = books[key];
-            if (existing == null) {
-              books[key] = BookHistoryItem(
-                title: key,
-                totalMinutes: log.minutesRead,
-                sessions: 1,
-                lastReadAt: log.date,
-                firstReadAt: log.date,
-              );
-            } else {
-              books[key] = existing.copyWith(
-                totalMinutes: existing.totalMinutes + log.minutesRead,
-                sessions: existing.sessions + 1,
-                lastReadAt: existing.lastReadAt.isAfter(log.date)
-                    ? existing.lastReadAt
-                    : log.date,
-                firstReadAt: existing.firstReadAt.isBefore(log.date)
-                    ? existing.firstReadAt
-                    : log.date,
-              );
-            }
-          }
-        }
+    _metadataResolver.resolveAll(books.keys.toList());
 
-        if (books.isEmpty) {
-          return const _EmptyState(
-            icon: Icons.menu_book_outlined,
-            title: 'No books yet',
-            message: 'Books you log reading will be collected here.',
-          );
-        }
+    var shelf = books.values.toList();
+    if (_searchQuery.isNotEmpty) {
+      final query = _searchQuery.toLowerCase();
+      shelf = shelf.where((book) {
+        final metadata = _metadataResolver.getCached(book.title);
+        final title = (metadata?.title ?? book.title).toLowerCase();
+        final author = (metadata?.author ?? '').toLowerCase();
+        return title.contains(query) || author.contains(query);
+      }).toList();
+    }
 
-        _metadataResolver.resolveAll(books.keys.toList());
+    switch (_booksSort) {
+      case _BooksSort.recent:
+        shelf.sort((a, b) => b.lastReadAt.compareTo(a.lastReadAt));
+      case _BooksSort.alphabetical:
+        shelf.sort((a, b) {
+          final at = _metadataResolver.getCached(a.title)?.title ?? a.title;
+          final bt = _metadataResolver.getCached(b.title)?.title ?? b.title;
+          return at.toLowerCase().compareTo(bt.toLowerCase());
+        });
+    }
 
-        var shelf = books.values.toList();
-        if (_searchQuery.isNotEmpty) {
-          final query = _searchQuery.toLowerCase();
-          shelf = shelf.where((book) {
-            final metadata = _metadataResolver.getCached(book.title);
-            final title = (metadata?.title ?? book.title).toLowerCase();
-            final author = (metadata?.author ?? '').toLowerCase();
-            return title.contains(query) || author.contains(query);
-          }).toList();
-        }
-
-        switch (_booksSort) {
-          case _BooksSort.recent:
-            shelf.sort((a, b) => b.lastReadAt.compareTo(a.lastReadAt));
-          case _BooksSort.alphabetical:
-            shelf.sort((a, b) {
-              final at = _metadataResolver.getCached(a.title)?.title ?? a.title;
-              final bt = _metadataResolver.getCached(b.title)?.title ?? b.title;
-              return at.toLowerCase().compareTo(bt.toLowerCase());
-            });
-        }
-
-        return Column(
-          children: [
-            _buildBooksToolbar(count: books.length, showSearch: books.length > 8),
-            Expanded(
-              child: shelf.isEmpty
-                  ? const _EmptyState(
-                      icon: Icons.search_off_rounded,
-                      title: 'No matches',
-                      message: 'No books match your search.',
-                    )
-                  : GridView.builder(
-                      padding: const EdgeInsets.fromLTRB(
-                        LumiTokens.space4,
-                        LumiTokens.space2,
-                        LumiTokens.space4,
-                        _kNavClearance,
-                      ),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        childAspectRatio: 0.50,
-                        crossAxisSpacing: LumiTokens.space3,
-                        mainAxisSpacing: LumiTokens.space4,
-                      ),
-                      itemCount: shelf.length,
-                      itemBuilder: (context, index) =>
-                          _buildBookTile(shelf[index]),
-                    ),
-            ),
-          ],
-        );
-      },
+    return Column(
+      children: [
+        _buildBooksToolbar(count: books.length, showSearch: books.length > 8),
+        _LoadedHistoryNotice(
+          count: _pagedHistory.length,
+          complete: !_historyHasMore,
+        ),
+        _HistoryPaginationFooter(
+          hasMore: _historyHasMore,
+          loading: _historyLoading,
+          error: _historyError,
+          onLoadMore: _loadNextHistoryPage,
+          compact: true,
+        ),
+        Expanded(
+          child: shelf.isEmpty
+              ? const _EmptyState(
+                  icon: Icons.search_off_rounded,
+                  title: 'No matches',
+                  message: 'No books match your search.',
+                )
+              : GridView.builder(
+                  padding: const EdgeInsets.fromLTRB(
+                    LumiTokens.space4,
+                    LumiTokens.space2,
+                    LumiTokens.space4,
+                    _kNavClearance,
+                  ),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    childAspectRatio: 0.50,
+                    crossAxisSpacing: LumiTokens.space3,
+                    mainAxisSpacing: LumiTokens.space4,
+                  ),
+                  itemCount: shelf.length,
+                  itemBuilder: (context, index) => _buildBookTile(shelf[index]),
+                ),
+        ),
+      ],
     );
   }
 
@@ -694,7 +807,8 @@ class _SegmentedTabs extends StatelessWidget {
                               fontSize: 14,
                               fontWeight:
                                   selected ? FontWeight.w700 : FontWeight.w600,
-                              color: selected ? LumiTokens.ink : LumiTokens.muted,
+                              color:
+                                  selected ? LumiTokens.ink : LumiTokens.muted,
                             ),
                             child: Text(labels[i]),
                           ),
@@ -1129,6 +1243,82 @@ class _SessionRow extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _LoadedHistoryNotice extends StatelessWidget {
+  const _LoadedHistoryNotice({required this.count, required this.complete});
+
+  final int count;
+  final bool complete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: LumiTokens.space4),
+      child: Text(
+        complete
+            ? 'All $count sessions loaded'
+            : '$count recent sessions loaded — older history is available',
+        textAlign: TextAlign.center,
+        style: LumiType.caption.copyWith(color: LumiTokens.muted),
+      ),
+    );
+  }
+}
+
+class _HistoryPaginationFooter extends StatelessWidget {
+  const _HistoryPaginationFooter({
+    required this.hasMore,
+    required this.loading,
+    required this.error,
+    required this.onLoadMore,
+    this.compact = false,
+  });
+
+  final bool hasMore;
+  final bool loading;
+  final Object? error;
+  final VoidCallback onLoadMore;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!hasMore && error == null) return const SizedBox.shrink();
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        LumiTokens.space4,
+        compact ? LumiTokens.space2 : LumiTokens.space3,
+        LumiTokens.space4,
+        compact ? LumiTokens.space2 : LumiTokens.space5,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (error != null) ...[
+            Text(
+              "Couldn't load older history. Your loaded sessions are safe.",
+              textAlign: TextAlign.center,
+              style: LumiType.caption.copyWith(color: LumiTokens.red),
+            ),
+            const SizedBox(height: LumiTokens.space2),
+          ],
+          OutlinedButton.icon(
+            onPressed: loading ? null : onLoadMore,
+            icon: loading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.history_rounded),
+            label: Text(
+              loading ? 'Loading older history…' : 'Load older history',
+            ),
+          ),
+        ],
       ),
     );
   }

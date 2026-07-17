@@ -13,6 +13,7 @@ import '../data/models/class_model.dart';
 import '../data/models/student_model.dart';
 import '../data/models/reading_log_model.dart';
 import '../data/models/user_model.dart';
+import 'class_daily_reading_service.dart';
 
 const _appGroupId = 'group.com.lumi.lumiReadingTracker';
 const _widgetDataKey = 'lumi_widget_data';
@@ -163,6 +164,7 @@ class WidgetDataService {
     required ClassModel classModel,
     required List<StudentModel> students,
     required List<ReadingLogModel> recentLogs,
+    List<ClassDailyReadingSummary> dailySummaries = const [],
   }) async {
     if (!_isSupported || teacher.role != UserRole.teacher) return;
     _cachedChildren = [];
@@ -174,6 +176,7 @@ class WidgetDataService {
       classModel: classModel,
       students: students,
       recentLogs: recentLogs,
+      dailySummaries: dailySummaries,
     );
     await _pushTeacherDashboard();
   }
@@ -622,6 +625,7 @@ class _TeacherDashboardPayload {
     required ClassModel classModel,
     required List<StudentModel> students,
     required List<ReadingLogModel> recentLogs,
+    List<ClassDailyReadingSummary> dailySummaries = const [],
     DateTime? now,
   }) {
     final current = now ?? DateTime.now();
@@ -631,6 +635,10 @@ class _TeacherDashboardPayload {
     final calendarStart =
         today.subtract(const Duration(days: _teacherCalendarDays - 1));
 
+    final summariesByDate = {
+      for (final summary in dailySummaries) summary.localDate: summary,
+    };
+    final hasSummaries = summariesByDate.isNotEmpty;
     final logsForClass =
         recentLogs.where((log) => log.classId == classModel.id).toList();
     final todayLogs = logsForClass
@@ -641,32 +649,50 @@ class _TeacherDashboardPayload {
             !WidgetDataService._dateOnly(log.date).isBefore(startOfWeek))
         .toList();
 
-    final studentsByDay = <DateTime, Set<String>>{};
-    for (final log in logsForClass) {
-      final day = WidgetDataService._dateOnly(log.date);
-      if (day.isBefore(calendarStart) || day.isAfter(today)) continue;
-      (studentsByDay[day] ??= <String>{}).add(log.studentId);
-    }
-
     final calendarDays = <_TeacherCalendarDayPayload>[
       for (var i = 0; i < _teacherCalendarDays; i++)
         _TeacherCalendarDayPayload(
           date: WidgetDataService._formatQueueDate(
             calendarStart.add(Duration(days: i)),
           ),
-          readCount:
-              studentsByDay[calendarStart.add(Duration(days: i))]?.length ?? 0,
+          readCount: hasSummaries
+              ? summariesByDate[WidgetDataService._formatQueueDate(
+                          calendarStart.add(Duration(days: i)))]
+                      ?.activeStudentCount ??
+                  0
+              : logsForClass
+                  .where((log) =>
+                      WidgetDataService._dateOnly(log.date) ==
+                      calendarStart.add(Duration(days: i)))
+                  .map((log) => log.studentId)
+                  .toSet()
+                  .length,
         ),
     ];
 
     final studentById = {for (final student in students) student.id: student};
     final minutesByStudent = <String, int>{};
-    for (final log in weeklyLogs) {
-      minutesByStudent.update(
-        log.studentId,
-        (minutes) => minutes + log.minutesRead,
-        ifAbsent: () => log.minutesRead,
-      );
+    if (hasSummaries) {
+      for (final summary in dailySummaries) {
+        if (summary.date.isBefore(startOfWeek) || summary.date.isAfter(today)) {
+          continue;
+        }
+        for (final entry in summary.students.entries) {
+          minutesByStudent.update(
+            entry.key,
+            (minutes) => minutes + entry.value.minutes,
+            ifAbsent: () => entry.value.minutes,
+          );
+        }
+      }
+    } else {
+      for (final log in weeklyLogs) {
+        minutesByStudent.update(
+          log.studentId,
+          (minutes) => minutes + log.minutesRead,
+          ifAbsent: () => log.minutesRead,
+        );
+      }
     }
     final sortedReaders = minutesByStudent.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
@@ -694,11 +720,21 @@ class _TeacherDashboardPayload {
       if (lastDay == today || lastDay == yesterday) onStreakCount++;
     }
 
-    final todayStudentIds = todayLogs.map((log) => log.studentId).toSet();
-    final teacherLoggedStudentIds = todayLogs
-        .where((log) => log.isTeacherProxy)
-        .map((log) => log.studentId)
-        .toSet();
+    final todaySummary =
+        summariesByDate[WidgetDataService._formatQueueDate(today)];
+    final todayStudentIds = hasSummaries
+        ? todaySummary?.students.keys.toSet() ?? <String>{}
+        : todayLogs.map((log) => log.studentId).toSet();
+    final teacherLoggedStudentIds = hasSummaries
+        ? todaySummary?.students.entries
+                .where((entry) => entry.value.teacherLogs > 0)
+                .map((entry) => entry.key)
+                .toSet() ??
+            <String>{}
+        : todayLogs
+            .where((log) => log.isTeacherProxy)
+            .map((log) => log.studentId)
+            .toSet();
 
     return _TeacherDashboardPayload(
       teacherId: teacher.id,
@@ -707,11 +743,13 @@ class _TeacherDashboardPayload {
       className: classModel.name,
       totalStudents: classModel.studentIds.length,
       readTodayCount: todayStudentIds.length,
-      sessionsTodayCount: todayLogs.length,
+      sessionsTodayCount:
+          hasSummaries ? todaySummary?.logCount ?? 0 : todayLogs.length,
       teacherLoggedTodayCount: teacherLoggedStudentIds.length,
       onStreakCount: onStreakCount,
-      totalMinutesToday:
-          todayLogs.fold<int>(0, (total, log) => total + log.minutesRead),
+      totalMinutesToday: hasSummaries
+          ? todaySummary?.totalMinutes ?? 0
+          : todayLogs.fold<int>(0, (total, log) => total + log.minutesRead),
       todayDate: WidgetDataService._formatQueueDate(today),
       todayStudentIds: todayStudentIds,
       teacherLoggedStudentIds: teacherLoggedStudentIds,

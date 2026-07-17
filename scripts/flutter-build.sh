@@ -41,6 +41,10 @@ case "${target}" in
       echo "error: mobile release builds require LUMI_APP_CHECK_ENABLED=true in ${DEFINES_FILE}" >&2
       exit 1
     fi
+    if ! grep -Eq '"LUMI_STATUS_WORKER_URL"[[:space:]]*:[[:space:]]*"https://[^\"]+"' "${DEFINES_FILE}"; then
+      echo "error: mobile release builds require an HTTPS LUMI_STATUS_WORKER_URL in ${DEFINES_FILE}" >&2
+      exit 1
+    fi
     ;;
 esac
 
