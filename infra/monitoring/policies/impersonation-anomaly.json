@@ -1,0 +1,26 @@
+{
+  "displayName": "Lumi production: developer impersonation anomaly",
+  "combiner": "OR",
+  "enabled": true,
+  "conditions": [
+    {
+      "displayName": "The hourly impersonation anomaly sweep flagged activity",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"cloud_run_revision\" AND (jsonPayload.message=\"impersonation.anomaly\" OR textPayload:\"impersonation.anomaly\")"
+      }
+    }
+  ],
+  "notificationChannels": [
+    "projects/lumi-ninc-au/notificationChannels/6689107490351214266",
+    "projects/lumi-ninc-au/notificationChannels/11207813659675718192"
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": { "period": "300s" },
+    "autoClose": "1800s"
+  },
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "Immediately review active developer sessions and audit events. Revoke the session or the developer allowlist entry if activity was not explicitly authorised."
+  },
+  "userLabels": { "service": "lumi", "severity": "critical", "signal": "security" }
+}

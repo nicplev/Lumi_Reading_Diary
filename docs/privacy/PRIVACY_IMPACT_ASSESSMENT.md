@@ -1,0 +1,171 @@
+# Lumi Privacy Impact Assessment
+
+**Version:** 0.9 working assessment
+**Assessment date:** 17 July 2026
+**Owner:** Lumi founder / privacy lead (approval pending)
+**Scope:** Flutter parent and teacher apps, school portal, super-admin portal,
+Firebase/GCP production services, comprehension recording, optional diagnostics,
+support and the proposed AI comprehension evaluation.
+**Decision:** Conditional technical go for the core reading diary; no-go for
+provider-connected AI processing and no broad school launch until the open
+high-risk actions below have an accountable owner and evidence.
+
+This is an operational privacy assessment, not legal advice. It follows the
+OAIC's ten-step PIA process and must be reviewed by Australian privacy counsel
+before Lumi relies on a legal conclusion.
+
+## 1. Threshold assessment
+
+A PIA is required. Lumi handles identifiable information about children,
+parents, carers, teachers and schools, including educational activity,
+free-text messages and optional voice recordings. A compromise or incorrect
+tenant boundary could expose children across families or schools.
+
+The OAIC recommends a PIA for projects involving personal information and
+treats it as an ongoing process, not a one-time document:
+
+- https://www.oaic.gov.au/privacy/privacy-guidance-for-organisations-and-government-agencies/privacy-impact-assessments/10-steps-to-undertaking-a-privacy-impact-assessment
+- https://education.oaic.gov.au/elearning/pia/topic1.html
+
+## 2. Purpose and necessity
+
+| Information | Purpose | Strictly necessary? | Default / minimisation |
+| --- | --- | --- | --- |
+| Child name, class and school | Show the correct roster and bind access | Yes for the school service | School-scoped; no public directory |
+| Reading date, minutes, title and completion | Reading diary and teacher progress view | Yes, except optional notes/feelings | Required fields are narrow; optional fields may be omitted |
+| Parent/teacher identity and contact | Authentication, authority, recovery and service messages | Yes | Role comes from server-owned membership, not client claims |
+| Parent–child and teacher–class links | Authorisation | Yes | Authoritative school records; no client self-grant |
+| Comments | Optional parent–teacher communication | No | Per-school feature switch; access follows the parent log and class |
+| Comprehension voice recording | Optional teacher review | No | Off by default per school; explicit parent action; separate retention |
+| Product analytics | Improve product use | No | Adult opt-in, off by default, no Lumi UID or detailed reading attributes |
+| Crash reports | Diagnose failures | No | Adult opt-in, off by default, no Lumi UID attached |
+| ISBN/title sent to public book APIs | Book metadata | Helpful but replaceable by manual entry | No school, account or child identifier sent |
+| AI transcript/evaluation | Proposed comprehension feedback | No | Production kill switch off; no provider secret or connected pipeline |
+
+## 3. Information flows
+
+The detailed register is `VENDOR_DATA_FLOW_REGISTER.md`. The main paths are:
+
+1. An adult authenticates through Firebase Authentication.
+2. The app reads and writes school-scoped data in Firestore under Security
+   Rules that bind the account to the school, class, child and record.
+3. Optional audio uploads to a create-only pending Storage path. An isolated
+   AU Cloud Run worker decodes and canonicalises bytes without receiving child,
+   school, log or account identifiers. The privileged Function publishes the
+   validated object and server receipt.
+4. Push notification tokens and adult notification content flow through FCM
+   and the device platform. Transactional adult email flows through SendGrid.
+5. Optional Analytics and Crashlytics traffic is disabled until an adult opts
+   in on that device.
+6. ISBN/title-only book lookups go directly to Google Books or Open Library.
+7. AI provider processing is prohibited until a separate approved PIA update,
+   contract, APP 8 assessment, retention decision and spend controls exist.
+
+## 4. Current controls
+
+- Firestore and Storage Rules have explicit cross-school, cross-class and
+  cross-family negative tests; subcollections do not rely on inheritance.
+- Roles and system fields are server-owned. Dedicated keyless runtime service
+  accounts replaced default-account Editor access.
+- App Check is integrated and release builds fail closed if it is omitted, but
+  managed-service enforcement awaits store-signed attestation evidence.
+- Analytics and Crashlytics are independently off by default and adult
+  controlled. Physical iPhone traffic evidence confirmed withdrawal.
+- Voice is off by default per school and the AI pipeline remains off.
+- Account and student deletion are idempotent server jobs; pending audio is
+  removed after 24 hours and deletion receipts after 90 days.
+- Firestore has seven-day point-in-time recovery and deletion protection.
+- Thirteen production anomaly policies, a project budget and a security/cost
+  dashboard are live.
+- Public privacy, terms and support pages return HTTP 200.
+
+## 5. Privacy risk register
+
+Likelihood and impact are rated Low / Medium / High after current controls.
+
+| ID | Risk | Likelihood | Impact | Required treatment | Status |
+| --- | --- | --- | --- | --- | --- |
+| P-01 | Teacher/parent can access another class, family or school | Low | High | Maintain rule tests for every changed collection and production denial canaries | Controlled; review every auth/data release |
+| P-02 | Client forges role, ownership, timestamps, stats or system fields | Low | High | Keep roles/system fields server-owned and schemas allow-listed | Controlled |
+| P-03 | Voice recorded without documented school authority or retained too long | Medium | High | Obtain school authority/notice evidence before enabling; choose and record retention days; quarterly audit enabled schools | Open release blocker |
+| P-04 | Transcript/audio disclosed to an overseas AI provider or used for training | Medium if enabled | High | Keep kill switch off; execute DPA; document countries/subprocessors, ZDR/training, deletion and APP 8 steps; approve a new PIA | Blocked by design / no-go |
+| P-05 | Optional SDK sends data before consent or policy differs from runtime | Low | Medium | Keep native+Dart defaults off; repeat store-signed traffic capture and questionnaires every SDK change | Store evidence open |
+| P-06 | App Check enforcement locks out real users or is left unenforced indefinitely | Medium | Medium | Observe store-attested valid traffic, stage enforcement, monitor denials and maintain rollback | Store evidence open |
+| P-07 | Deletion fails partially, misses a subcollection/object or backup copy | Low | High | Retain integration tests and job receipts; complete signed-in device retest; document PITR/beyond-use period | Device retest open |
+| P-08 | Overseas provider/support access is not contractually assessed | Medium | High | Complete vendor DPA, subprocessor, location, support-access and APP 8 evidence register | Open release blocker |
+| P-09 | Unbounded reads/listeners expose more data than needed and create cost pressure | Medium | Medium | Finish pagination, listener inventory and 30/100/1,000-student load profiles | In progress |
+| P-10 | Security alert is missed or incident response is improvised | Medium | High | Confirm both alert inboxes; approve response roles; run six-monthly tabletop | Technical drill complete; owner sign-off open |
+| P-11 | Support/access/deletion requester impersonates a parent or school | Medium | High | Verify authority through existing account and school contact; never act from an unverified email alone; log decisions | Procedure defined; exercise required |
+| P-12 | Book lookup leaks child context through titles/searches | Low | Medium | Send only ISBN/title; never include child, school, notes or account identifiers; retain manual entry | Controlled |
+
+## 6. APP and children's-code alignment
+
+- **APP 1 / governance:** this PIA, the vendor register, release gate and breach
+  plan establish documented practices. Named ownership and counsel approval
+  remain open.
+- **APP 3 / collection:** the purpose table records necessity; voice,
+  diagnostics and AI are not treated as necessary core data.
+- **APP 5 / notice:** the live privacy page describes categories, providers,
+  location, optional diagnostics and deletion. School-specific voice notice and
+  authority evidence remain open.
+- **APP 6 / use and disclosure:** school use is role/class/child-scoped. New
+  vendors or AI purposes require change review.
+- **APP 8 / overseas recipients:** contracts and overseas support/subprocessor
+  evidence are not complete. The OAIC notes that reasonable steps may be
+  required before disclosure and an entity may remain accountable for an
+  overseas recipient: https://www.oaic.gov.au/privacy/australian-privacy-principles/australian-privacy-principles-guidelines/chapter-8-app-8-cross-border-disclosure-of-personal-information
+- **APP 10 / quality:** schools and parents can correct records; support must
+  verify authority before making corrections.
+- **APP 11 / security and destruction:** technical controls are strong, but
+  provider deletion verification, retention schedules and the device deletion
+  retest remain. OAIC guidance requires active security measures and reasonable
+  destruction/de-identification when data is no longer needed:
+  https://www.oaic.gov.au/privacy/australian-privacy-principles/australian-privacy-principles-guidelines/chapter-11-app-11-security-of-personal-information
+- **APP 12/13 / access and correction:** requests use the school or
+  `support@lumi-reading.com`; the response workflow must record identity,
+  authority, scope, decision and completion.
+
+The Children's Online Privacy Code is still an exposure draft as at this
+assessment. Lumi should nevertheless apply best interests, high privacy by
+default, strict necessity and accessible deletion now. Final legal applicability
+must be rechecked when the Code is registered by 10 December 2026:
+https://www.oaic.gov.au/privacy/privacy-registers/privacy-codes/childrens-online-privacy-code
+
+## 7. Recommendations and release decision
+
+### Must close before processing real school voice or AI data
+
+- [ ] Record the enabling school's authority, notice/consent basis, contact and
+  chosen audio retention period.
+- [ ] Complete Google/Firebase and SendGrid DPA/subprocessor/location/support
+  evidence and an APP 8 decision approved by counsel.
+- [ ] Keep AI provider processing disabled until a separate approved PIA and
+  vendor controls exist.
+- [ ] Confirm both security alert inboxes and the support mailbox are monitored.
+- [ ] Complete the user's signed-in account/student deletion device test.
+
+### Must close before public store launch
+
+- [ ] Obtain store-signed App Attest/Play Integrity evidence and stage App Check
+  enforcement without breaking supported versions.
+- [ ] Make live App Store/Play privacy questionnaires match the final binary.
+- [ ] Scan final signed artifacts and register production signing identities.
+- [ ] Obtain owner and Australian privacy-counsel approval of this PIA.
+
+### First-month work
+
+- [ ] Finish pagination/load tests and tune alert thresholds after a pilot.
+- [ ] Review retention and destruction evidence monthly during beta.
+- [ ] Run the breach tabletop every six months and after a material incident.
+
+## 8. Approval and review
+
+| Role | Name | Decision | Date |
+| --- | --- | --- | --- |
+| Product/privacy owner | Pending | Pending | — |
+| Technical/security reviewer | Pending | Pending | — |
+| Australian privacy counsel | Pending | Pending | — |
+
+Review this assessment on every release that changes authentication, child
+data, Storage, voice/AI, analytics, vendors, retention or deletion, and at least
+quarterly while schools are in beta.

@@ -304,7 +304,7 @@ class ReadingLogService {
   /// How long the interactive online write waits for a SERVER ack before
   /// falling back to the offline queue. With offline persistence enabled, a
   /// `set()` Future resolves only on server ack — on "healthy-looking but
-  /// dead" school wifi (the status probe refreshes every ~30s, so a stale
+  /// dead" school wifi (the status probe refreshes every ~600s, so a stale
   /// healthy verdict is possible) it used to hang the save spinner forever.
   static const Duration _onlineWriteAckTimeout = Duration(seconds: 15);
 

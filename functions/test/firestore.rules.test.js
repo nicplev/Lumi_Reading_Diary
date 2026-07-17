@@ -2138,6 +2138,33 @@ test('impersonation: dev cannot write userSchoolIndex', async () => {
   );
 });
 
+test('userMembershipIndex: signed-in users cannot read UID membership index', async () => {
+  const parentUid = 'membership_index_parent';
+  await seedData(async (db) => {
+    await db.collection('userMembershipIndex').doc(parentUid).set({
+      userId: parentUid,
+      schoolId: SCHOOL_A,
+      userType: 'parent',
+    });
+  });
+  const db = authDb(parentUid);
+  await assertFails(
+    db.collection('userMembershipIndex').doc(parentUid).get(),
+  );
+});
+
+test('userMembershipIndex: signed-in users cannot forge UID membership index', async () => {
+  const parentUid = 'membership_index_parent';
+  const db = authDb(parentUid);
+  await assertFails(
+    db.collection('userMembershipIndex').doc(parentUid).set({
+      userId: parentUid,
+      schoolId: SCHOOL_B,
+      userType: 'parent',
+    }),
+  );
+});
+
 test('impersonation: devReadOnly claim alone (no impersonating flag) still blocks writes', async () => {
   const db = authDb(DEV_UID, { devReadOnly: true });
   await assertFails(

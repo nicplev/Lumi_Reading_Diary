@@ -1,0 +1,33 @@
+{
+  "displayName": "Lumi production: Firestore write-volume spike",
+  "combiner": "OR",
+  "enabled": true,
+  "conditions": [
+    {
+      "displayName": "More than 5,000 successful writes in one hour",
+      "conditionThreshold": {
+        "filter": "resource.type=\"firestore_instance\" AND metric.type=\"firestore.googleapis.com/document/write_count\"",
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 5000,
+        "duration": "0s",
+        "aggregations": [
+          {
+            "alignmentPeriod": "3600s",
+            "perSeriesAligner": "ALIGN_SUM",
+            "crossSeriesReducer": "REDUCE_SUM"
+          }
+        ],
+        "trigger": { "count": 1 }
+      }
+    }
+  ],
+  "notificationChannels": [
+    "projects/lumi-ninc-au/notificationChannels/6689107490351214266",
+    "projects/lumi-ninc-au/notificationChannels/11207813659675718192"
+  ],
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "Investigate retry loops, runaway counters, compromised clients and bulk mutations. The preceding 30-day maximum was 1,964 writes/hour."
+  },
+  "userLabels": { "service": "lumi", "severity": "high", "signal": "cost" }
+}

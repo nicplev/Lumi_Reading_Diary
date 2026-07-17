@@ -1,0 +1,33 @@
+{
+  "displayName": "Lumi production: Firebase Storage egress spike",
+  "combiner": "OR",
+  "enabled": true,
+  "conditions": [
+    {
+      "displayName": "More than 50 MiB sent from the user-content bucket in one hour",
+      "conditionThreshold": {
+        "filter": "resource.type=\"gcs_bucket\" AND resource.labels.bucket_name=\"lumi-ninc-au.firebasestorage.app\" AND metric.type=\"storage.googleapis.com/network/sent_bytes_count\"",
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 52428800,
+        "duration": "0s",
+        "aggregations": [
+          {
+            "alignmentPeriod": "3600s",
+            "perSeriesAligner": "ALIGN_SUM",
+            "crossSeriesReducer": "REDUCE_SUM"
+          }
+        ],
+        "trigger": { "count": 1 }
+      }
+    }
+  ],
+  "notificationChannels": [
+    "projects/lumi-ninc-au/notificationChannels/6689107490351214266",
+    "projects/lumi-ninc-au/notificationChannels/11207813659675718192"
+  ],
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "Investigate leaked signed URLs, abusive playback/download loops and unexpected public access. This is scoped only to the Firebase user-content bucket; the preceding 30-day maximum was about 1.5 MB/hour."
+  },
+  "userLabels": { "service": "lumi", "severity": "high", "signal": "egress" }
+}

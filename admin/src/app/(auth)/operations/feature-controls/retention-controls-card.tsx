@@ -16,12 +16,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { formatDateTime } from "@/lib/utils";
-import {
-  MIN_RETENTION_DAYS,
-  MAX_RETENTION_DAYS,
-  type ComprehensionRetentionConfig,
-  type RunRetentionNowOutcome,
+import type {
+  ComprehensionRetentionConfig,
+  RunRetentionNowOutcome,
 } from "@lumi/server-ops";
+
+// UI guidance only. The API independently enforces the authoritative 7–730 day
+// bounds, so these values are not part of the security boundary.
+const MIN_RETENTION_DAYS = 7;
+const MAX_RETENTION_DAYS = 730;
 
 interface Props {
   initialConfig: ComprehensionRetentionConfig;

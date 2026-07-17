@@ -488,6 +488,11 @@ export async function deleteAccountData(uid: string): Promise<Counts> {
     "userIndexesDeleted",
     counts
   );
+  const membershipIndex = db.doc(`userMembershipIndex/${uid}`);
+  if ((await membershipIndex.get()).exists) {
+    await membershipIndex.delete();
+    bump(counts, "userMembershipIndexesDeleted");
+  }
   await deleteMatchingDocs(
     db.collection("feedback").where("userId", "==", uid),
     "feedbackDeleted",

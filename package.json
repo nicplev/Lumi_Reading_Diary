@@ -8,5 +8,14 @@
     "admin:build": "pnpm --filter lumi-admin-scaffold build",
     "admin:lint": "pnpm --filter lumi-admin-scaffold lint",
     "typecheck": "pnpm -r --if-present exec tsc --noEmit"
+  },
+  "pnpm": {
+    "overrides": {
+      "@grpc/grpc-js": "1.14.4",
+      "form-data@<2.5.6": "2.5.6",
+      "hono": "4.12.30",
+      "protobufjs": "7.6.3",
+      "websocket-driver": "0.7.5"
+    }
   }
 }

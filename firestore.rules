@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Healthcheck doc read by every client every ~30s as the L3 probe.
+    // Healthcheck doc read by every foreground client every ~600s as the L3 probe.
     // Tiny, public to signed-in users, never written from the client.
     // Seed once via an admin script: `_meta/healthcheck = { version: 1 }`.
     match /_meta/healthcheck {
@@ -1129,6 +1129,12 @@ service cloud.firestore {
           resource.data.userId == request.auth.uid;
 
       allow list: if false;
+    }
+
+    // O(1) login fallback maintained only by server-side membership triggers.
+    // Clients do not need to know whether an arbitrary UID belongs to a school.
+    match /userMembershipIndex/{uid} {
+      allow read, write: if false;
     }
 
     // Dev-access allowlist is server-only. Mobile self-checks go through the

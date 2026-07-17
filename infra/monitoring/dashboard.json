@@ -1,0 +1,177 @@
+{
+  "displayName": "Lumi production security and cost",
+  "mosaicLayout": {
+    "columns": 48,
+    "tiles": [
+      {
+        "xPos": 0,
+        "yPos": 0,
+        "width": 24,
+        "height": 16,
+        "widget": {
+          "title": "Firestore successful reads",
+          "xyChart": {
+            "dataSets": [{
+              "plotType": "LINE",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "resource.type=\"firestore_instance\" AND metric.type=\"firestore.googleapis.com/document/read_count\"",
+                  "aggregation": { "alignmentPeriod": "3600s", "perSeriesAligner": "ALIGN_SUM", "crossSeriesReducer": "REDUCE_SUM" }
+                }
+              }
+            }],
+            "yAxis": { "label": "reads/hour", "scale": "LINEAR" }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 0,
+        "width": 24,
+        "height": 16,
+        "widget": {
+          "title": "Firestore successful writes",
+          "xyChart": {
+            "dataSets": [{
+              "plotType": "LINE",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "resource.type=\"firestore_instance\" AND metric.type=\"firestore.googleapis.com/document/write_count\"",
+                  "aggregation": { "alignmentPeriod": "3600s", "perSeriesAligner": "ALIGN_SUM", "crossSeriesReducer": "REDUCE_SUM" }
+                }
+              }
+            }],
+            "yAxis": { "label": "writes/hour", "scale": "LINEAR" }
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 16,
+        "width": 24,
+        "height": 16,
+        "widget": {
+          "title": "Cloud Run 5xx responses",
+          "xyChart": {
+            "dataSets": [{
+              "plotType": "STACKED_BAR",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "resource.type=\"cloud_run_revision\" AND metric.type=\"run.googleapis.com/request_count\" AND metric.labels.response_code_class=\"5xx\"",
+                  "aggregation": { "alignmentPeriod": "300s", "perSeriesAligner": "ALIGN_SUM", "crossSeriesReducer": "REDUCE_SUM" }
+                }
+              }
+            }],
+            "yAxis": { "label": "errors/5m", "scale": "LINEAR" }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 16,
+        "width": 24,
+        "height": 16,
+        "widget": {
+          "title": "Cloud Run egress",
+          "xyChart": {
+            "dataSets": [{
+              "plotType": "LINE",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "resource.type=\"cloud_run_revision\" AND metric.type=\"run.googleapis.com/container/network/sent_bytes_count\"",
+                  "aggregation": { "alignmentPeriod": "3600s", "perSeriesAligner": "ALIGN_SUM", "crossSeriesReducer": "REDUCE_SUM" }
+                }
+              }
+            }],
+            "yAxis": { "label": "bytes/hour", "scale": "LINEAR" }
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 32,
+        "width": 24,
+        "height": 16,
+        "widget": {
+          "title": "Firebase user-content Storage egress",
+          "xyChart": {
+            "dataSets": [{
+              "plotType": "LINE",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "resource.type=\"gcs_bucket\" AND resource.labels.bucket_name=\"lumi-ninc-au.firebasestorage.app\" AND metric.type=\"storage.googleapis.com/network/sent_bytes_count\"",
+                  "aggregation": { "alignmentPeriod": "3600s", "perSeriesAligner": "ALIGN_SUM", "crossSeriesReducer": "REDUCE_SUM" }
+                }
+              }
+            }],
+            "yAxis": { "label": "bytes/hour", "scale": "LINEAR" }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 32,
+        "width": 24,
+        "height": 16,
+        "widget": {
+          "title": "Firebase user-content Storage footprint",
+          "xyChart": {
+            "dataSets": [{
+              "plotType": "LINE",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "resource.type=\"gcs_bucket\" AND resource.labels.bucket_name=\"lumi-ninc-au.firebasestorage.app\" AND metric.type=\"storage.googleapis.com/storage/total_bytes\"",
+                  "aggregation": { "alignmentPeriod": "86400s", "perSeriesAligner": "ALIGN_MAX", "crossSeriesReducer": "REDUCE_SUM" }
+                }
+              }
+            }],
+            "yAxis": { "label": "bytes", "scale": "LINEAR" }
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 48,
+        "width": 24,
+        "height": 16,
+        "widget": {
+          "title": "App Check denied verdicts",
+          "xyChart": {
+            "dataSets": [{
+              "plotType": "STACKED_BAR",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "resource.type=\"firebaseappcheck.googleapis.com/Instance\" AND metric.type=\"firebaseappcheck.googleapis.com/services/verdict_count\" AND metric.labels.result=\"DENY\"",
+                  "aggregation": { "alignmentPeriod": "300s", "perSeriesAligner": "ALIGN_SUM", "crossSeriesReducer": "REDUCE_SUM" }
+                }
+              }
+            }],
+            "yAxis": { "label": "denials/5m", "scale": "LINEAR" }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 48,
+        "width": 24,
+        "height": 16,
+        "widget": {
+          "title": "Firestore Rules evaluation errors",
+          "xyChart": {
+            "dataSets": [{
+              "plotType": "STACKED_BAR",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "resource.type=\"firestore.googleapis.com/Database\" AND metric.type=\"firestore.googleapis.com/rules/evaluation_count\" AND metric.labels.result=\"ERROR\"",
+                  "aggregation": { "alignmentPeriod": "300s", "perSeriesAligner": "ALIGN_SUM", "crossSeriesReducer": "REDUCE_SUM" }
+                }
+              }
+            }],
+            "yAxis": { "label": "errors/5m", "scale": "LINEAR" }
+          }
+        }
+      }
+    ]
+  },
+  "labels": { "service": "lumi", "purpose": "security-cost" }
+}

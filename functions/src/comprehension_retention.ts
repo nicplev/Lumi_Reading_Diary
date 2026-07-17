@@ -77,7 +77,7 @@ const AUDIO_VALIDATOR_REGION = "australia-southeast1";
 const AUDIO_VALIDATOR_SERVICE_ACCOUNT =
   "lumi-audio-validator@lumi-ninc-au.iam.gserviceaccount.com";
 const AUDIO_VALIDATOR_CALLER =
-  "lumi-ninc-au@appspot.gserviceaccount.com";
+  "lumi-functions-runtime@lumi-ninc-au.iam.gserviceaccount.com";
 const AUDIO_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const AUDIO_RATE_LIMIT_MAX_ATTEMPTS = 20;
 const PENDING_AUDIO_MAX_AGE_MS = 24 * 60 * 60 * 1000;

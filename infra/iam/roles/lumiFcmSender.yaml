@@ -1,0 +1,6 @@
+title: Lumi FCM Sender
+description: Send Firebase Cloud Messaging notifications without topic-administration access.
+stage: GA
+includedPermissions:
+  - cloudmessaging.messages.create
+  - resourcemanager.projects.get

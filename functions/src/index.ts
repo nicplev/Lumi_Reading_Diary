@@ -142,6 +142,13 @@ export {verifySchoolCode} from "./code_verification";
 // later be removed. Dormant until the app adopts it. See school_resolution.ts.
 export {resolveUserSchoolByUid} from "./school_resolution";
 
+// Server-owned O(1) UID-to-membership index. These triggers remove the last
+// login fallback that scanned every school's membership subcollection.
+export {
+  maintainParentMembershipIndex,
+  maintainStaffMembershipIndex,
+} from "./membership_index";
+
 // Access/licensing lifecycle. T1 reacts to subscription changes to recompute
 // school.access + cascade student access. T2 (renewStudents callable) + T4
 // (annualRollover cron) live in functions/src/renewals.ts. See
