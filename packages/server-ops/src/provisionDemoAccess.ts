@@ -161,17 +161,18 @@ export async function provisionDemoAccess(
       // TOTP exception is safe only while it is coupled to read-only claims.
       multiFactor: { enrolledFactors: [] },
     });
+    // Replace, rather than spread, custom claims. These are shared accounts;
+    // preserving a stale developer/impersonation/admin capability would turn
+    // a harmless demo credential into a privileged production credential.
     const claims: Record<string, unknown> = {
-      ...(authUser.customClaims ?? {}),
       demoAccount: true,
       demoSchoolId: schoolId,
+      schoolId,
     };
     if (spec.role === "admin") {
       claims.demoAdminMfaExempt = true;
       claims.demoReadOnly = true;
-    } else {
-      delete claims.demoAdminMfaExempt;
-      delete claims.demoReadOnly;
+      claims.demoInteractive = true;
     }
     await auth.setCustomUserClaims(uid, claims);
     accounts.push({ role: spec.role, email: spec.email, uid });

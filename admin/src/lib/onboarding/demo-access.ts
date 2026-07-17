@@ -4,6 +4,7 @@ import { getAdminAuth, getAdminDb } from "@/lib/firebase-admin";
 import { provisionDemoAccess, type DemoAccessAccount } from "@lumi/server-ops";
 import { logAuditEvent } from "@/lib/firestore/audit-log";
 import { readDemoAccessConfig, sydneyDayKey } from "@/lib/firestore/demo-access";
+import { runDemoReseed } from "@/lib/demo/reseed";
 
 // 400/409-class errors surfaced to the operator (mirrors OnboardingProvisionError).
 export class DemoAccessError extends Error {
@@ -38,6 +39,20 @@ export async function provisionDemoAccessForOnboarding(
 
   const config = await readDemoAccessConfig();
   const dayKey = sydneyDayKey();
+
+  // Decide before issuing credentials. provisionDemoAccess would report
+  // reused:false for exactly this state; refreshing first ensures interactive
+  // claims are never finalised against stale/partially rebuilt demo data.
+  const stateSnap = await db.doc("demoAccess/state").get();
+  const state = stateSnap.data();
+  const wouldReuse =
+    stateSnap.exists &&
+    state?.dayKey === dayKey &&
+    state?.scrambledAt == null &&
+    typeof state?.password === "string";
+  if (!wouldReuse) {
+    await runDemoReseed(actor, "provision");
+  }
 
   const result = await provisionDemoAccess(getAdminAuth(), db, actor, {
     config: {

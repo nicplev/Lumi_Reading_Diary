@@ -16,6 +16,7 @@ import { SchoolParentsTab } from "./school-parents-tab";
 import { SchoolSubscriptionTab } from "./school-subscription-tab";
 import type { SchoolSubscriptionRow } from "@/lib/firestore/school-subscriptions";
 import { SchoolDemoAccessTab } from "./school-demo-access-tab";
+import { SchoolDemoControlsTab } from "./school-demo-controls-tab";
 import type { DemoEmailHistoryItem } from "@/lib/firestore/demo-access";
 
 interface SchoolDetailTabsProps {
@@ -62,6 +63,9 @@ export function SchoolDetailTabs({
         <TabsTrigger value="students">Students</TabsTrigger>
         <TabsTrigger value="classes">Classes</TabsTrigger>
         <TabsTrigger value="parents">Parents</TabsTrigger>
+        {showDemoTab && (
+          <TabsTrigger value="demo-controls">Demo controls</TabsTrigger>
+        )}
         {showDemoTab && (
           <TabsTrigger value="demo-access">Demo access</TabsTrigger>
         )}
@@ -110,6 +114,11 @@ export function SchoolDetailTabs({
       <TabsContent value="parents">
         <SchoolParentsTab schoolId={school.id} parents={parents} />
       </TabsContent>
+      {showDemoTab && (
+        <TabsContent value="demo-controls">
+          <SchoolDemoControlsTab />
+        </TabsContent>
+      )}
       {showDemoTab && (
         <TabsContent value="demo-access">
           <SchoolDemoAccessTab emails={demoAccessEmails ?? []} />

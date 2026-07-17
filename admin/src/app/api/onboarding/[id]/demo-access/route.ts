@@ -7,6 +7,11 @@ import {
 } from "@/lib/onboarding/demo-access";
 import { demoAccessActionSchema } from "@/lib/validations/onboarding";
 import { ServerOpsValidationError } from "@lumi/server-ops";
+import {
+  assertSameOrigin,
+  consumeDemoRouteLimits,
+  DemoRouteSecurityError,
+} from "@/lib/demo/security";
 
 // POST /api/onboarding/[id]/demo-access
 //   { action: "provision" }  → issue/reuse today's shared demo password
@@ -21,18 +26,30 @@ export async function POST(
   }
 
   try {
+    assertSameOrigin(request);
     const { id } = await params;
     const body = await request.json();
     const parsed = demoAccessActionSchema.parse(body);
     const actor = { uid: session.uid, email: session.email ?? undefined };
 
     if (parsed.action === "provision") {
+      await consumeDemoRouteLimits([
+        { key: `provision:actor:${session.uid}`, max: 5, windowMs: 60 * 60 * 1000 },
+        { key: "provision:global", max: 10, windowMs: 60 * 60 * 1000 },
+      ]);
       const result = await provisionDemoAccessForOnboarding(actor, id);
       return NextResponse.json({ success: true, ...result });
     }
+    await consumeDemoRouteLimits([
+      { key: `demo-email:actor:${session.uid}`, max: 10, windowMs: 60 * 60 * 1000 },
+      { key: "demo-email:global", max: 30, windowMs: 60 * 60 * 1000 },
+    ]);
     const result = await sendDemoAccessEmail(actor, id);
     return NextResponse.json({ success: true, ...result });
   } catch (error: unknown) {
+    if (error instanceof DemoRouteSecurityError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     if (error instanceof Error && error.name === "ZodError") {
       return NextResponse.json(
         {

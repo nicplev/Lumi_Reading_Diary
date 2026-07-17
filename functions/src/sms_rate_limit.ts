@@ -20,6 +20,7 @@ import * as admin from "firebase-admin";
 import * as functions from "firebase-functions/v1";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {errorCodeForLog} from "./log_safety";
+import {assertNotReadOnly} from "./read_only_guard";
 
 // App Check enforcement, opt-in via env var (default OFF). Flip only after the
 // client attestation rollout is verified (1.6). App Check attests the APP, not
@@ -98,6 +99,7 @@ export const requestSmsVerification = onCall({
   enforceAppCheck: SMS_APP_CHECK_ENFORCED,
   consumeAppCheckToken: SMS_APP_CHECK_ENFORCED,
 }, async (request) => {
+  assertNotReadOnly(request);
   const data = request.data;
   const phone = normalizePhone(data?.phoneE164);
   const purpose = typeof data?.purpose === "string" ? data.purpose : "";

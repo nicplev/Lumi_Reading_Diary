@@ -1,103 +1,11 @@
-#!/usr/bin/env node
+import { createHash } from "node:crypto";
 
-// DEPRECATED: retained temporarily for parity review only. New destructive
-// refreshes must use scripts/reseed_demo_school.ts, whose server-ops backend
-// uses an isDemo guard, a fencing lease, exact claims and fail-closed status.
-/**
- * Seed (or reset) the sales-demo school: "Lumi Demo Primary School".
- *
- * Creates a fully-populated, clearly-marked demo tenant so live demos never
- * start from an empty school: staff + parent accounts, classes, 16 students
- * with 60 days of reading logs, streaks, achievements, allocations, a
- * parent↔teacher comment thread, and active parent link codes.
- * See docs/demo-playbook.md for the demo flow this data is designed around.
- *
- * Usage:
- *   DEMO_PASSWORD='<secret from your password manager>' \
- *   FIREBASE_ADMIN_SERVICE_ACCOUNT_PATH=/abs/path/to/service-account.json \
- *     node scripts/seed_demo_school.js [--dry-run] [--reset] [--yes]
- *
- *   OR with Application Default Credentials:
- *     gcloud auth application-default login
- *     node scripts/seed_demo_school.js [flags]
- *
- * Flags:
- *   --dry-run   Print the full planned write-set and exit. Never connects to
- *               Firebase, so it works without credentials or node_modules
- *               network access. Run this first.
- *   --reset     Wipe the demo school (Auth users, index entries, link codes,
- *               school doc + all subcollections) and re-seed it fresh.
- *               Refuses to touch any school whose doc lacks `isDemo: true`.
- *   --yes       Skip the interactive project-id confirmation (CI/scripted).
- *
- * Dependency resolution: firebase-admin is not installed at the repo root
- * (pnpm monorepo). The script auto-falls-back to functions/node_modules, so:
- *   cd functions && npm install && cd .. && node scripts/seed_demo_school.js
- *
- * Idempotent: every document has a deterministic ID; re-running updates the
- * same docs in place. Log dates are derived from "today", so re-running on a
- * later day shifts the reading history window forward (run before each demo
- * day — or just run --reset, which is the recommended pre-demo ritual).
- *
- * Interaction with Cloud Functions triggers (safe, but know what fires):
- *   - validateReadingLog (onCreate readingLogs) checks minutes 1-240, that
- *     the student exists, and that the log's parentId is in the student's
- *     parentIds. Seeding order (students before logs) and the ghost-parent
- *     linking below are arranged so every seeded log validates.
- *   - aggregateStudentStats / class stats recompute from the logs on every
- *     log write. The stats this script writes are computed from the same
- *     seeded logs, so trigger recomputes converge to the same numbers
- *     (the weekly reconciler repairs any streak-tolerance nuance).
- *   - detectAchievements fires on student-doc *updates* only; initial seeding
- *     uses set(), and pre-earned achievement ids are deduped by the trigger,
- *     so badges are not double-awarded during live demo logging.
- *
- * Pre-demo checklist (also in docs/demo-playbook.md):
- *   1. node scripts/seed_demo_school.js --reset      (confirm project id!)
- *   2. Log into the school-admin portal as the demo admin — charts populated.
- *   3. Log into the app as demo teacher — class 3G shows last night's logs.
- *   4. Log into the app as demo parent — Ava's streak + badges visible.
- */
-
-"use strict";
-
-// Log timestamps use local-time setHours(); pin the process to the demo
-// school's timezone so "7pm bedtime reading" is 7pm Melbourne on any host.
-// Must run before the first Date operation (Node caches the tz lazily).
-process.env.TZ = process.env.TZ || "Australia/Melbourne";
-
-const crypto = require("crypto");
-const fs = require("fs");
-const path = require("path");
-const readline = require("readline");
-
-// ─── CLI ────────────────────────────────────────────────────────────────────
-
-const argv = process.argv.slice(2);
-const DRY_RUN = argv.includes("--dry-run");
-const RESET = argv.includes("--reset");
-const ASSUME_YES = argv.includes("--yes");
-const KNOWN_FLAGS = new Set(["--dry-run", "--reset", "--yes"]);
-
-for (const arg of argv) {
-  if (!KNOWN_FLAGS.has(arg)) {
-    die(`Unknown flag: ${arg}\nUsage: node scripts/seed_demo_school.js [--dry-run] [--reset] [--yes]`);
-  }
-}
-
-function die(msg, code = 1) {
-  process.stderr.write(`${msg}\n`);
-  process.exit(code);
-}
-
-function log(msg) {
-  process.stdout.write(`${msg}\n`);
-}
-
-// ─── Small utilities ────────────────────────────────────────────────────────
+// Pure deterministic data builder mechanically extracted from the original
+// CLI seed. Keep Firebase/Auth/deletion concerns in reseed.ts; this module has
+// no credentials, network calls or environment-secret access.
 
 function sha256(s) {
-  return crypto.createHash("sha256").update(s).digest("hex");
+  return createHash("sha256").update(s).digest("hex");
 }
 
 // userSchoolIndex doc ids are sha256(lowercased trimmed email) — must match
@@ -117,7 +25,7 @@ function mulberry32(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-const rand = mulberry32(0x10a11); // fixed seed → identical data every run
+let rand = mulberry32(0x10a11); // fixed seed → identical data every run
 function pick(arr) {
   return arr[Math.floor(rand() * arr.length)];
 }
@@ -151,18 +59,10 @@ function daysAgoAt(now, daysAgo, hour, minute) {
 
 // ─── The demo cast ──────────────────────────────────────────────────────────
 
-const SCHOOL_ID = "lumi_demo_primary_school";
-const TZ = "Australia/Melbourne";
-const suppliedDemoPassword = process.env.DEMO_PASSWORD;
-if (!DRY_RUN && (!suppliedDemoPassword || suppliedDemoPassword.length < 16)) {
-  die(
-    "DEMO_PASSWORD is required and must be at least 16 characters. " +
-      "Load it from a password manager; no default password is stored in Git."
-  );
-}
-const DEMO_PASSWORD = suppliedDemoPassword || "<dry-run-secret-not-loaded>";
 const DEMO_EMAIL_DOMAIN = "lumidemo.school";
 
+const SCHOOL_ID = "lumi_demo_primary_school";
+const TZ = "Australia/Melbourne";
 const SCHOOL_NAME = "Lumi Demo Primary School";
 
 // Accounts shared with prospects on demo day. They live on @lumi-reading.com
@@ -537,6 +437,7 @@ function buildPlan(now) {
     parents: [],
     classes: [],
     students: [],
+    books: [],
     logs: [],
     comments: [],
     allocations: [],
@@ -598,7 +499,23 @@ function buildPlan(now) {
       isActive: true,
       createdAt: daysAgoAt(now, HISTORY_DAYS + 30, 9, 0),
       createdBy: adminUid,
-      settings: { readingGoalMinutes: 20 },
+      settings: {
+        readingGoalMinutes: 20,
+        messaging: { enabled: true },
+        parentComments: {
+          enabled: true,
+          freeTextEnabled: true,
+          customPresets: [
+            { id: "default-1", name: "Encouragement", chips: ["Great job!", "Keep it up!", "Loved hearing you read!", "So proud of you!"] },
+            { id: "default-2", name: "Reading Skills", chips: ["Sounded out words well", "Good finger tracking", "Read with expression", "Used picture clues"] },
+            { id: "default-3", name: "Comprehension", chips: ["Understood the story well", "Asked great questions", "Made predictions", "Retold the story"] },
+          ],
+        },
+        // Shared demo accounts cannot upload new audio. The demo controls may
+        // expose a separately governed, seeded-fixture preview later.
+        comprehensionRecording: { enabled: false },
+        quickLogging: { enabled: true },
+      },
       studentCount: STUDENTS.length,
       teacherCount: STAFF.filter((s) => s.role === "teacher").length,
       parentCount: PARENTS.length,
@@ -710,6 +627,14 @@ function buildPlan(now) {
         createdAt: daysAgoAt(now, HISTORY_DAYS + 10, 9, 0),
         enrolledAt: daysAgoAt(now, HISTORY_DAYS + 10, 9, 0),
         enrollmentStatus: s.enrollmentStatus,
+        access: {
+          status: "active",
+          academicYear: year,
+          expiresAt: new Date(`${year}-12-31T23:59:59+11:00`),
+          source: "demo_seed",
+          grantedAt: now,
+          grantedBy: "seed_demo_school",
+        },
         levelHistory: [
           {
             level: s.level,
@@ -767,23 +692,64 @@ function buildPlan(now) {
     );
   }
 
-  // Allocations for the demo class: one by-level, one weekend free-choice.
+  // School-local books and a realistic by-title allocation. ISBNs are stable
+  // published editions, verified against Australian publisher catalogues on
+  // 17 July 2026. Demo data never writes the global community catalogue.
+  const allocatedBooks = [
+    { isbn: "9781742612379", title: "The 39-Storey Treehouse", author: "Andy Griffiths", publisher: "Pan Australia" },
+    { isbn: "9781741699920", title: "The Very Cranky Bear", author: "Nick Bland", publisher: "Scholastic Press" },
+    { isbn: "9780399255373", title: "The Day the Crayons Quit", author: "Drew Daywalt", publisher: "Philomel Books" },
+  ];
+  for (const book of allocatedBooks) {
+    plan.books.push({
+      id: `isbn_${book.isbn}`,
+      data: {
+        schoolId: SCHOOL_ID,
+        title: book.title,
+        titleNormalized: book.title.toLowerCase(),
+        author: book.author,
+        isbn: book.isbn,
+        isbnNormalized: book.isbn,
+        publisher: book.publisher,
+        genres: [],
+        tags: ["demo"],
+        isActive: true,
+        createdAt: daysAgoAt(now, 21, 9, 0),
+        addedBy: teacherUid,
+        scannedByTeacherIds: [teacherUid],
+        timesAssignedSchoolWide: 1,
+        source: "demo_seed",
+      },
+    });
+  }
+
+  // Allocations for the demo class: real titles plus weekend free-choice.
   plan.allocations.push(
     {
-      id: "demo_alloc_3g_bylevel",
+      id: "demo_alloc_3g_bytitle",
       data: {
         schoolId: SCHOOL_ID,
         classId: classByKey["3g"].id,
         teacherId: teacherUid,
         studentIds: studentIdsByClass["3g"],
-        type: "byLevel",
-        cadence: "daily",
+        type: "byTitle",
+        cadence: "weekly",
         targetMinutes: 20,
         startDate: daysAgoAt(now, 30, 0, 0),
         endDate: daysAgoAt(now, -30, 0, 0), // 30 days into the future
-        levelStart: "J",
-        levelEnd: "N",
-        assignmentItems: [],
+        assignmentItems: allocatedBooks.map((book, index) => ({
+          id: `demo_item_${index + 1}`,
+          title: book.title,
+          bookId: `isbn_${book.isbn}`,
+          isbn: book.isbn,
+          isbnNormalized: book.isbn,
+          isDeleted: false,
+          addedAt: daysAgoAt(now, 7, 8, 0),
+          addedBy: teacherUid,
+          metadata: { source: "demo_seed" },
+        })),
+        bookTitles: allocatedBooks.map((book) => book.title),
+        bookIds: allocatedBooks.map((book) => `isbn_${book.isbn}`),
         schemaVersion: 2,
         isRecurring: true,
         isActive: true,
@@ -856,354 +822,18 @@ function buildPlan(now) {
 
 // ─── Dry run ────────────────────────────────────────────────────────────────
 
-function printDryRun(plan) {
-  const show = (obj) => JSON.stringify(obj, null, 2);
-  log("── DRY RUN — nothing will be written ─────────────────────────────");
-  log(`School doc:            schools/${SCHOOL_ID}  (isDemo: true)`);
-  log(`Auth users:            ${plan.authUsers.length}  (password loaded from DEMO_PASSWORD)`);
-  for (const u of plan.authUsers) log(`   • ${u.email}  uid=${u.uid}`);
-  log(`Staff docs:            ${plan.users.length} (schools/${SCHOOL_ID}/users + top-level users mirror)`);
-  log(`Parent docs:           ${plan.parents.length} (schools/${SCHOOL_ID}/parents)`);
-  log(`userSchoolIndex docs:  ${plan.indexEntries.length}`);
-  log(`Classes:               ${plan.classes.map((c) => c.data.name).join(", ")}`);
-  log(`Students:              ${plan.students.length}`);
-  for (const s of plan.students) {
-    const st = s.data.stats;
-    log(
-      `   • ${s.data.firstName} ${s.data.lastName}  level=${s.data.currentReadingLevel}` +
-        `  streak=${st.currentStreak}  days=${st.totalReadingDays}  mins=${st.totalMinutesRead}` +
-        `  badges=${s.data.achievements.length}  status=${s.data.enrollmentStatus}`
-    );
-  }
-  log(`Reading logs:          ${plan.logs.length} (last ${HISTORY_DAYS} days)`);
-  log(`Log comments:          ${plan.comments.length} (thread on the hero's latest log)`);
-  log(`Allocations:           ${plan.allocations.length}`);
-  log(`Link codes:            ${plan.linkCodes.map((c) => `${c.data.code} → ${c.data.studentId}`).join(", ")}`);
-  log("");
-  log("Sample student doc (hero):");
-  const hero = plan.students.find((s) => s.key === "ava");
-  log(show({ ...hero.data, achievements: `[${hero.data.achievements.length} badges]`, stats: hero.data.stats }));
-  log("");
-  log("Sample reading log:");
-  log(show(plan.logs[plan.logs.length - 1].data));
-  log("───────────────────────────────────────────────────────────────────");
+
+
+export function buildDemoSchoolPlanData(now = new Date()) {
+  // buildPlan used to run once per CLI process. Reset the deterministic PRNG
+  // for every server invocation so retries produce the identical document set.
+  rand = mulberry32(0x10a11);
+  return buildPlan(now);
 }
 
-// ─── Firebase plumbing ──────────────────────────────────────────────────────
-
-// firebase-admin isn't hoisted to the repo root (pnpm); fall back to the
-// functions workspace where it is a direct dependency.
-function loadFirebaseAdmin() {
-  try {
-    return require("firebase-admin");
-  } catch (_) {
-    try {
-      return require(path.join(__dirname, "..", "functions", "node_modules", "firebase-admin"));
-    } catch (_) {
-      die(
-        "Could not resolve firebase-admin. Install the functions dependencies first:\n" +
-          "  cd functions && npm install\n" +
-          "then re-run this script from the repo root."
-      );
-    }
-  }
-}
-
-function initAdmin(admin) {
-  const saPath = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT_PATH;
-  if (saPath) {
-    if (!fs.existsSync(saPath)) die(`Service account file not found at ${saPath}`);
-    const sa = JSON.parse(fs.readFileSync(saPath, "utf-8"));
-    admin.initializeApp({ credential: admin.credential.cert(sa) });
-    return sa.project_id;
-  }
-  admin.initializeApp(); // GOOGLE_APPLICATION_CREDENTIALS / gcloud ADC
-  const app = admin.app();
-  return (
-    app.options.projectId ||
-    process.env.GOOGLE_CLOUD_PROJECT ||
-    process.env.GCLOUD_PROJECT ||
-    "(unknown — check your ADC)"
-  );
-}
-
-async function confirm(projectId, mode) {
-  log("───────────────────────────────────────────────────────────────────");
-  log(`  Firebase project : ${projectId}`);
-  log(`  Mode             : ${mode}`);
-  log(`  Target school    : schools/${SCHOOL_ID} ("${SCHOOL_NAME}")`);
-  log("───────────────────────────────────────────────────────────────────");
-  if (ASSUME_YES) return;
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const answer = await new Promise((resolve) => rl.question("Proceed? Type 'yes' to continue: ", resolve));
-  rl.close();
-  if (answer.trim().toLowerCase() !== "yes") die("Aborted — nothing written.", 0);
-}
-
-// ─── Reset ──────────────────────────────────────────────────────────────────
-
-async function resetDemoSchool(admin, db, plan) {
-  const schoolRef = db.collection("schools").doc(SCHOOL_ID);
-  const snap = await schoolRef.get();
-
-  if (snap.exists && snap.data().isDemo !== true) {
-    die(
-      `SAFETY STOP: schools/${SCHOOL_ID} exists but does not have isDemo: true.\n` +
-        "Refusing to delete a school that is not marked as demo data."
-    );
-  }
-
-  if (snap.exists) {
-    log("Deleting demo school document tree (subcollections included)…");
-    // recursiveDelete (firebase-admin ≥ 10.1) removes the doc and every
-    // nested subcollection, including readingLogs/{id}/comments.
-    if (typeof db.recursiveDelete === "function") {
-      await db.recursiveDelete(schoolRef);
-    } else {
-      die("This firebase-admin version lacks recursiveDelete; upgrade functions/node_modules (needs >= 10.1).");
-    }
-  } else {
-    log("No existing demo school doc — skipping tree delete.");
-  }
-
-  // Top-level artifacts that live outside the school tree.
-  log("Deleting demo link codes…");
-  const codes = await db.collection("studentLinkCodes").where("schoolId", "==", SCHOOL_ID).get();
-  for (const doc of codes.docs) await doc.ref.delete();
-
-  log("Deleting demo userSchoolIndex entries + top-level user mirrors…");
-  for (const entry of plan.indexEntries) {
-    await db.collection("userSchoolIndex").doc(entry.id).delete();
-  }
-  for (const user of plan.users) {
-    await db.collection("users").doc(user.id).delete();
-  }
-
-  log("Deleting demo Auth users…");
-  for (const u of plan.authUsers) {
-    try {
-      const existing = await admin.auth().getUserByEmail(u.email);
-      await admin.auth().deleteUser(existing.uid);
-      log(`   • deleted ${u.email}`);
-    } catch (err) {
-      if (err.code !== "auth/user-not-found") throw err;
-    }
-  }
-  log("Reset complete.\n");
-}
-
-// ─── Seed ───────────────────────────────────────────────────────────────────
-
-async function ensureAuthUsers(admin, plan) {
-  log("Ensuring Auth users (emailVerified, no MFA — demo accounts must log in friction-free)…");
-  for (const u of plan.authUsers) {
-    let authUser;
-    try {
-      const existing = await admin.auth().getUserByEmail(u.email);
-      if (existing.uid !== u.uid) {
-        throw new Error(
-          `SAFETY STOP: ${u.email} belongs to unexpected uid ${existing.uid}; ` +
-          `expected ${u.uid}. Refusing to delete or repurpose an Auth user.`
-        );
-      }
-      authUser = await admin.auth().updateUser(u.uid, {
-        password: DEMO_PASSWORD,
-        emailVerified: true,
-        displayName: u.fullName,
-        // A non-reset seed must also remove any factor accidentally enrolled
-        // during rehearsal; otherwise the documented friction-free login is
-        // not deterministic.
-        multiFactor: { enrolledFactors: [] },
-      });
-      log(`   • exists   ${u.email}`);
-    } catch (err) {
-      if (err.code !== "auth/user-not-found") throw err;
-
-      // The target email is free. Rename a known deterministic demo uid in
-      // place so class, log and child references remain intact; otherwise
-      // create the account for the first time.
-      let existingByUid = null;
-      try {
-        existingByUid = await admin.auth().getUser(u.uid);
-      } catch (lookupErr) {
-        if (lookupErr.code !== "auth/user-not-found") throw lookupErr;
-      }
-
-      if (existingByUid) {
-        const previousEmail = existingByUid.email || "";
-        const knownDemoEmail =
-          previousEmail.endsWith(`@${DEMO_EMAIL_DOMAIN}`) ||
-          /^support\+demo(?:\.[^@]+)?@lumi-reading\.com$/.test(previousEmail);
-        if (!knownDemoEmail) {
-          throw new Error(
-            `SAFETY STOP: deterministic demo uid ${u.uid} has unexpected email ` +
-            `${previousEmail}; refusing to repurpose it.`
-          );
-        }
-        authUser = await admin.auth().updateUser(u.uid, {
-          email: u.email,
-          password: DEMO_PASSWORD,
-          emailVerified: true,
-          displayName: u.fullName,
-          multiFactor: { enrolledFactors: [] },
-        });
-        log(`   • renamed  ${previousEmail} → ${u.email}`);
-      } else {
-        authUser = await admin.auth().createUser({
-          uid: u.uid,
-          email: u.email,
-          password: DEMO_PASSWORD,
-          emailVerified: true,
-          displayName: u.fullName,
-        });
-        log(`   • created  ${u.email}`);
-      }
-    }
-
-    const claims = {
-      ...(authUser.customClaims || {}),
-      demoAccount: true,
-      demoSchoolId: SCHOOL_ID,
-    };
-    if (u.role === "schoolAdmin") {
-      // Demo administrators need an exception to the portal's
-      // mandatory TOTP policy. The exemption is coupled to read-only claims
-      // enforced by middleware, Firestore rules, and callable guards.
-      claims.demoAdminMfaExempt = true;
-      claims.demoReadOnly = true;
-    } else {
-      delete claims.demoAdminMfaExempt;
-      delete claims.demoReadOnly;
-    }
-    await admin.auth().setCustomUserClaims(u.uid, claims);
-  }
-}
-
-async function seedFirestore(db, plan) {
-  const writer = db.bulkWriter();
-  let count = 0;
-  const set = (ref, data) => {
-    writer.set(ref, data);
-    count++;
-  };
-
-  const schoolRef = db.collection("schools").doc(SCHOOL_ID);
-  set(schoolRef, plan.school.data);
-
-  // Students must exist before their logs: validateReadingLog fires on log
-  // create and checks the student doc + parent linkage.
-  for (const u of plan.users) {
-    set(schoolRef.collection("users").doc(u.id), u.data);
-    set(db.collection("users").doc(u.id), u.data);
-  }
-  for (const p of plan.parents) set(schoolRef.collection("parents").doc(p.id), p.data);
-  for (const c of plan.classes) set(schoolRef.collection("classes").doc(c.id), c.data);
-  for (const s of plan.students) set(schoolRef.collection("students").doc(s.id), s.data);
-  for (const a of plan.allocations) set(schoolRef.collection("allocations").doc(a.id), a.data);
-  await writer.flush();
-
-  for (const l of plan.logs) set(schoolRef.collection("readingLogs").doc(l.id), l.data);
-  for (const c of plan.comments) {
-    set(schoolRef.collection("readingLogs").doc(c.logId).collection("comments").doc(c.id), c.data);
-  }
-  for (const code of plan.linkCodes) set(db.collection("studentLinkCodes").doc(code.id), code.data);
-  for (const entry of plan.indexEntries) set(db.collection("userSchoolIndex").doc(entry.id), entry.data);
-
-  await writer.close();
-  return count;
-}
-
-// Delete userSchoolIndex entries for addresses the shared accounts no longer
-// use (post-rename), so a stale hash can't shadow the new address. Idempotent —
-// a missing doc delete is a no-op.
-async function cleanupRetiredIndexEntries(db) {
-  for (const email of RETIRED_INDEX_EMAILS) {
-    await db.collection("userSchoolIndex").doc(emailHash(email)).delete();
-  }
-  if (RETIRED_INDEX_EMAILS.length > 0) {
-    log(`   • cleaned ${RETIRED_INDEX_EMAILS.length} retired userSchoolIndex entries`);
-  }
-}
-
-// Write platformConfig/demoAccess — the non-secret config the demo-access
-// backend + portal read. Idempotent, and PRESERVES any appStoreUrl/playStoreUrl
-// an operator has filled in (those are set in the portal/console once the store
-// listings are live — a re-seed must never clobber them back to null).
-async function seedDemoAccessConfig(db) {
-  const ref = db.collection("platformConfig").doc("demoAccess");
-  const snap = await ref.get();
-  const existing = snap.exists ? snap.data() : {};
-  await ref.set({
-    schoolId: SCHOOL_ID,
-    adminEmail: SHARED_ADMIN_EMAIL,
-    teacherEmail: SHARED_TEACHER_EMAIL,
-    parentEmail: SHARED_PARENT_EMAIL,
-    // Rotated nightly but never shared with prospects: the internal/backup admin
-    // and the no-login second teacher/parent personas. Keeps every account in
-    // the school off a known password.
-    scrambleOnlyEmails: [
-      `demo.admin@${DEMO_EMAIL_DOMAIN}`,
-      `demo.teacher2@${DEMO_EMAIL_DOMAIN}`,
-      `demo.parent2@${DEMO_EMAIL_DOMAIN}`,
-    ],
-    portalLoginUrl: "https://lumi-school-admin-au.web.app/login",
-    marketingUrl: "https://lumi-reading.com",
-    appStoreUrl: existing.appStoreUrl ?? null,
-    playStoreUrl: existing.playStoreUrl ?? null,
-    updatedAt: new Date(),
-    updatedBy: "seed_demo_school.js",
-  });
-  const preserved = existing.appStoreUrl || existing.playStoreUrl;
-  log(`   • platformConfig/demoAccess written (store URLs ${preserved ? "preserved" : "null"})`);
-}
-
-// ─── Main ───────────────────────────────────────────────────────────────────
-
-async function main() {
-  const now = new Date();
-  const plan = buildPlan(now);
-
-  if (DRY_RUN) {
-    printDryRun(plan);
-    return;
-  }
-
-  const admin = loadFirebaseAdmin();
-  const projectId = initAdmin(admin);
-  await confirm(projectId, RESET ? "RESET (wipe + re-seed)" : "seed / upsert");
-
-  const db = admin.firestore();
-
-  if (RESET) {
-    await resetDemoSchool(admin, db, plan);
-  } else {
-    // Even outside --reset, never silently overwrite a non-demo school.
-    const snap = await db.collection("schools").doc(SCHOOL_ID).get();
-    if (snap.exists && snap.data().isDemo !== true) {
-      die(`SAFETY STOP: schools/${SCHOOL_ID} exists without isDemo: true — refusing to overwrite.`);
-    }
-  }
-
-  await ensureAuthUsers(admin, plan);
-  log("Writing Firestore documents…");
-  const written = await seedFirestore(db, plan);
-  await cleanupRetiredIndexEntries(db);
-  await seedDemoAccessConfig(db);
-
-  log("");
-  log(`✓ Demo school seeded (${written} documents).`);
-  log("");
-  log("  Demo logins:");
-  for (const u of plan.authUsers) log(`    ${u.email}`);
-  log("");
-  log("  Passwords are ROLLED DAILY. The DEMO_PASSWORD secret is only the seed value —");
-  log("  scrambleDemoPasswords scrambles it nightly, and the super-admin portal's");
-  log("  \"Provision today's demo password\" issues the shared day password.");
-  log("");
-  log("  Live-linking codes (hand these out in demos):");
-  for (const c of plan.linkCodes) log(`    ${c.data.code}  →  ${c.data.studentId}`);
-  log("");
-  log("  Next: run the pre-demo checks in docs/demo-playbook.md.");
-}
-
-main().catch((err) => die(`Seed failed: ${err.stack || err}`));
+export const DEMO_SCHOOL_CONSTANTS = {
+  schoolId: SCHOOL_ID,
+  schoolName: SCHOOL_NAME,
+  timezone: TZ,
+  retiredIndexEmails: [...RETIRED_INDEX_EMAILS],
+};

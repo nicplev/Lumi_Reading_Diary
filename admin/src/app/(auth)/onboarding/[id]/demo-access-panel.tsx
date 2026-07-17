@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Copy, KeyRound, Mail } from "lucide-react";
@@ -44,12 +44,41 @@ export function DemoAccessPanel({
   const router = useRouter();
   const [loading, setLoading] = useState<null | "provision" | "email">(null);
   const [confirmEmail, setConfirmEmail] = useState(false);
+  const [reseedPhase, setReseedPhase] = useState<string | null>(null);
   // Password from a just-completed provision (avoids a refresh flash); falls
   // back to the server-rendered live password.
   const [freshPassword, setFreshPassword] = useState<string | null>(null);
 
   const password = freshPassword ?? view.password;
   const hasLivePassword = !!password;
+
+  useEffect(() => {
+    if (loading !== "provision") return;
+
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const response = await fetch("/api/demo/reseed", { cache: "no-store" });
+        if (!response.ok) return;
+        const status = (await response.json()) as {
+          state?: string;
+          phase?: string | null;
+        };
+        if (!cancelled && status.state === "running") {
+          setReseedPhase(status.phase ?? "preparing");
+        }
+      } catch {
+        // Provisioning remains authoritative; status polling is best-effort UI.
+      }
+    };
+
+    void poll();
+    const timer = window.setInterval(poll, 1500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [loading]);
 
   const copy = async (label: string, value: string) => {
     try {
@@ -61,6 +90,7 @@ export function DemoAccessPanel({
   };
 
   const provision = async () => {
+    setReseedPhase(null);
     setLoading("provision");
     try {
       const res = await fetch(`/api/onboarding/${onboardingId}/demo-access`, {
@@ -217,6 +247,11 @@ export function DemoAccessPanel({
               Email demo details
             </Button>
           </div>
+          {loading === "provision" && reseedPhase && (
+            <p className="text-xs text-muted-foreground" role="status">
+              Refreshing demo data: {reseedPhase.replaceAll("_", " ")}…
+            </p>
+          )}
 
           {/* Send history for this request */}
           {view.history.length > 0 && (

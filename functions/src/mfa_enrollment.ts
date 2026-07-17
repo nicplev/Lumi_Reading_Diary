@@ -26,6 +26,7 @@ import * as admin from "firebase-admin";
 import {errorCodeForLog} from "./log_safety";
 import * as functions from "firebase-functions/v1";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {assertNotReadOnly} from "./read_only_guard";
 import {linkParentToStudentCore, resolveLinkCodeSchool} from "./parent_linking";
 import {consumeSchoolCode} from "./code_verification";
 
@@ -332,6 +333,7 @@ export const enrollLinkedPhoneAsMfa = onCall(
     consumeAppCheckToken: MFA_ENROLLMENT_APP_CHECK_ENFORCED,
   },
   async (request) => {
+    assertNotReadOnly(request);
     const data = request.data;
     const uid = request.auth?.uid;
     if (!uid) {
@@ -611,6 +613,7 @@ export const finalizeEmailSignup = onCall(
     consumeAppCheckToken: MFA_ENROLLMENT_APP_CHECK_ENFORCED,
   },
   async (request) => {
+    assertNotReadOnly(request);
     const data: FinalizeEmailSignupInput = request.data;
     const uid = request.auth?.uid;
     if (!uid) {
@@ -702,6 +705,7 @@ export const syncUserMfaProfileState = onCall(
     consumeAppCheckToken: MFA_ENROLLMENT_APP_CHECK_ENFORCED,
   },
   async (request) => {
+    assertNotReadOnly(request);
     const data: SyncUserMfaProfileStateInput = request.data;
     const uid = request.auth?.uid;
     if (!uid) {
@@ -771,6 +775,7 @@ export const finalizeParentSignup = onCall(
     consumeAppCheckToken: MFA_ENROLLMENT_APP_CHECK_ENFORCED,
   },
   async (request) => {
+    assertNotReadOnly(request);
     const data: FinalizeParentSignupInput = request.data;
     const uid = request.auth?.uid;
     if (!uid) {

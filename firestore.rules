@@ -190,8 +190,48 @@ service cloud.firestore {
           && request.auth.token.get('demoReadOnly', false) == true;
     }
 
+    function isDemoAccount() {
+      return request.auth != null
+          && request.auth.token.get('demoAccount', false) == true;
+    }
+
+    // Shared demo credentials are never granted the ordinary write surface.
+    // A small set of school-local content rules calls
+    // writeAllowedForSchoolContent() instead. That helper proves the token is
+    // bound to an authoritative synthetic tenant and that no destructive
+    // reseed is running before permitting the individual path's normal
+    // role/ownership/schema checks to continue.
+    function demoAccountMayWriteSchoolContent(schoolId) {
+      let adminShape =
+          request.auth.token.get('demoAdminMfaExempt', false) == true
+          && request.auth.token.get('demoReadOnly', false) == true
+          && request.auth.token.get('demoInteractive', false) == true;
+      let ordinaryShape =
+          request.auth.token.get('demoAdminMfaExempt', false) == false
+          && request.auth.token.get('demoReadOnly', false) == false
+          && request.auth.token.get('demoInteractive', false) == false;
+      let school = get(
+        /databases/$(database)/documents/schools/$(schoolId)
+      );
+      let reseed = get(
+        /databases/$(database)/documents/demoAccess/reseedStatus
+      );
+      return isDemoAccount()
+          && !devReadOnly()
+          && request.auth.token.get('demoSchoolId', '') == schoolId
+          && (adminShape || ordinaryShape)
+          && school.data.get('isDemo', false) == true
+          && reseed.data.get('schoolId', '') == schoolId
+          && reseed.data.get('state', '') == 'succeeded';
+    }
+
     function writeAllowedForDev() {
-      return !devReadOnly() && !demoAdminReadOnly();
+      return !devReadOnly() && !isDemoAccount();
+    }
+
+    function writeAllowedForSchoolContent(schoolId) {
+      return writeAllowedForDev()
+          || demoAccountMayWriteSchoolContent(schoolId);
     }
 
     // ── Per-school feature gates ────────────────────────────────────
@@ -533,7 +573,7 @@ service cloud.firestore {
 
         allow create, delete: if isSchoolAdmin(schoolId) && writeAllowedForDev();
 
-        allow update: if writeAllowedForDev() &&
+        allow update: if writeAllowedForSchoolContent(schoolId) &&
             (
               isSchoolAdmin(schoolId) ||
               (isTeacher(schoolId) &&
@@ -710,7 +750,7 @@ service cloud.firestore {
         // `classIds` on the teacher's user doc is created empty and never
         // synced by the portal, so relying on it denied every proxy log.
         allow create: if isSignedIn() &&
-            writeAllowedForDev() &&
+            writeAllowedForSchoolContent(schoolId) &&
             createSchemaIsValid() &&
             minutesInBounds() &&
             studentAccessLive(
@@ -735,7 +775,7 @@ service cloud.firestore {
               )
             );
 
-        allow update: if writeAllowedForDev() &&
+        allow update: if writeAllowedForSchoolContent(schoolId) &&
             contentUpdateIsValid() &&
             (
               (isSignedIn() && resource.data.parentId == request.auth.uid) ||
@@ -744,7 +784,7 @@ service cloud.firestore {
                 teacherTeachesClass(schoolId, resource.data.classId))
             );
 
-        allow update: if writeAllowedForDev() &&
+        allow update: if writeAllowedForSchoolContent(schoolId) &&
             isSignedIn() &&
             threadPreviewUpdateIsValid();
 
@@ -753,7 +793,7 @@ service cloud.firestore {
         // own unread badge. Scoped tightly: the only field they can touch is
         // `commentsViewedAt`, and within it only their own uid key — so a
         // non-owner can't edit log content or another carer's read marker.
-        allow update: if writeAllowedForDev() &&
+        allow update: if writeAllowedForSchoolContent(schoolId) &&
             isSignedIn() &&
             getUserData(schoolId).linkedChildren != null &&
             resource.data.studentId in getUserData(schoolId).linkedChildren &&
@@ -766,7 +806,7 @@ service cloud.firestore {
         // Parent can delete a log they created (powers the widget-undo
         // banner). Stats are reconciled by the aggregateStudentStats Cloud
         // Function on log delete, so no client-side stats write is needed.
-        allow delete: if writeAllowedForDev() &&
+        allow delete: if writeAllowedForSchoolContent(schoolId) &&
             (
               isSchoolAdmin(schoolId) ||
               (isSignedIn() && resource.data.parentId == request.auth.uid)
@@ -820,7 +860,7 @@ service cloud.firestore {
           // messagingEnabled() is the server-side backstop to the app-side gate:
           // a school that has turned parent↔teacher messaging off can't have new
           // threads created regardless of client state.
-          allow create: if writeAllowedForDev() &&
+          allow create: if writeAllowedForSchoolContent(schoolId) &&
               messagingEnabled(schoolId) &&
               commentSchemaIsValid() &&
               (
@@ -866,20 +906,20 @@ service cloud.firestore {
         allow create: if (isSchoolAdmin(schoolId) ||
               (isTeacher(schoolId) &&
                 teacherTeachesClass(schoolId, request.resource.data.classId))) &&
-            writeAllowedForDev() &&
+            writeAllowedForSchoolContent(schoolId) &&
             request.resource.data.schoolId == schoolId;
 
         allow update: if (isSchoolAdmin(schoolId) ||
               (isTeacher(schoolId) &&
                 teacherTeachesClass(schoolId, resource.data.classId) &&
                 teacherTeachesClass(schoolId, request.resource.data.classId))) &&
-            writeAllowedForDev() &&
+            writeAllowedForSchoolContent(schoolId) &&
             request.resource.data.schoolId == schoolId;
 
         allow delete: if (isSchoolAdmin(schoolId) ||
               (isTeacher(schoolId) &&
                 teacherTeachesClass(schoolId, resource.data.classId))) &&
-            writeAllowedForDev();
+            writeAllowedForSchoolContent(schoolId);
       }
 
       match /books/{bookId} {
@@ -888,10 +928,11 @@ service cloud.firestore {
 
         // Only teachers and admins can add/update books (parents cannot write)
         allow create, update: if (isSchoolAdmin(schoolId) || isTeacher(schoolId)) &&
-            writeAllowedForDev() &&
+            writeAllowedForSchoolContent(schoolId) &&
             request.resource.data.schoolId == schoolId;
 
-        allow delete: if isSchoolAdmin(schoolId) && writeAllowedForDev();
+        allow delete: if isSchoolAdmin(schoolId) &&
+            writeAllowedForSchoolContent(schoolId);
       }
 
       match /readingGroups/{groupId} {
@@ -906,20 +947,20 @@ service cloud.firestore {
         allow create: if (isSchoolAdmin(schoolId) ||
               (isTeacher(schoolId) &&
                 teacherTeachesClass(schoolId, request.resource.data.classId))) &&
-            writeAllowedForDev() &&
+            writeAllowedForSchoolContent(schoolId) &&
             request.resource.data.schoolId == schoolId;
 
         allow update: if (isSchoolAdmin(schoolId) ||
               (isTeacher(schoolId) &&
                 teacherTeachesClass(schoolId, resource.data.classId) &&
                 teacherTeachesClass(schoolId, request.resource.data.classId))) &&
-            writeAllowedForDev() &&
+            writeAllowedForSchoolContent(schoolId) &&
             request.resource.data.schoolId == schoolId;
 
         allow delete: if (isSchoolAdmin(schoolId) ||
               (isTeacher(schoolId) &&
                 teacherTeachesClass(schoolId, resource.data.classId))) &&
-            writeAllowedForDev();
+            writeAllowedForSchoolContent(schoolId);
       }
 
       match /notificationCampaigns/{campaignId} {

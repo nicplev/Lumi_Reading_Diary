@@ -9,6 +9,11 @@ service firebase.storage {
           (staff.data.role == 'teacher' || staff.data.role == 'schoolAdmin');
     }
 
+    function isDemoAccount() {
+      return request.auth != null
+          && request.auth.token.get('demoAccount', false) == true;
+    }
+
     function comprehensionRecordingEnabled() {
       let config = firestore.get(
         /databases/(default)/documents/platformConfig/comprehensionRecording
@@ -56,6 +61,7 @@ service firebase.storage {
       allow write: if request.resource != null
                    && resource == null
                    && request.auth != null
+                   && !isDemoAccount()
                    && request.resource.metadata.schoolId is string
                    && request.resource.metadata.uploaderUid == request.auth.uid
                    && isStaffAtSchool(request.resource.metadata.schoolId)
@@ -70,6 +76,7 @@ service firebase.storage {
     match /comprehension_audio_uploads/{schoolId}/{fileName} {
       allow read: if false;
       allow write: if request.resource != null
+                   && !isDemoAccount()
                    && ownsAudioLog(schoolId, fileName)
                    && comprehensionRecordingEnabled()
                    && schoolAudioCollectionAuthorised(schoolId)
