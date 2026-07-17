@@ -81,7 +81,26 @@ export interface QuickLoggingSettings {
 // wizard. Per-class prompts live on `classes/{id}.settings.comprehensionQuestion`.
 export interface ComprehensionRecordingSettings {
   enabled: boolean;
+  retentionDays?: number;
+  authorityVersion?: string;
+  authorityConfirmedAt?: string;
+  authorityConfirmedBy?: string;
+  authorityConfirmedByRole?: 'schoolAdmin';
+  authorisedBySchool?: boolean;
+  familyNoticeConfirmed?: boolean;
+  updatedAt?: string;
 }
+
+export type ComprehensionRecordingUpdate =
+  | { enabled: false }
+  | {
+      enabled: true;
+      authorityDecision?: {
+        authorisedBySchool: true;
+        familyNoticeConfirmed: true;
+        retentionDays: 7 | 30 | 90 | 365;
+      };
+    };
 
 // Stored at `schools/{id}.settings.messaging`. Gates the parent↔teacher comment
 // threads attached to reading logs (the in-app "texting" between a parent and

@@ -721,6 +721,20 @@
           "order": "ASCENDING"
         },
         {
+          "fieldPath": "createdAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "readingLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "comprehensionAudioUploaded",
+          "order": "ASCENDING"
+        },
+        {
           "fieldPath": "date",
           "order": "ASCENDING"
         }

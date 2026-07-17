@@ -22,7 +22,6 @@ export async function updateSchool(
     termDates?: Record<string, string>;
     parentCommentSettings?: { enabled: boolean; freeTextEnabled: boolean; customPresets: { id: string; name: string; chips: string[] }[] };
     quickLoggingSettings?: { enabled: boolean };
-    comprehensionRecordingSettings?: { enabled: boolean };
     messagingSettings?: { enabled: boolean };
     achievementThresholds?: AchievementThresholds;
     achievementCustomization?: AchievementCustomization;
@@ -47,9 +46,6 @@ export async function updateSchool(
   }
   if (data.quickLoggingSettings !== undefined) {
     update['settings.quickLogging'] = data.quickLoggingSettings;
-  }
-  if (data.comprehensionRecordingSettings !== undefined) {
-    update['settings.comprehensionRecording'] = data.comprehensionRecordingSettings;
   }
   if (data.messagingSettings !== undefined) {
     update['settings.messaging'] = data.messagingSettings;

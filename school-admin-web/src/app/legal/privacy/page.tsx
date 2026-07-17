@@ -58,7 +58,7 @@ export default function PrivacyPolicyPage() {
           <li>the student&rsquo;s name, class and year level, and (optionally) a date of birth and profile photo;</li>
           <li>reading level and the history of reading-level changes;</li>
           <li>reading activity — dates, minutes read, books read, how the child felt about the session, and any notes;</li>
-          <li>optional short voice recordings of the child recapping what they read (the &ldquo;comprehension recording&rdquo; feature), where a school has turned this feature on;</li>
+          <li>optional short voice recordings of the child recapping what they read (the &ldquo;comprehension recording&rdquo; feature), where an authorised school administrator has turned this feature on, confirmed the school will notify families and selected a 7, 30, 90 or 365-day deletion period;</li>
           <li>optional photos attached to a reading log;</li>
           <li>messages exchanged between a teacher and a parent/carer about a reading log.</li>
         </ul>
@@ -151,6 +151,12 @@ export default function PrivacyPolicyPage() {
           school&rsquo;s enrolment and annual renewal. When information is no longer required, or on a
           valid deletion request, we delete it or de-identify it, unless we are required to retain it
           by law.
+        </p>
+        <p>
+          Comprehension voice recordings are kept only for the deletion period selected by the
+          school when the feature is enabled: 7, 30, 90 or 365 days. Unconfirmed uploads are removed
+          after 24 hours. A school can delete a recording earlier, and account or student deletion
+          also removes applicable recordings.
         </p>
       </section>
 

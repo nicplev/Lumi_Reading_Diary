@@ -13,6 +13,11 @@ const {
   teacherIsAssignedToClassData,
 } = require('../lib/comprehension_retention.js');
 const {
+  AUDIO_AUTHORITY_VERSION,
+  retentionDaysForSchool,
+  schoolAudioCollectionIsAuthorised,
+} = require('../lib/audio_authority.js');
+const {
   AudioMediaValidationError,
   validateAndTranscodeAudioBuffer,
 } = require('../lib/audio_media_validation.js');
@@ -124,4 +129,37 @@ test('audio access recognises only the assigned teacher or co-teacher', () => {
   assert.equal(teacherIsAssignedToClassData('teacher_b', classData), true);
   assert.equal(teacherIsAssignedToClassData('teacher_c', classData), false);
   assert.equal(teacherIsAssignedToClassData('teacher_a', {}), false);
+});
+
+test('school audio collection requires current server-recorded authority', () => {
+  const valid = {
+    settings: {
+      comprehensionRecording: {
+        enabled: true,
+        authorityVersion: AUDIO_AUTHORITY_VERSION,
+        authorityConfirmedAt: new Date(),
+        retentionDays: 30,
+      },
+    },
+  };
+  assert.equal(schoolAudioCollectionIsAuthorised(valid), true);
+  assert.equal(schoolAudioCollectionIsAuthorised({
+    ...valid,
+    settings: {comprehensionRecording: {
+      ...valid.settings.comprehensionRecording,
+      authorityVersion: 'old',
+    }},
+  }), false);
+  assert.equal(schoolAudioCollectionIsAuthorised({
+    settings: {comprehensionRecording: {enabled: true}},
+  }), false);
+});
+
+test('school retention uses an allowed school choice or the legacy default', () => {
+  assert.equal(retentionDaysForSchool({
+    settings: {comprehensionRecording: {retentionDays: 7}},
+  }, 90), 7);
+  assert.equal(retentionDaysForSchool({
+    settings: {comprehensionRecording: {retentionDays: 14}},
+  }, 90), 90);
 });

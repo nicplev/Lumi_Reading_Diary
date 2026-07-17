@@ -5,8 +5,9 @@
 modification of Lumi personal information.
 **Emergency security contacts:** primary `nic@lumi-reading.com`; backup
 `nicxplev@gmail.com`.
-**Privacy/support intake:** `support@lumi-reading.com` (monitoring confirmation
-pending).
+**Privacy/support intake:** `support@lumi-reading.com` (owner confirmed on
+17 July 2026 that it is monitored daily and protected by MFA; mailbox provider,
+delegates and retention settings still need to be recorded).
 
 This plan must be available outside the production systems. It is not legal
 advice. The incident lead should obtain Australian privacy/legal advice when a
@@ -165,8 +166,9 @@ names, book titles, minutes and optional comments. No audio download is proven.
    repository. Add them to the contract/CRM without storing them in app code.
 4. **Gap:** External Australian privacy counsel and incident roles are not yet
    formally appointed.
-5. **Gap:** Monitoring of `support@lumi-reading.com` and both security alert
-   messages still needs human confirmation.
+5. **Partly closed:** Daily monitoring and MFA for `support@lumi-reading.com`
+   are owner-confirmed. Receipt of the synthetic Cloud Monitoring incident in
+   both separate security-alert inboxes still needs human confirmation.
 6. **Gap:** Store-attested App Check is not yet enforceable; it would reduce
    scripted exploitation but would not correct broken authorisation.
 
