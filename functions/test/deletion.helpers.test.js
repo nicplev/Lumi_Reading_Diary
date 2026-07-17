@@ -98,6 +98,38 @@ test('production indexes support cross-school student notification cleanup', () 
   ));
 });
 
+test('production indexes support cross-school account content cleanup', () => {
+  const config = JSON.parse(fs.readFileSync(
+    path.resolve(__dirname, '..', '..', 'firestore.indexes.json'),
+    'utf8',
+  ));
+
+  for (const [collectionGroup, fieldPath] of [
+    ['comments', 'authorId'],
+    ['deletionRequests', 'requestedBy'],
+  ]) {
+    const override = config.fieldOverrides.find((entry) =>
+      entry.collectionGroup === collectionGroup &&
+      entry.fieldPath === fieldPath
+    );
+    assert.ok(override, `${collectionGroup}.${fieldPath} override is required`);
+    assert.ok(override.indexes.some((index) =>
+      index.order === 'ASCENDING' && index.queryScope === 'COLLECTION'
+    ));
+    assert.ok(override.indexes.some((index) =>
+      index.order === 'DESCENDING' && index.queryScope === 'COLLECTION'
+    ));
+    assert.ok(override.indexes.some((index) =>
+      index.arrayConfig === 'CONTAINS' &&
+      index.queryScope === 'COLLECTION'
+    ));
+    assert.ok(override.indexes.some((index) =>
+      index.order === 'ASCENDING' &&
+      index.queryScope === 'COLLECTION_GROUP'
+    ));
+  }
+});
+
 test('checked-in index config preserves live rate-limit TTL policies', () => {
   const config = JSON.parse(fs.readFileSync(
     path.resolve(__dirname, '..', '..', 'firestore.indexes.json'),
