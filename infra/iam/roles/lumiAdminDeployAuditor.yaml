@@ -1,0 +1,12 @@
+title: Lumi Admin Deploy Auditor
+description: Read-only identity, IAM-policy and key-metadata checks for the super-admin deployment guard.
+stage: GA
+includedPermissions:
+  - artifactregistry.repositories.getIamPolicy
+  - cloudfunctions.functions.get
+  - iam.serviceAccountKeys.list
+  - iam.serviceAccounts.get
+  - iam.serviceAccounts.getIamPolicy
+  - resourcemanager.projects.getIamPolicy
+  - secretmanager.secrets.getIamPolicy
+  - storage.buckets.getIamPolicy
