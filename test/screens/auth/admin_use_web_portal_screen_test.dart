@@ -14,7 +14,10 @@ void main() {
     expect(find.text('Manage Your School on the Web'), findsOneWidget);
     expect(find.text('Open Web Portal'), findsOneWidget);
     expect(find.text('Copy portal link'), findsOneWidget);
-    expect(find.text('https://lumi-school-admin.web.app'), findsOneWidget);
+    expect(
+      find.text('https://lumi-school-admin-au.web.app/login'),
+      findsOneWidget,
+    );
     expect(find.text('Back to Login'), findsOneWidget);
 
     final image = tester.widget<Image>(find.byType(Image));

@@ -196,16 +196,11 @@ service cloud.firestore {
     }
 
     // Shared demo credentials are never granted the ordinary write surface.
-    // A small set of school-local content rules calls
-    // writeAllowedForSchoolContent() instead. That helper proves the token is
-    // bound to an authoritative synthetic tenant and that no destructive
-    // reseed is running before permitting the individual path's normal
-    // role/ownership/schema checks to continue.
+    // Only the ordinary demo teacher/parent claim shape may continue through
+    // the normal role/ownership/schema checks for school-local content. The
+    // shared school administrator remains read-only everywhere because its
+    // mobile role is only a pointer to the web portal.
     function demoAccountMayWriteSchoolContent(schoolId) {
-      let adminShape =
-          request.auth.token.get('demoAdminMfaExempt', false) == true
-          && request.auth.token.get('demoReadOnly', false) == true
-          && request.auth.token.get('demoInteractive', false) == true;
       let ordinaryShape =
           request.auth.token.get('demoAdminMfaExempt', false) == false
           && request.auth.token.get('demoReadOnly', false) == false
@@ -219,7 +214,7 @@ service cloud.firestore {
       return isDemoAccount()
           && !devReadOnly()
           && request.auth.token.get('demoSchoolId', '') == schoolId
-          && (adminShape || ordinaryShape)
+          && ordinaryShape
           && school.data.get('isDemo', false) == true
           && reseed.data.get('schoolId', '') == schoolId
           && reseed.data.get('state', '') == 'succeeded';

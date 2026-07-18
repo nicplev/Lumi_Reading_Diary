@@ -172,7 +172,6 @@ export async function provisionDemoAccess(
     if (spec.role === "admin") {
       claims.demoAdminMfaExempt = true;
       claims.demoReadOnly = true;
-      claims.demoInteractive = true;
     }
     await auth.setCustomUserClaims(uid, claims);
     accounts.push({ role: spec.role, email: spec.email, uid });

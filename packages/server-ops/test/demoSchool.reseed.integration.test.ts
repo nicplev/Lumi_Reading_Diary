@@ -53,7 +53,6 @@ test("fenced reseed preserves password state and finalises exact demo claims", a
     schoolId: "lumi_demo_primary_school",
     demoAdminMfaExempt: true,
     demoReadOnly: true,
-    demoInteractive: true,
   });
   assert.deepEqual((await auth.getUser(teacher.uid)).customClaims, {
     demoAccount: true,

@@ -14,7 +14,7 @@ import '../../theme/lumi_typography.dart';
 class AdminUseWebPortalScreen extends StatelessWidget {
   const AdminUseWebPortalScreen({super.key});
 
-  static const String _portalUrl = 'https://lumi-school-admin.web.app';
+  static const String _portalUrl = 'https://lumi-school-admin-au.web.app/login';
 
   Future<void> _launchPortal() async {
     final uri = Uri.parse(_portalUrl);
@@ -111,8 +111,8 @@ class AdminUseWebPortalScreen extends StatelessWidget {
                   // Copy link
                   TextButton.icon(
                     onPressed: () => _copyToClipboard(context),
-                    icon:
-                        const Icon(Icons.copy, size: 18, color: LumiTokens.blue),
+                    icon: const Icon(Icons.copy,
+                        size: 18, color: LumiTokens.blue),
                     label: Text(
                       'Copy portal link',
                       style: LumiType.caption.copyWith(
