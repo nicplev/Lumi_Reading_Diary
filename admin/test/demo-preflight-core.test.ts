@@ -28,7 +28,7 @@ function snap(data: Record<string, unknown> | undefined) {
   return { exists: data !== undefined, data: () => data };
 }
 
-function createHarness(failingRole?: string) {
+function createHarness(failingRole?: string, portalMutationStatus = 403) {
   const restoredPaths: string[] = [];
   const byPath = new Map<string, Record<string, unknown>>([
     [`schools/${schoolId}`, { isDemo: true }],
@@ -140,7 +140,7 @@ function createHarness(failingRole?: string) {
       return new Response("{}", { status: 200 });
     }
     if (url.endsWith("/api/profile")) {
-      return new Response("{}", { status: 401 });
+      return new Response("{}", { status: portalMutationStatus });
     }
     throw new Error(`Unexpected test request: ${url}`);
   };
@@ -148,8 +148,8 @@ function createHarness(failingRole?: string) {
   return { auth, db, fetchImpl: fetchImpl as typeof fetch, restoredPaths };
 }
 
-function options(failingRole?: string) {
-  const harness = createHarness(failingRole);
+function options(failingRole?: string, portalMutationStatus = 403) {
+  const harness = createHarness(failingRole, portalMutationStatus);
   return {
     ...harness,
     projectId: "lumi-ninc-au",
@@ -201,6 +201,22 @@ test("failed live sign-in returns a redacted not-ready receipt", async () => {
       assert.equal(error.result.checks.at(-1)?.status, "fail");
       assert.equal(JSON.stringify(error.result).includes(password), false);
       assert.equal(JSON.stringify(error.result).includes("secret-teacher-uid"), false);
+      return true;
+    },
+  );
+});
+
+test("portal check accepts authorization denials but rejects validation reachability", async () => {
+  const handlerDenial = await runDemoPreflight(options(undefined, 401));
+  assert.equal(handlerDenial.ready, true);
+
+  await assert.rejects(
+    () => runDemoPreflight(options(undefined, 400)),
+    (error: unknown) => {
+      assert.ok(error instanceof DemoPreflightError);
+      assert.equal(error.result.ready, false);
+      assert.equal(error.result.checks.at(-1)?.key, "portal");
+      assert.equal(error.result.checks.at(-1)?.status, "fail");
       return true;
     },
   );

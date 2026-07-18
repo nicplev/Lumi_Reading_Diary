@@ -225,7 +225,8 @@ async function verifyPortalSession(
   );
 
   // Empty PATCH is harmless. A mutable account would reach validation and
-  // return 400; the read-only shared demo account must stop at auth with 401.
+  // return 400. The read-only shared demo account must instead be denied by
+  // either the edge guard (403) or the route's defence-in-depth guard (401).
   const mutationResponse = await fetchImpl(`${portalOrigin}/api/profile`, {
     method: "PATCH",
     headers: { cookie, "content-type": "application/json" },
@@ -233,7 +234,7 @@ async function verifyPortalSession(
     redirect: "manual",
   });
   ensure(
-    mutationResponse.status === 401,
+    mutationResponse.status === 401 || mutationResponse.status === 403,
     `The shared demo administrator was not rejected by a mutable portal route (HTTP ${mutationResponse.status}).`,
   );
 }
