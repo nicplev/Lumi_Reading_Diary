@@ -1654,6 +1654,13 @@ async function seedDemoAdmin() {
         classIds: [],
         isActive: true,
       });
+    await db.collection('schools').doc(DEMO_SCHOOL_ID)
+      .collection('parents').doc('demo_parent_1').set({
+        role: 'parent',
+        schoolId: DEMO_SCHOOL_ID,
+        linkedChildren: ['demo_student_1'],
+        isActive: true,
+      });
     await db.collection('demoAccess').doc('reseedStatus').set({
       schoolId: DEMO_SCHOOL_ID,
       state: 'succeeded',
@@ -1710,6 +1717,20 @@ test('demo admin: cannot write school-local content even with a legacy interacti
   );
 });
 
+test('demo admin: cannot write mobile login or terms fields on its own profile', async () => {
+  await seedDemoAdmin();
+  const db = authDb(DEMO_ADMIN_UID, demoAdminClaims());
+  const ownProfile = db.collection('schools').doc(DEMO_SCHOOL_ID)
+    .collection('users').doc(DEMO_ADMIN_UID);
+  await assertFails(ownProfile.update({lastLoginAt: new Date()}));
+  await assertFails(ownProfile.update({
+    termsAccepted: true,
+    termsAcceptedAt: serverTimestamp(),
+    termsAcceptedVersion: '2026-07-10',
+    termsAcceptedPlatform: 'ios',
+  }));
+});
+
 test('demo admin: cannot mutate global catalogue or queue email', async () => {
   await seedDemoAdmin();
   const db = authDb(DEMO_ADMIN_UID, demoAdminClaims({ demoInteractive: true }));
@@ -1743,6 +1764,27 @@ test('ordinary demo teacher: can write school-local content after a successful r
   );
 });
 
+test('ordinary demo teacher and parent: mobile login self-updates work but sensitive fields remain denied', async () => {
+  await seedDemoAdmin();
+  const teacherDb = authDb('demo_teacher_1', ordinaryDemoClaims());
+  const teacherProfile = teacherDb.collection('schools').doc(DEMO_SCHOOL_ID)
+    .collection('users').doc('demo_teacher_1');
+  await assertSucceeds(teacherProfile.update({lastLoginAt: new Date()}));
+
+  const parentDb = authDb('demo_parent_1', ordinaryDemoClaims());
+  const parentProfile = parentDb.collection('schools').doc(DEMO_SCHOOL_ID)
+    .collection('parents').doc('demo_parent_1');
+  await assertSucceeds(parentProfile.update({lastLoginAt: new Date()}));
+  await assertSucceeds(parentProfile.update({
+    termsAccepted: true,
+    termsAcceptedAt: serverTimestamp(),
+    termsAcceptedVersion: '2026-07-10',
+    termsAcceptedPlatform: 'ios',
+  }));
+  await assertFails(parentProfile.update({linkedChildren: ['forged_student']}));
+  await assertFails(parentProfile.update({role: 'schoolAdmin'}));
+});
+
 test('ordinary demo writes fail closed while reseed is running', async () => {
   await seedDemoAdmin();
   await seedData(async (db) => {
@@ -1758,6 +1800,10 @@ test('ordinary demo writes fail closed while reseed is running', async () => {
         title: 'Blocked during reseed',
         schoolId: DEMO_SCHOOL_ID,
       }),
+  );
+  await assertFails(
+    db.collection('schools').doc(DEMO_SCHOOL_ID).collection('users')
+      .doc('demo_teacher_1').update({lastLoginAt: new Date()}),
   );
 });
 
@@ -1777,6 +1823,10 @@ test('ordinary demo account: privileged or cross-school claim shapes are denied'
           title: 'Blocked shape',
           schoolId: DEMO_SCHOOL_ID,
         }),
+    );
+    await assertFails(
+      db.collection('schools').doc(DEMO_SCHOOL_ID).collection('users')
+        .doc('demo_teacher_1').update({lastLoginAt: new Date()}),
     );
   }
 });

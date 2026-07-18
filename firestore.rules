@@ -376,7 +376,7 @@ service cloud.firestore {
         // written exclusively from a trusted source (Admin SDK in Cloud
         // Functions or the super-admin backend), bypassing client rules.
         allow update: if isSignedIn() &&
-            writeAllowedForDev() &&
+            writeAllowedForSchoolContent(schoolId) &&
             (
               isSchoolAdmin(schoolId) ||
               (
@@ -426,7 +426,7 @@ service cloud.firestore {
         // etc.) must be written exclusively from a trusted source (Admin SDK
         // in Cloud Functions or the super-admin backend).
         allow update: if isSignedIn() &&
-            writeAllowedForDev() &&
+            writeAllowedForSchoolContent(schoolId) &&
             (
               isSchoolAdmin(schoolId) ||
               (
