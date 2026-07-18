@@ -28,6 +28,40 @@ void main() {
       expect(AppRouter.checkParentWebAccess(UserRole.schoolAdmin), isNull);
     });
 
+    test('school admin bypasses mobile gates for portal hand-off', () {
+      expect(
+        AppRouter.getPortalOnlyRedirect(
+          role: UserRole.schoolAdmin,
+          location: '/terms-acceptance',
+        ),
+        '/auth/admin-portal',
+      );
+      expect(
+        AppRouter.getPortalOnlyRedirect(
+          role: UserRole.schoolAdmin,
+          location: '/auth/admin-portal',
+        ),
+        isNull,
+      );
+    });
+
+    test('mobile roles do not use the admin portal-only redirect', () {
+      expect(
+        AppRouter.getPortalOnlyRedirect(
+          role: UserRole.teacher,
+          location: '/terms-acceptance',
+        ),
+        isNull,
+      );
+      expect(
+        AppRouter.getPortalOnlyRedirect(
+          role: UserRole.parent,
+          location: '/parent/home',
+        ),
+        isNull,
+      );
+    });
+
     test('resolveUserFromRoute prefers route extra over fallback user', () {
       final resolved = AppRouter.resolveUserFromRoute(
         extra: teacher,

@@ -9,7 +9,11 @@ import '../constants/legal_links.dart';
 import '../models/remote_message.dart';
 import '../services/remote_message_controller.dart';
 import '../services/force_update_evaluator.dart';
-import 'lumi_mascot.dart';
+import '../theme/lumi_spacing.dart';
+import '../../theme/lumi_tokens.dart';
+import '../../theme/lumi_typography.dart';
+
+const String versionGateArtwork = 'assets/UI Lumi/lumi welcome.png';
 
 /// Optional App Store page for the Update button on iOS (Play can be derived
 /// from the package id; the App Store's numeric id can't be). Set via
@@ -92,23 +96,16 @@ class _VersionCheckScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Color(0xFFFBF7F0),
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 20),
-                Text(
-                  'Checking this version of Lumi…',
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
+    return const VersionGateLayout(
+      title: 'Checking this version of Lumi…',
+      message:
+          'Lumi is making sure this build can safely connect to your school.',
+      actions: Center(
+        child: SizedBox.square(
+          dimension: 28,
+          child: CircularProgressIndicator(
+            color: LumiTokens.red,
+            strokeWidth: 3,
           ),
         ),
       ),
@@ -147,62 +144,47 @@ class _VersionSupportScreenState extends State<_VersionSupportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFBF7F0),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(32),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const LumiMascot(variant: LumiVariant.teacherWhy, size: 96),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Lumi needs a quick version check',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    widget.endpointUnreachable
-                        ? 'Lumi could not reach its independent version '
-                            'service. Try again or contact support if this '
-                            'continues.'
-                        : 'This build cannot verify that it is safe to use. '
-                            'Please contact Lumi support.',
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 28),
-                  if (widget.onRetry != null)
-                    FilledButton.icon(
-                      onPressed: _retrying ? null : _retry,
-                      icon: _retrying
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.refresh_rounded),
-                      label: const Text('Try version check again'),
-                    ),
-                  const SizedBox(height: 10),
-                  TextButton.icon(
-                    onPressed: () => launchUrl(
-                      Uri.parse(LegalLinks.support),
-                      mode: LaunchMode.externalApplication,
-                    ),
-                    icon: const Icon(Icons.support_agent_rounded),
-                    label: const Text('Contact Lumi support'),
-                  ),
-                ],
+    return VersionGateLayout(
+      title: 'Lumi needs a quick version check',
+      message: widget.endpointUnreachable
+          ? 'Lumi could not reach its independent version service. Try again, or contact support if this continues.'
+          : 'This build cannot verify that it is safe to use. Please contact Lumi support.',
+      actions: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (widget.onRetry != null) ...[
+            FilledButton.icon(
+              onPressed: _retrying ? null : _retry,
+              style: _primaryButtonStyle(),
+              icon: _retrying
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(
+                        color: LumiTokens.paper,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(Icons.refresh_rounded),
+              label: Text(
+                _retrying ? 'Checking again…' : 'Try version check again',
+                style: LumiType.button,
               ),
             ),
+            LumiGap.s,
+          ],
+          OutlinedButton.icon(
+            onPressed: () => launchUrl(
+              Uri.parse(LegalLinks.support),
+              mode: LaunchMode.externalApplication,
+            ),
+            style: _secondaryButtonStyle(),
+            icon: const Icon(Icons.support_agent_rounded),
+            label: Text(
+              'Contact Lumi support',
+              style: LumiType.button.copyWith(color: LumiTokens.ink),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -236,68 +218,120 @@ class _ForceUpdateScreen extends StatelessWidget {
         ? 'App Store'
         : 'Play Store';
 
+    return VersionGateLayout(
+      title: 'Time to update Lumi',
+      message: (message.message?.isNotEmpty ?? false)
+          ? message.message!
+          : 'This version of Lumi is no longer supported. Please update to keep reading.',
+      actions: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (storeUri != null)
+            FilledButton.icon(
+              onPressed: () => launchUrl(
+                storeUri,
+                mode: LaunchMode.externalApplication,
+              ),
+              style: _primaryButtonStyle(),
+              icon: const Icon(Icons.system_update_alt_rounded),
+              label: Text(
+                'Update on the $storeName',
+                style: LumiType.button,
+              ),
+            )
+          else ...[
+            Container(
+              padding: LumiPadding.allS,
+              decoration: BoxDecoration(
+                color: LumiTokens.tintYellow.withValues(alpha: 0.45),
+                borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+                border: Border.all(color: LumiTokens.tintYellow),
+              ),
+              child: Text(
+                'Open the $storeName and update Lumi to continue.',
+                style: LumiType.body.copyWith(
+                  color: LumiTokens.ink,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            LumiGap.s,
+            OutlinedButton.icon(
+              onPressed: () => launchUrl(
+                Uri.parse(LegalLinks.support),
+                mode: LaunchMode.externalApplication,
+              ),
+              style: _secondaryButtonStyle(),
+              icon: const Icon(Icons.support_agent_rounded),
+              label: Text(
+                'Contact Lumi support',
+                style: LumiType.button.copyWith(color: LumiTokens.ink),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Shared presentation for every blocking version state. The policy decision
+/// remains outside this widget so a visual change cannot weaken the gate.
+@visibleForTesting
+class VersionGateLayout extends StatelessWidget {
+  const VersionGateLayout({
+    super.key,
+    required this.title,
+    required this.message,
+    required this.actions,
+  });
+
+  final String title;
+  final String message;
+  final Widget actions;
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFBF7F0),
+      backgroundColor: LumiTokens.cream,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(32),
+            padding: LumiPadding.allM,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const LumiMascot(variant: LumiVariant.teacherWhy, size: 96),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Time to update Lumi',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    (message.message?.isNotEmpty ?? false)
-                        ? message.message!
-                        : 'This version of Lumi is no longer supported. '
-                            'Please update to keep reading.',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 28),
-                  if (storeUri != null)
-                    FilledButton.icon(
-                      onPressed: () => launchUrl(
-                        storeUri,
-                        mode: LaunchMode.externalApplication,
-                      ),
-                      icon: const Icon(Icons.system_update_alt_rounded),
-                      label: Text('Update on the $storeName'),
-                    )
-                  else
-                    Column(
-                      children: [
-                        Text(
-                          'Open the $storeName and update Lumi to continue.',
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 12),
-                        TextButton.icon(
-                          onPressed: () => launchUrl(
-                            Uri.parse(LegalLinks.support),
-                            mode: LaunchMode.externalApplication,
-                          ),
-                          icon: const Icon(Icons.support_agent_rounded),
-                          label: const Text('Contact Lumi support'),
-                        ),
-                      ],
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Container(
+                width: double.infinity,
+                padding: LumiPadding.allL,
+                decoration: BoxDecoration(
+                  color: LumiTokens.paper,
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+                  border: Border.all(color: LumiTokens.rule),
+                  boxShadow: LumiTokens.shadowCard,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset(
+                      versionGateArtwork,
+                      height: 190,
+                      fit: BoxFit.contain,
+                      semanticLabel: 'Lumi welcome illustration',
                     ),
-                ],
+                    LumiGap.m,
+                    Text(title,
+                        style: LumiType.heading, textAlign: TextAlign.center),
+                    LumiGap.s,
+                    Text(
+                      message,
+                      style: LumiType.body.copyWith(color: LumiTokens.muted),
+                      textAlign: TextAlign.center,
+                    ),
+                    LumiGap.l,
+                    SizedBox(width: double.infinity, child: actions),
+                  ],
+                ),
               ),
             ),
           ),
@@ -306,3 +340,23 @@ class _ForceUpdateScreen extends StatelessWidget {
     );
   }
 }
+
+ButtonStyle _primaryButtonStyle() => FilledButton.styleFrom(
+      minimumSize: const Size.fromHeight(56),
+      backgroundColor: LumiTokens.red,
+      foregroundColor: LumiTokens.paper,
+      disabledBackgroundColor: LumiTokens.tintRed,
+      disabledForegroundColor: LumiTokens.paper,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+      ),
+    );
+
+ButtonStyle _secondaryButtonStyle() => OutlinedButton.styleFrom(
+      minimumSize: const Size.fromHeight(56),
+      foregroundColor: LumiTokens.ink,
+      side: const BorderSide(color: LumiTokens.rule, width: 1.5),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+      ),
+    );

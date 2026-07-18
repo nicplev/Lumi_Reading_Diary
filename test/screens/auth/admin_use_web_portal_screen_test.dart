@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lumi_reading_tracker/screens/auth/admin_use_web_portal_screen.dart';
+import 'package:lumi_reading_tracker/theme/lumi_tokens.dart';
 
 void main() {
   testWidgets('renders portal hand-off content and the la_blue artwork',
@@ -18,7 +19,10 @@ void main() {
       find.text('https://lumi-school-admin-au.web.app/login'),
       findsOneWidget,
     );
-    expect(find.text('Back to Login'), findsOneWidget);
+    expect(find.text('Sign out'), findsOneWidget);
+
+    final signOutLabel = tester.widget<Text>(find.text('Sign out'));
+    expect(signOutLabel.style?.color, LumiTokens.ink);
 
     final image = tester.widget<Image>(find.byType(Image));
     expect(
