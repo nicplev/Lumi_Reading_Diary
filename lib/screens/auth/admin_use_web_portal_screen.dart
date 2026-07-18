@@ -7,6 +7,7 @@ import '../../core/theme/lumi_spacing.dart';
 import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
+import '../../services/firebase_service.dart';
 
 /// Shown when a school-admin account signs into the mobile app. School
 /// administration lives entirely in the separate web portal, so the mobile
@@ -32,6 +33,14 @@ class AdminUseWebPortalScreen extends StatelessWidget {
         duration: const Duration(seconds: 2),
       );
     }
+  }
+
+  Future<void> _signOut(BuildContext context) async {
+    await FirebaseService.instance.signOut(
+      afterAuthSignOut: () async {
+        if (context.mounted) context.go('/auth/login');
+      },
+    );
   }
 
   @override
@@ -142,9 +151,11 @@ class AdminUseWebPortalScreen extends StatelessWidget {
 
                   LumiGap.xl,
 
-                  // Back Button
+                  // This account remains authenticated while the external
+                  // portal opens, so returning to login must explicitly end
+                  // the mobile session rather than only changing routes.
                   OutlinedButton.icon(
-                    onPressed: () => context.go('/auth/login'),
+                    onPressed: () => _signOut(context),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: LumiTokens.ink,
                       side: const BorderSide(color: LumiTokens.rule),
@@ -157,8 +168,11 @@ class AdminUseWebPortalScreen extends StatelessWidget {
                             BorderRadius.circular(LumiTokens.radiusPill),
                       ),
                     ),
-                    icon: const Icon(Icons.arrow_back, size: 18),
-                    label: Text('Back to Login', style: LumiType.button),
+                    icon: const Icon(Icons.logout, size: 18),
+                    label: Text(
+                      'Sign out',
+                      style: LumiType.button.copyWith(color: LumiTokens.ink),
+                    ),
                   ).animate().fadeIn(delay: 900.ms),
                 ],
               ),

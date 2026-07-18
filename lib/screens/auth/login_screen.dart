@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/gestures.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -31,6 +32,13 @@ import 'widgets/teacher_registration_modal.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  /// School administrators are portal-only. Their mobile sign-in must route
+  /// directly to the portal hand-off without performing teacher/parent device
+  /// setup or writing mutable profile fields such as `lastLoginAt`.
+  @visibleForTesting
+  static bool shouldPerformMobilePostLoginSetup(UserRole role) =>
+      role != UserRole.schoolAdmin;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -189,6 +197,12 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
       final user = UserModel.fromFirestore(doc);
+
+      if (!LoginScreen.shouldPerformMobilePostLoginSetup(user.role)) {
+        if (!mounted) return;
+        _navigateToHome(user);
+        return;
+      }
 
       await _firebaseService.firestore
           .collection('schools')
@@ -399,6 +413,16 @@ class _LoginScreenState extends State<LoginScreen> {
           }
 
           if (user != null && userSchoolId != null) {
+            // School administrators are intentionally portal-only. In
+            // particular, the shared demo administrator is read-only, so a
+            // mobile `lastLoginAt` write would be rejected by Firestore and
+            // turn a successful sign-in into a misleading generic error.
+            if (!LoginScreen.shouldPerformMobilePostLoginSetup(user.role)) {
+              if (!mounted) return;
+              _navigateToHome(user);
+              return;
+            }
+
             // Update last login time
             final isParent = user.role == UserRole.parent;
             await _firebaseService.firestore
@@ -424,7 +448,21 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() {
           _errorMessage = _getErrorMessage(e.code);
         });
-      } catch (e) {
+      } catch (e, stackTrace) {
+        // Authentication can succeed before profile lookup/device setup
+        // fails. Never leave that partially completed sign-in active behind
+        // the login screen on a shared device.
+        if (kDebugMode) {
+          debugPrint('[login] post-auth setup failed: $e');
+          debugPrintStack(stackTrace: stackTrace);
+        }
+        try {
+          await _firebaseService.signOut();
+        } catch (_) {
+          // The original error remains the useful one; routing stays on the
+          // unauthenticated surface and a later bootstrap retries cleanup.
+        }
+        if (!mounted) return;
         setState(() {
           _errorMessage = 'An error occurred. Please try again.';
         });

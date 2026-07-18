@@ -197,6 +197,18 @@ class AppRouter {
       }
 
       final userRole = userModel.role;
+
+      // School administrators are portal-only in the Flutter app. Route them
+      // to the hand-off before applying mobile-only gates such as terms
+      // acceptance; otherwise a read-only demo admin is asked to perform a
+      // Firestore write that its deliberately restricted account cannot make.
+      // Administrator legal acceptance belongs in the web admin portal.
+      final portalOnlyRedirect = getPortalOnlyRedirect(
+        role: userRole,
+        location: location,
+      );
+      if (portalOnlyRedirect != null) return portalOnlyRedirect;
+
       final isImpersonating =
           _ref.read(impersonationSessionProvider).value != null;
       final hasAcceptedTerms =
@@ -906,6 +918,20 @@ class AppRouter {
       default:
         return '/teacher/home';
     }
+  }
+
+  /// Returns the only valid mobile destination for a school administrator.
+  /// Kept independent of router/provider state so this boundary's ordering
+  /// before mobile terms and setup can be regression-tested.
+  @visibleForTesting
+  static String? getPortalOnlyRedirect({
+    required UserRole role,
+    required String location,
+  }) {
+    if (role != UserRole.schoolAdmin || location == '/auth/admin-portal') {
+      return null;
+    }
+    return '/auth/admin-portal';
   }
 
   /// Helper method to check if a parent is on web and redirect
