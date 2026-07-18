@@ -390,7 +390,6 @@ function exactClaims(user: DemoAuthUser): Record<string, unknown> {
   if (user.key === "sharedadmin") {
     claims.demoAdminMfaExempt = true;
     claims.demoReadOnly = true;
-    claims.demoInteractive = true;
   }
   return claims;
 }
