@@ -73,6 +73,10 @@ class _TermsAcceptanceScreenState extends ConsumerState<TermsAcceptanceScreen> {
     );
   }
 
+  void _retryAccountLoad() {
+    ref.invalidate(userProvider);
+  }
+
   String _destinationFor(UserModel user) {
     final returnTo = widget.returnTo;
     if (returnTo != null &&
@@ -100,10 +104,16 @@ class _TermsAcceptanceScreenState extends ConsumerState<TermsAcceptanceScreen> {
             loading: () => const Center(
               child: CircularProgressIndicator(color: LumiTokens.green),
             ),
-            error: (_, __) => _ErrorState(onSignOut: _signOut),
+            error: (_, __) => TermsAccountLoadError(
+              onRetry: _retryAccountLoad,
+              onSignOut: _signOut,
+            ),
             data: (user) {
               if (user == null) {
-                return _ErrorState(onSignOut: _signOut);
+                return TermsAccountLoadError(
+                  onRetry: _retryAccountLoad,
+                  onSignOut: _signOut,
+                );
               }
               return Center(
                 child: SingleChildScrollView(
@@ -427,35 +437,120 @@ class _LegalLinkRow extends StatelessWidget {
   }
 }
 
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.onSignOut});
+class TermsAccountLoadError extends StatelessWidget {
+  const TermsAccountLoadError({
+    super.key,
+    required this.onRetry,
+    required this.onSignOut,
+  });
 
+  final VoidCallback onRetry;
   final VoidCallback onSignOut;
 
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.lock_outline_rounded,
-                size: 44, color: LumiTokens.muted),
-            const SizedBox(height: 12),
-            Text('Could not load your account', style: LumiType.subhead),
-            const SizedBox(height: 8),
-            Text(
-              'Sign out and try again.',
-              style: LumiType.body.copyWith(color: LumiTokens.muted),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 18),
-            FilledButton(
-              onPressed: onSignOut,
-              child: const Text('Sign out'),
-            ),
-          ],
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(LumiTokens.space5),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                'assets/UI Lumi/lumi welcome.png',
+                width: 190,
+                height: 190,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(height: LumiTokens.space5),
+              Container(
+                padding: const EdgeInsets.all(LumiTokens.space5),
+                decoration: BoxDecoration(
+                  color: LumiTokens.paper,
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+                  border: Border.all(color: LumiTokens.rule),
+                  boxShadow: LumiTokens.shadowCard,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Align(
+                      child: Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: LumiTokens.tintGreen.withValues(alpha: 0.42),
+                          borderRadius:
+                              BorderRadius.circular(LumiTokens.radiusMedium),
+                        ),
+                        child: const Icon(
+                          Icons.lock_reset_rounded,
+                          color: LumiTokens.green,
+                          size: 30,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: LumiTokens.space4),
+                    Text(
+                      'Let\'s reconnect your account',
+                      style: LumiType.heading,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: LumiTokens.space2),
+                    Text(
+                      'Lumi couldn\'t refresh your account details. Try again first—your account and reading data are still safe.',
+                      style: LumiType.body.copyWith(color: LumiTokens.muted),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: LumiTokens.space5),
+                    SizedBox(
+                      height: 54,
+                      child: FilledButton.icon(
+                        key: const Key('terms-account-retry'),
+                        onPressed: onRetry,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: Text('Try again', style: LumiType.button),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: LumiTokens.green,
+                          foregroundColor: LumiTokens.paper,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              LumiTokens.radiusPill,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: LumiTokens.space3),
+                    SizedBox(
+                      height: 52,
+                      child: OutlinedButton.icon(
+                        key: const Key('terms-account-sign-out'),
+                        onPressed: onSignOut,
+                        icon: const Icon(Icons.logout_rounded),
+                        label: Text(
+                          'Sign out',
+                          style: LumiType.button.copyWith(
+                            color: LumiTokens.ink,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: LumiTokens.ink,
+                          side: const BorderSide(color: LumiTokens.rule),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              LumiTokens.radiusPill,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

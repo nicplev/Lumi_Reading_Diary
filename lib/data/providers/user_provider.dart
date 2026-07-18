@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/impersonation_session.dart';
@@ -79,10 +80,34 @@ final userProvider = StreamProvider<UserModel?>((ref) {
         .asStream();
   }
 
-  final uid = ref.watch(authStateChangesProvider).value;
+  final authState = ref.watch(authStateChangesProvider);
+  final uid = resolveUserProviderUid(
+    authState,
+    FirebaseAuth.instance.currentUser?.uid,
+  );
   if (uid == null) return Stream.value(null);
   return _loadUserResilient(userRepository, uid);
 });
+
+/// Resolves the UID without turning the short initial auth-stream loading
+/// window into a false signed-out/profile-missing result.
+///
+/// An explicit `AsyncData(null)` remains authoritative: once Firebase emits a
+/// signed-out state, a possibly stale synchronous user must never resurrect
+/// the session. The synchronous UID is used only while the stream is loading
+/// or has a transient error; all profile reads still go through Firestore
+/// Security Rules with Firebase's verified ID token.
+@visibleForTesting
+String? resolveUserProviderUid(
+  AsyncValue<String?> authState,
+  String? currentFirebaseUid,
+) {
+  return authState.when(
+    data: (uid) => uid,
+    loading: () => currentFirebaseUid,
+    error: (_, __) => currentFirebaseUid,
+  );
+}
 
 /// Loads the profile for [uid], retrying briefly on a null/failed read while a
 /// Firebase session is still present — staying in the loading state (no
