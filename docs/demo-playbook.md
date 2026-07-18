@@ -148,11 +148,14 @@ Everything above, plus:
 
 ## 4. The pre-demo ritual (10 minutes, every time)
 
-1. **Provision today:** in the super-admin portal, open the prospect's demo
-   request and select **Provision today's demo password**. The first provision
-   of a new Sydney day performs the fenced demo reseed before issuing the
-   password; do not separately run the legacy seed/reset command.
-2. **Run the automated live preflight** from the repo root:
+1. **Prepare and verify:** in the super-admin portal, open the prospect's demo
+   request and select **Prepare and verify today's demo**. One click provisions
+   (or safely reuses) today's password, runs the fenced reseed when a new Sydney
+   day requires it, and then checks the real administrator, teacher, parent,
+   Rules and portal paths. Wait for the green **Ready for a customer demo**
+   receipt. Do not separately run the legacy seed/reset command.
+2. **Terminal fallback only:** if the portal readiness control itself is
+   unavailable, run the same redacted automated preflight from the repo root:
 
    ```bash
    pnpm demo:preflight -- --project=lumi-ninc-au --canary
@@ -164,8 +167,9 @@ Everything above, plus:
    credential, all three fresh password sign-ins, exact role claims, membership
    indexes, populated demo content, production Rules reads, the read-only admin
    portal session, and reversible parent/teacher login + Terms writes. The
-   canary restores every profile field it touches. **Do not begin the call
-   unless the final line says `READY`.**
+   canary restores every profile field it touches. This command is an operator
+   fallback, not the normal daily workflow. **Do not begin the call unless the
+   portal is green or the fallback's final line says `READY`.**
 3. **Thirty-second surface smoke:** admin portal dashboard loads and remains
    read-only; teacher account reaches Teacher Home; parent account reaches the
    current Terms screen or Parent Home. If Terms appear, accept them before the

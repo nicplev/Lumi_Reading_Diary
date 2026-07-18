@@ -13,6 +13,13 @@ import {
   DemoRouteSecurityError,
 } from "@/lib/demo/security";
 
+function noStoreJson(body: unknown, status = 200): NextResponse {
+  return NextResponse.json(body, {
+    status,
+    headers: { "cache-control": "no-store, max-age=0" },
+  });
+}
+
 // POST /api/onboarding/[id]/demo-access
 //   { action: "provision" }  → issue/reuse today's shared demo password
 //   { action: "sendEmail" }  → queue the demo-details email to the requester
@@ -22,7 +29,7 @@ export async function POST(
 ) {
   const session = await verifySession();
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return noStoreJson({ error: "Unauthorized" }, 401);
   }
 
   try {
@@ -38,37 +45,37 @@ export async function POST(
         { key: "provision:global", max: 10, windowMs: 60 * 60 * 1000 },
       ]);
       const result = await provisionDemoAccessForOnboarding(actor, id);
-      return NextResponse.json({ success: true, ...result });
+      return noStoreJson({ success: true, ...result });
     }
     await consumeDemoRouteLimits([
       { key: `demo-email:actor:${session.uid}`, max: 10, windowMs: 60 * 60 * 1000 },
       { key: "demo-email:global", max: 30, windowMs: 60 * 60 * 1000 },
     ]);
     const result = await sendDemoAccessEmail(actor, id);
-    return NextResponse.json({ success: true, ...result });
+    return noStoreJson({ success: true, ...result });
   } catch (error: unknown) {
     if (error instanceof DemoRouteSecurityError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      return noStoreJson({ error: error.message }, error.status);
     }
     if (error instanceof Error && error.name === "ZodError") {
-      return NextResponse.json(
+      return noStoreJson(
         {
           error: "Validation failed",
           details: (error as unknown as { errors: unknown }).errors,
         },
-        { status: 400 }
+        400
       );
     }
     if (error instanceof DemoAccessError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      return noStoreJson({ error: error.message }, error.status);
     }
     if (error instanceof ServerOpsValidationError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return noStoreJson({ error: error.message }, 400);
     }
     console.error("Demo-access error:", error);
-    return NextResponse.json(
+    return noStoreJson(
       { error: "Failed to complete the demo-access action" },
-      { status: 500 }
+      500
     );
   }
 }

@@ -123,8 +123,61 @@ export interface DemoAccessView {
   parentEmail: string;
   portalLoginUrl: string;
   marketingUrl: string;
+  readiness: DemoReadinessView | null;
   /** Send history for THIS onboarding request, newest first. */
   history: DemoEmailHistoryItem[];
+}
+
+export interface DemoReadinessView {
+  ready: boolean;
+  state: "ready" | "not_ready" | "stale";
+  dayKey: string | null;
+  checkedAtISO: string | null;
+  checkedByEmail: string | null;
+  checks: Array<{
+    key: string;
+    label: string;
+    status: "pass" | "fail" | "skipped";
+    detail: string;
+  }>;
+}
+
+function mapReadiness(data: FirebaseFirestore.DocumentData | undefined): DemoReadinessView | null {
+  if (!data) return null;
+  const state = ["ready", "not_ready", "stale"].includes(data.state)
+    ? (data.state as DemoReadinessView["state"])
+    : "stale";
+  const checks = Array.isArray(data.checks)
+    ? data.checks
+        .filter(
+          (check: unknown): check is Record<string, unknown> =>
+            !!check && typeof check === "object",
+        )
+        .map((check: Record<string, unknown>) => ({
+          key: typeof check.key === "string" ? check.key : "unknown",
+          label: typeof check.label === "string" ? check.label : "Readiness check",
+          status: ["pass", "fail", "skipped"].includes(String(check.status))
+            ? (check.status as "pass" | "fail" | "skipped")
+            : "fail",
+          detail:
+            typeof check.detail === "string"
+              ? check.detail
+              : "No readiness detail is available.",
+        }))
+    : [];
+  const checkedBy =
+    data.checkedBy && typeof data.checkedBy === "object"
+      ? (data.checkedBy as Record<string, unknown>)
+      : {};
+  return {
+    ready: data.ready === true && state === "ready",
+    state,
+    dayKey: typeof data.dayKey === "string" ? data.dayKey : null,
+    checkedAtISO: toISO(data.checkedAt) || null,
+    checkedByEmail:
+      typeof checkedBy.email === "string" ? checkedBy.email : null,
+    checks,
+  };
 }
 
 // State + this-request history for the onboarding detail panel. The password is
@@ -134,9 +187,10 @@ export async function getDemoAccessView(
   onboardingId: string
 ): Promise<DemoAccessView> {
   const db = getAdminDb();
-  const [config, stateSnap, emailsSnap] = await Promise.all([
+  const [config, stateSnap, readinessSnap, emailsSnap] = await Promise.all([
     readDemoAccessConfig(),
     db.doc("demoAccess/state").get(),
+    db.doc("demoAccess/readinessStatus").get(),
     db
       .collection("demoAccessEmails")
       .where("onboardingId", "==", onboardingId)
@@ -164,6 +218,7 @@ export async function getDemoAccessView(
     parentEmail: config.parentEmail,
     portalLoginUrl: config.portalLoginUrl,
     marketingUrl: config.marketingUrl,
+    readiness: mapReadiness(readinessSnap.data()),
     history,
   };
 }

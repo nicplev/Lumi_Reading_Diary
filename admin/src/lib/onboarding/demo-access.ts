@@ -118,7 +118,10 @@ export async function sendDemoAccessEmail(
   }
 
   const today = sydneyDayKey();
-  const stateSnap = await db.doc("demoAccess/state").get();
+  const [stateSnap, readinessSnap] = await Promise.all([
+    db.doc("demoAccess/state").get(),
+    db.doc("demoAccess/readinessStatus").get(),
+  ]);
   const state = stateSnap.data();
   if (!stateSnap.exists || !state) {
     throw new DemoAccessError(
@@ -129,6 +132,18 @@ export async function sendDemoAccessEmail(
   if (state.dayKey !== today || state.scrambledAt != null) {
     throw new DemoAccessError(
       "Today's demo password isn't active — provision it again before emailing.",
+      409
+    );
+  }
+  const readiness = readinessSnap.data();
+  if (
+    !readinessSnap.exists ||
+    readiness?.ready !== true ||
+    readiness?.state !== "ready" ||
+    readiness?.dayKey !== today
+  ) {
+    throw new DemoAccessError(
+      "Prepare and verify today's demo before emailing its credentials.",
       409
     );
   }

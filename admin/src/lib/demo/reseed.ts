@@ -6,6 +6,7 @@ import {
   type DemoReseedResult,
 } from "@lumi/server-ops";
 import { getAdminAuth, getAdminDb, getAdminStorage } from "@/lib/firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 import { readDemoAccessConfig } from "@/lib/firestore/demo-access";
 
 export async function runDemoReseed(
@@ -24,6 +25,18 @@ export async function runDemoReseed(
   if (!school.exists || school.data()?.isDemo !== true) {
     throw new Error("Safety stop: configured tenant is not authoritatively marked as demo data.");
   }
+  // A refresh changes the dataset beneath the last readiness result. Invalidate
+  // it before any destructive work begins so the portal can never display a
+  // stale green result after a partial or failed reseed.
+  await db.doc("demoAccess/readinessStatus").set({
+    ready: false,
+    state: "stale",
+    dayKey: null,
+    checks: [],
+    invalidatedAt: FieldValue.serverTimestamp(),
+    invalidatedBy: { uid: actor.uid, email: actor.email ?? null },
+    reason: "reseed",
+  });
   return reseedDemoSchool(
     getAdminAuth(),
     db,
