@@ -12,6 +12,9 @@ step() {
 step "Deterministic demo plan"
 pnpm test:demo-plan
 
+step "Redacted live preflight core"
+pnpm test:demo-preflight
+
 step "Fenced Auth/Firestore/Storage reseed"
 JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home}" \
   PATH="${JAVA_HOME:-/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home}/bin:$PATH" \

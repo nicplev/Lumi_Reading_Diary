@@ -3,7 +3,15 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Copy, KeyRound, Mail } from "lucide-react";
+import {
+  CheckCircle2,
+  CircleX,
+  Copy,
+  KeyRound,
+  LoaderCircle,
+  Mail,
+  ShieldCheck,
+} from "lucide-react";
 import {
   Card,
   CardContent,
@@ -14,7 +22,10 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import type { DemoAccessView } from "@/lib/firestore/demo-access";
+import type {
+  DemoAccessView,
+  DemoReadinessView,
+} from "@/lib/firestore/demo-access";
 
 interface DemoAccessPanelProps {
   onboardingId: string;
@@ -42,18 +53,26 @@ export function DemoAccessPanel({
   view,
 }: DemoAccessPanelProps) {
   const router = useRouter();
-  const [loading, setLoading] = useState<null | "provision" | "email">(null);
+  const [loading, setLoading] = useState<null | "prepare" | "email">(null);
   const [confirmEmail, setConfirmEmail] = useState(false);
   const [reseedPhase, setReseedPhase] = useState<string | null>(null);
+  const [preparePhase, setPreparePhase] = useState<
+    "provisioning" | "verifying" | null
+  >(null);
+  const [readiness, setReadiness] = useState<DemoReadinessView | null>(
+    view.readiness,
+  );
   // Password from a just-completed provision (avoids a refresh flash); falls
   // back to the server-rendered live password.
   const [freshPassword, setFreshPassword] = useState<string | null>(null);
 
   const password = freshPassword ?? view.password;
   const hasLivePassword = !!password;
+  const isReadyToday =
+    readiness?.ready === true && readiness.dayKey === view.today;
 
   useEffect(() => {
-    if (loading !== "provision") return;
+    if (loading !== "prepare" || preparePhase !== "provisioning") return;
 
     let cancelled = false;
     const poll = async () => {
@@ -78,7 +97,7 @@ export function DemoAccessPanel({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [loading]);
+  }, [loading, preparePhase]);
 
   const copy = async (label: string, value: string) => {
     try {
@@ -89,27 +108,51 @@ export function DemoAccessPanel({
     }
   };
 
-  const provision = async () => {
+  const prepareAndVerify = async () => {
     setReseedPhase(null);
-    setLoading("provision");
+    setPreparePhase("provisioning");
+    setLoading("prepare");
     try {
-      const res = await fetch(`/api/onboarding/${onboardingId}/demo-access`, {
+      const provisionResponse = await fetch(
+        `/api/onboarding/${onboardingId}/demo-access`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "provision" }),
+        },
+      );
+      const provisionData = await provisionResponse.json();
+      if (!provisionResponse.ok) {
+        throw new Error(provisionData.error || "Preparation failed");
+      }
+      setFreshPassword(provisionData.password);
+      setPreparePhase("verifying");
+
+      const readinessResponse = await fetch(
+        `/api/onboarding/${onboardingId}/demo-readiness`,
+        {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "provision" }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Provision failed");
-      setFreshPassword(data.password);
-      toast.success(
-        data.reused
-          ? "Reused today's demo password"
-          : "Today's demo password is live"
+          body: JSON.stringify({ confirm: "RUN DEMO PREFLIGHT" }),
+        },
       );
+      const readinessData = (await readinessResponse.json()) as
+        DemoReadinessView & { error?: string };
+      if (Array.isArray(readinessData.checks)) {
+        setReadiness(readinessData);
+      }
+      if (!readinessResponse.ok || !readinessData.ready) {
+        throw new Error(
+          readinessData.error || "The demo is not ready. Review the failed check.",
+        );
+      }
+      toast.success("Today’s demo is prepared and verified");
       router.refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Provision failed");
+      toast.error(e instanceof Error ? e.message : "Demo preparation failed");
+      router.refresh();
     } finally {
+      setPreparePhase(null);
       setLoading(null);
     }
   };
@@ -167,8 +210,8 @@ export function DemoAccessPanel({
             <span className="font-medium text-foreground">
               rolling daily password
             </span>
-            . Provision it, then read the credentials out on the call or email
-            them to the requester. Access self-expires at{" "}
+            . Prepare and verify it before the call, then read the credentials
+            out or email them to the requester. Access self-expires at{" "}
             <span className="font-medium text-foreground">
               midnight (Sydney)
             </span>
@@ -221,25 +264,98 @@ export function DemoAccessPanel({
             </div>
           )}
 
+          {/* Readiness receipt — deliberately contains no credentials or IDs. */}
+          <div
+            className={`rounded-lg border p-3 ${
+              isReadyToday
+                ? "border-emerald-300 bg-emerald-50 text-emerald-950"
+                : readiness?.state === "not_ready"
+                  ? "border-red-300 bg-red-50 text-red-950"
+                  : "border-amber-300 bg-amber-50 text-amber-950"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              {isReadyToday ? (
+                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
+              ) : readiness?.state === "not_ready" ? (
+                <CircleX className="mt-0.5 h-5 w-5 shrink-0" />
+              ) : (
+                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="font-medium">
+                  {isReadyToday
+                    ? "Ready for a customer demo"
+                    : readiness?.state === "not_ready"
+                      ? "Demo needs attention"
+                      : "Demo has not been verified today"}
+                </p>
+                {readiness?.checkedAtISO && (
+                  <p className="mt-0.5 text-xs opacity-75">
+                    Checked {fmtSydney(readiness.checkedAtISO)}
+                    {readiness.checkedByEmail
+                      ? ` by ${readiness.checkedByEmail}`
+                      : ""}
+                  </p>
+                )}
+                {readiness?.state === "stale" && (
+                  <p className="mt-1 text-xs">
+                    Demo data changed after the last check. Prepare and verify it
+                    again before presenting.
+                  </p>
+                )}
+              </div>
+            </div>
+            {readiness && readiness.checks.length > 0 && (
+              <ul className="mt-3 space-y-2 border-t border-current/15 pt-3">
+                {readiness.checks.map((check) => (
+                  <li key={check.key} className="flex items-start gap-2 text-xs">
+                    {check.status === "pass" ? (
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                    ) : check.status === "fail" ? (
+                      <CircleX className="mt-0.5 h-4 w-4 shrink-0" />
+                    ) : (
+                      <LoaderCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    )}
+                    <span>
+                      <strong>{check.label}:</strong> {check.detail}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           {/* Actions */}
           <div className="flex flex-wrap gap-2">
-            <Button onClick={provision} disabled={loading !== null}>
-              <KeyRound className="mr-2 h-4 w-4" />
-              {loading === "provision"
-                ? "Provisioning…"
-                : hasLivePassword
-                  ? "Re-issue today's password"
-                  : "Provision today's demo password"}
+            <Button onClick={prepareAndVerify} disabled={loading !== null}>
+              {loading === "prepare" ? (
+                <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <ShieldCheck className="mr-2 h-4 w-4" />
+              )}
+              {loading === "prepare"
+                ? preparePhase === "verifying"
+                  ? "Verifying live demo…"
+                  : "Preparing demo…"
+                : "Prepare and verify today’s demo"}
             </Button>
             <Button
               variant="outline"
               onClick={() => setConfirmEmail(true)}
-              disabled={loading !== null || !hasLivePassword || !contactEmail}
+              disabled={
+                loading !== null ||
+                !hasLivePassword ||
+                !isReadyToday ||
+                !contactEmail
+              }
               title={
                 !contactEmail
                   ? "This request has no contact email"
                   : !hasLivePassword
-                    ? "Provision today's password first"
+                    ? "Prepare today’s demo first"
+                    : !isReadyToday
+                      ? "The live demo must pass readiness checks before credentials are emailed"
                     : undefined
               }
             >
@@ -247,11 +363,13 @@ export function DemoAccessPanel({
               Email demo details
             </Button>
           </div>
-          {loading === "provision" && reseedPhase && (
+          {loading === "prepare" &&
+            preparePhase === "provisioning" &&
+            reseedPhase && (
             <p className="text-xs text-muted-foreground" role="status">
               Refreshing demo data: {reseedPhase.replaceAll("_", " ")}…
             </p>
-          )}
+            )}
 
           {/* Send history for this request */}
           {view.history.length > 0 && (
