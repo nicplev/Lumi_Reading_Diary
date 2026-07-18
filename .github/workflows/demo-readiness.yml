@@ -1,0 +1,77 @@
+name: demo-readiness
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'admin/**'
+      - 'functions/**'
+      - 'lib/core/routing/**'
+      - 'lib/data/providers/user_provider.dart'
+      - 'lib/screens/auth/**'
+      - 'packages/**'
+      - 'school-admin-web/**'
+      - 'scripts/demo-readiness-local.sh'
+      - 'firestore.rules'
+      - 'storage.rules'
+      - 'firebase*.json'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pubspec.lock'
+      - 'pubspec.yaml'
+      - '.github/workflows/demo-readiness.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'admin/**'
+      - 'functions/**'
+      - 'lib/core/routing/**'
+      - 'lib/data/providers/user_provider.dart'
+      - 'lib/screens/auth/**'
+      - 'packages/**'
+      - 'school-admin-web/**'
+      - 'scripts/demo-readiness-local.sh'
+      - 'firestore.rules'
+      - 'storage.rules'
+      - 'firebase*.json'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pubspec.lock'
+      - 'pubspec.yaml'
+      - '.github/workflows/demo-readiness.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: demo-readiness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regression-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Functions dependencies
+        working-directory: functions
+        run: npm ci
+      - name: Install Flutter dependencies
+        run: flutter pub get
+      - name: Run the complete demo regression gate
+        run: pnpm test:demo-readiness

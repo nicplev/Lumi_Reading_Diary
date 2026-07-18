@@ -1,6 +1,6 @@
 # Lumi — Sales Demo Playbook
 
-> **Status:** v1.0 · 2026-06-15 · Owner: Lumi (founder)
+> **Status:** v1.1 · 2026-07-19 · Owner: Lumi (founder)
 > **Purpose:** a repeatable script for demoing Lumi to school prospects — on video
 > calls and in person — that any future sales/CS teammate can run.
 > **Companion tooling:** [`scripts/seed_demo_school.js`](../scripts/seed_demo_school.js)
@@ -120,7 +120,7 @@ Fill these in once and keep them with the playbook:
 
 ### Video call (Zoom/Meet/Teams)
 
-- [ ] `--reset` run this morning; the three post-seed checks pass (§4)
+- [ ] Today's password provisioned; the redacted live preflight says **READY** (§4)
 - [ ] Browser window 1: school-admin portal, logged in as **Dana**, on Dashboard
 - [ ] Browser window 2: Flutter web, logged in as **Priya**, on class 3G
 - [ ] iPhone signed in as **Sarah**, app **closed** (preserves the badge popup),
@@ -148,16 +148,40 @@ Everything above, plus:
 
 ## 4. The pre-demo ritual (10 minutes, every time)
 
-1. **Reset:** `node scripts/seed_demo_school.js --reset` (confirm project id).
-2. **Admin check:** log into the school-admin portal as Dana — dashboard charts
-   populated, Riley visible in at-risk.
-3. **Teacher check:** Flutter web as Priya — 3G shows last night's logs and the
-   comment thread on Ava's latest log.
-4. **Parent check — the popup trap:** opening the app as Sarah consumes Ava's
-   one-shot badge popup. So either trust the seed output and leave the app
-   closed, or verify the parent login fully and then run `--reset` once more,
-   leaving the app closed afterwards.
-5. Silence everything that isn't the demo phone's Lumi notifications.
+1. **Provision today:** in the super-admin portal, open the prospect's demo
+   request and select **Provision today's demo password**. The first provision
+   of a new Sydney day performs the fenced demo reseed before issuing the
+   password; do not separately run the legacy seed/reset command.
+2. **Run the automated live preflight** from the repo root:
+
+   ```bash
+   pnpm demo:preflight -- --project=lumi-ninc-au --canary
+   ```
+
+   If ADC is not available on this computer, first run
+   `gcloud auth application-default login`. The command prints no password,
+   token, UID, child identity or document ID. It verifies today's unscrambled
+   credential, all three fresh password sign-ins, exact role claims, membership
+   indexes, populated demo content, production Rules reads, the read-only admin
+   portal session, and reversible parent/teacher login + Terms writes. The
+   canary restores every profile field it touches. **Do not begin the call
+   unless the final line says `READY`.**
+3. **Thirty-second surface smoke:** admin portal dashboard loads and remains
+   read-only; teacher account reaches Teacher Home; parent account reaches the
+   current Terms screen or Parent Home. If Terms appear, accept them before the
+   call. This is the only part the automated gate cannot visually prove.
+4. **Parent popup trap:** opening the app can consume Ava's one-shot badge
+   celebration. If that moment matters for the call, use the explicit demo
+   reseed control after the smoke check, confirm it succeeds, and leave the app
+   closed. Same-day password provisioning alone intentionally reuses the
+   credential and does not reset activity.
+5. **Fallbacks ready:** confirm the three short fallback clips/screenshots are
+   on the laptop, then silence everything except Lumi notifications.
+
+The code-level regression suite is `pnpm test:demo-readiness`. It runs in the
+`demo-readiness` GitHub workflow whenever demo auth, routing, Rules, portals,
+Functions or seed logic changes. It is a release gate, not a substitute for the
+daily live preflight above.
 
 ---
 

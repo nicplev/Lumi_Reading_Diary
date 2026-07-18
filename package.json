@@ -9,7 +9,9 @@
     "admin:lint": "pnpm --filter lumi-admin-scaffold lint",
     "typecheck": "pnpm -r --if-present exec tsc --noEmit",
     "demo:reseed:dry-run": "tsx scripts/reseed_demo_school.ts --dry-run",
-    "test:demo-plan": "tsx --test packages/server-ops/test/demoSchool.plan.test.ts"
+    "demo:preflight": "tsx admin/scripts/demo-preflight.ts",
+    "test:demo-plan": "tsx --test packages/server-ops/test/demoSchool.plan.test.ts",
+    "test:demo-readiness": "bash scripts/demo-readiness-local.sh"
   },
   "devDependencies": {
     "firebase-admin": "^13.10.0",
