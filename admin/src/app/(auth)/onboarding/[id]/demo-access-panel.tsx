@@ -7,6 +7,8 @@ import {
   CheckCircle2,
   CircleX,
   Copy,
+  Eye,
+  EyeOff,
   KeyRound,
   LoaderCircle,
   Mail,
@@ -65,6 +67,7 @@ export function DemoAccessPanel({
   // Password from a just-completed provision (avoids a refresh flash); falls
   // back to the server-rendered live password.
   const [freshPassword, setFreshPassword] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const password = freshPassword ?? view.password;
   const hasLivePassword = !!password;
@@ -177,23 +180,48 @@ export function DemoAccessPanel({
     }
   };
 
-  const credentialRow = (label: string, value: string) => (
-    <div className="space-y-1">
-      <Label className="text-xs">{label}</Label>
-      <div className="flex items-center gap-2">
-        <code className="flex-1 truncate rounded bg-muted px-2 py-1 font-mono text-sm">
-          {value}
-        </code>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => copy(label, value)}
-        >
-          <Copy className="h-4 w-4" />
-        </Button>
+  const credentialRow = (
+    label: string,
+    value: string,
+    options: { sensitive?: boolean } = {},
+  ) => {
+    const visibleValue =
+      options.sensitive && !showPassword ? "••••••••••••" : value;
+    return (
+      <div className="space-y-1">
+        <Label className="text-xs">{label}</Label>
+        <div className="flex items-center gap-2">
+          <code className="flex-1 truncate rounded bg-muted px-2 py-1 font-mono text-sm">
+            {visibleValue}
+          </code>
+          {options.sensitive && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowPassword((shown) => !shown)}
+              aria-label={
+                showPassword ? "Hide shared password" : "Reveal shared password"
+              }
+            >
+              {showPassword ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => copy(label, value)}
+            aria-label={`Copy ${label.toLowerCase()}`}
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <>
@@ -244,7 +272,9 @@ export function DemoAccessPanel({
           {/* Credentials */}
           {hasLivePassword && (
             <div className="space-y-3 rounded-lg border p-3">
-              {credentialRow("Shared password (all three logins)", password!)}
+              {credentialRow("Shared password (all three logins)", password!, {
+                sensitive: true,
+              })}
               <div className="grid gap-3 sm:grid-cols-3">
                 {credentialRow("Admin portal", view.adminEmail)}
                 {credentialRow("Teacher (app)", view.teacherEmail)}
