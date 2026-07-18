@@ -236,4 +236,9 @@ test("server and mobile Terms canary versions stay in sync", () => {
   )?.[1];
   assert.ok(serverVersion);
   assert.equal(serverVersion, mobileVersion);
+  assert.match(
+    server,
+    /SUPER_ADMIN_ORIGIN\s*=\s*"https:\/\/lumi-dev-admin-au\.web\.app"/,
+    "server preflight must identify the deployed referrer-restricted admin site",
+  );
 });

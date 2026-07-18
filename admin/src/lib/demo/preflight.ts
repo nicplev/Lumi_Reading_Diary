@@ -8,7 +8,7 @@ import { DEMO_SCHOOL_ID_DEFAULT } from "@/lib/firestore/demo-access";
 
 const PROJECT_ID = "lumi-ninc-au";
 const SCHOOL_PORTAL_ORIGIN = "https://lumi-school-admin-au.web.app";
-const SUPER_ADMIN_ORIGIN = "https://lumi-super-admin-au.web.app";
+const SUPER_ADMIN_ORIGIN = "https://lumi-dev-admin-au.web.app";
 
 // Kept beside the server preflight intentionally. The demo regression gate
 // checks this against TermsAcceptanceService.currentTermsVersion so a mobile
