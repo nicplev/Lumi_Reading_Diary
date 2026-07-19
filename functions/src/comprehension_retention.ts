@@ -396,7 +396,10 @@ async function performCleanup(
 
 export const cleanupComprehensionAudio = onSchedule(
   {
-    schedule: "every 24 hours",
+    // Fixed slot (was floating "every 24 hours") so the AI-eval sweep's
+    // midnight run precedes retention; the >=7-day retention floor remains
+    // the real guarantee for deferred jobs.
+    schedule: "0 4 * * *",
     timeZone: "Australia/Sydney",
     timeoutSeconds: 540,
     memory: "512MiB",
