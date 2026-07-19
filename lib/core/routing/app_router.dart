@@ -86,6 +86,13 @@ class AppRouter {
     redirect: (context, state) async {
       final location = state.matchedLocation;
 
+      // Verified HTTPS links deliberately expose one non-destructive entry
+      // point. Do not forward query parameters from the public URL into app
+      // state; callers control them. Authentication and role routing resume
+      // normally from splash.
+      final trustedWebLinkRedirect = getTrustedWebLinkRedirect(state.uri);
+      if (trustedWebLinkRedirect != null) return trustedWebLinkRedirect;
+
       // iOS widget deep links arrive as `lumi://widget/home?childId=…` or
       // `lumi://widget/log?childId=…`. Flutter's deep-link channel hands the
       // raw URI to GoRouter, which only sees the path (`/home` or `/log`) and
@@ -918,6 +925,19 @@ class AppRouter {
       default:
         return '/teacher/home';
     }
+  }
+
+  /// Converts the one verified marketing-domain App Link into a safe app
+  /// entry point. The exact host, HTTPS scheme and path are allowlisted so a
+  /// lookalike domain or arbitrary marketing URL cannot drive navigation.
+  @visibleForTesting
+  static String? getTrustedWebLinkRedirect(Uri uri) {
+    if (uri.scheme.toLowerCase() != 'https' ||
+        uri.host.toLowerCase() != 'lumi-reading.com' ||
+        (uri.path != '/app' && uri.path != '/app/')) {
+      return null;
+    }
+    return '/splash';
   }
 
   /// Returns the only valid mobile destination for a school administrator.

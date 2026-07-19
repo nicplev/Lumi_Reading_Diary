@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.get_login_creds",
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.lumi.lumi_reading_tracker",
+      "sha256_cert_fingerprints": [
+        "D9:DF:9B:B3:CE:7D:B2:3D:78:5C:F3:B7:E7:1B:B4:9D:FF:CA:63:60:2E:08:1E:40:2A:DF:E5:B0:F0:DC:A2:EC"
+      ]
+    }
+  }
+]

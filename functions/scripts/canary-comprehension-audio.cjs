@@ -76,8 +76,8 @@ async function signInCanaryUser() {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        origin: "https://lumi-ninc-au.web.app",
-        referer: "https://lumi-ninc-au.web.app/",
+        origin: "https://lumi-reading.com",
+        referer: "https://lumi-reading.com/",
       },
       body: JSON.stringify({
         email: canaryEmail,

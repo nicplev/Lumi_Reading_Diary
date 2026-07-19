@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "C2BSJNTRU5.com.lumi.lumiReadingTracker",
+        "paths": ["/app"]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["C2BSJNTRU5.com.lumi.lumiReadingTracker"]
+  }
+}

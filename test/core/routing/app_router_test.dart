@@ -23,6 +23,46 @@ void main() {
       );
     });
 
+    test('trusted marketing App Link enters through splash', () {
+      expect(
+        AppRouter.getTrustedWebLinkRedirect(
+          Uri.parse('https://lumi-reading.com/app'),
+        ),
+        '/splash',
+      );
+      expect(
+        AppRouter.getTrustedWebLinkRedirect(
+          Uri.parse('https://lumi-reading.com/app?untrusted=value'),
+        ),
+        '/splash',
+      );
+    });
+
+    test('trusted App Link rejects other schemes, hosts and paths', () {
+      expect(
+        AppRouter.getTrustedWebLinkRedirect(
+          Uri.parse('http://lumi-reading.com/app'),
+        ),
+        isNull,
+      );
+      expect(
+        AppRouter.getTrustedWebLinkRedirect(
+          Uri.parse('https://lumi-reading.com.evil.example/app'),
+        ),
+        isNull,
+      );
+      expect(
+        AppRouter.getTrustedWebLinkRedirect(
+          Uri.parse('https://lumi-reading.com/contact-sales'),
+        ),
+        isNull,
+      );
+      expect(
+        AppRouter.getTrustedWebLinkRedirect(Uri.parse('/app')),
+        isNull,
+      );
+    });
+
     test('checkParentWebAccess allows non-parent roles', () {
       expect(AppRouter.checkParentWebAccess(UserRole.teacher), isNull);
       expect(AppRouter.checkParentWebAccess(UserRole.schoolAdmin), isNull);

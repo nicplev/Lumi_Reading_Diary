@@ -15,30 +15,6 @@
   },
   "hosting": [
     {
-      "target": "default",
-      "public": "build/web",
-      "appAssociation": "NONE",
-      "ignore": [
-        "firebase.json",
-        "**/.*",
-        "**/node_modules/**"
-      ],
-      "rewrites": [
-        {
-          "source": "/.well-known/apple-app-site-association",
-          "destination": "/aasa.json"
-        },
-        {
-          "source": "/.well-known/assetlinks.json",
-          "destination": "/assetlinks.json"
-        },
-        {
-          "source": "**",
-          "destination": "/index.html"
-        }
-      ]
-    },
-    {
       "target": "admin",
       "source": "admin",
       "frameworksBackend": {
@@ -64,11 +40,50 @@
     {
       "target": "marketing",
       "public": "marketing-site/out",
+      "appAssociation": "NONE",
       "cleanUrls": true,
       "ignore": [
         "firebase.json",
         "**/.*",
         "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "/.well-known/apple-app-site-association",
+          "destination": "/aasa.json"
+        },
+        {
+          "source": "/.well-known/assetlinks.json",
+          "destination": "/assetlinks.json"
+        }
+      ],
+      "headers": [
+        {
+          "source": "/.well-known/apple-app-site-association",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=3600"
+            }
+          ]
+        },
+        {
+          "source": "/.well-known/assetlinks.json",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=3600"
+            }
+          ]
+        }
       ]
     }
   ],

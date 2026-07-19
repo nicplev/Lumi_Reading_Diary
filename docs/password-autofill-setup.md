@@ -1,67 +1,79 @@
-# Password AutoFill — domain association setup
+# Password AutoFill and verified App Links
 
-Lets a Lumi password saved on the website auto-suggest in the iOS/Android
-app (and vice-versa), on top of the in-field `autofillHints` already wired
-into `LumiInput`. The SMS one-time-code autofill needs **none** of this — it
-already works from the `oneTimeCode` hint.
+Lumi uses the permanent marketing domain, `lumi-reading.com`, as the trust
+boundary between the website and the native iOS/Android apps. The former
+Flutter placeholder (`lumi-ninc-au.web.app`) is disabled and intentionally has
+no deployable Hosting target in `firebase.json`.
 
-## What's in the repo
+This association adds cross-platform website/app credential sharing on top of
+the in-field `autofillHints` already wired into `LumiInput`. SMS one-time-code
+autofill is independent and continues to use the `oneTimeCode` hint.
+
+## Repository configuration
 
 | File | Purpose |
 | --- | --- |
-| `ios/Runner/Runner.entitlements` | `com.apple.developer.associated-domains` → `webcredentials:lumi-ninc-au.web.app` (+ `.firebaseapp.com`) |
-| `web/aasa.json` | Apple App Site Association payload (`webcredentials.apps` = `C2BSJNTRU5.com.lumi.lumiReadingTracker`) |
-| `web/assetlinks.json` | Android Digital Asset Links (`get_login_creds`) — **fingerprint placeholder, must be filled** |
-| `firebase.json` | `appAssociation: NONE` + rewrites mapping `/.well-known/...` → the two files above |
+| `ios/Runner/Runner.entitlements` | Trusts `lumi-reading.com` for `webcredentials` and `applinks` |
+| `android/app/src/main/AndroidManifest.xml` | Verifies only `https://lumi-reading.com/app` |
+| `marketing-site/public/aasa.json` | Apple AASA payload for credentials and the exact `/app` path |
+| `marketing-site/public/assetlinks.json` | Android credentials/App Links statement and signing fingerprints |
+| `firebase.json` | Disables Firebase's generated association files and rewrites the two explicit JSON documents |
+| `lib/core/routing/app_router.dart` | Converts the verified `/app` URL to `/splash` without trusting query parameters |
 
-Files in `web/` are copied into `build/web/` by `flutter build web`. They're
-served via Firebase **rewrites** (not a `.well-known/` folder) because the
-deploy `ignore` drops dotfiles.
+The marketing site provides a browser fallback at `/app`. If the native app is
+installed and verified, the OS opens Lumi instead. Existing `lumi://` widget
+links are separate and unchanged.
 
-## Manual steps still required
+## Apple release requirements
 
-### 1. Apple Developer — enable the capability (REQUIRED, or signed builds fail)
-Adding the entitlement key is not enough: the App ID must carry the
-capability or code-signing breaks.
-- Xcode → Runner target → **Signing & Capabilities** → **+ Capability** →
-  **Associated Domains** (it picks up the entitlement entries).
-- Or in the Apple Developer portal: App ID `com.lumi.lumiReadingTracker` →
-  enable **Associated Domains** → regenerate provisioning profiles.
+The application identifier in AASA is
+`C2BSJNTRU5.com.lumi.lumiReadingTracker`.
 
-### 2. Deploy hosting so the AASA is live
+1. The Apple Developer App ID must have **Associated Domains** enabled.
+2. Regenerate the distribution provisioning profile after enabling it.
+3. Ship a signed build containing the updated entitlements. Existing installs
+   cannot learn a new associated domain remotely.
+4. Expect Apple CDN propagation and device caching. Reinstall the test build
+   after the AASA file is live when validating a new association.
+
+## Android signing requirements
+
+The checked-in fingerprint is the certificate currently used by local Android
+builds:
+
+`D9:DF:9B:B3:CE:7D:B2:3D:78:5C:F3:B7:E7:1B:B4:9D:FF:CA:63:60:2E:08:1E:40:2A:DF:E5:B0:F0:DC:A2:EC`
+
+Before the first Play release, add the **App signing key certificate** SHA-256
+from Play Console → Test and release → App integrity to
+`marketing-site/public/assetlinks.json`. Keep the local fingerprint as a second
+entry only if sideloaded local builds should continue verifying.
+
+The repository currently has no Play signing certificate registered in
+Firebase and Android release builds still use the local debug signing config.
+Do not treat the Android production association as complete until production
+signing is configured and its fingerprint is deployed.
+
+## Build, deploy and verify
+
+```sh
+pnpm test:domain-associations
+flutter test test/core/routing/app_router_test.dart
+pnpm --dir marketing-site build
+firebase deploy --only hosting:marketing --project lumi-ninc-au
 ```
-./scripts/flutter-build.sh web      # or: flutter build web
-firebase deploy --only hosting:default
-```
-Must be reachable over HTTPS, `Content-Type: application/json`, **no redirect**:
-```
-curl -sI https://lumi-ninc-au.web.app/.well-known/apple-app-site-association
-curl -s  https://lumi-ninc-au.web.app/.well-known/apple-app-site-association | python3 -m json.tool
-```
-Apple's CDN (what devices actually fetch; may lag a few hours after deploy):
-`https://app-site-association.cdn-apple.com/a/v1/lumi-ninc-au.web.app`
 
-### 3. Android — fill in the signing fingerprint
-Replace `REPLACE_WITH_RELEASE_SHA256_FINGERPRINT` in `web/assetlinks.json`
-with the **release** cert SHA-256 (colon-separated hex). If using Play App
-Signing, use the **App signing key** fingerprint from
-Play Console → Test and release → App integrity. List multiple entries if you
-also want the upload key / debug key to match.
-```
-keytool -list -v -keystore <release.jks> -alias <alias>   # local keystore
-curl -s https://lumi-ninc-au.web.app/.well-known/assetlinks.json
-```
-Until this is filled, Android credential association is inactive (harmless —
-in-field autofill still works).
+Both association URLs must return HTTP 200, JSON content, and no redirect:
 
-### 4. Custom domain (if one is ever added)
-If the web app moves to a custom domain (e.g. `app.golumi.com`), add
-`webcredentials:<that-domain>` to the entitlement and confirm the AASA is
-served there too (same Firebase hosting, so the rewrite already covers it).
+```sh
+curl -i https://lumi-reading.com/.well-known/apple-app-site-association
+curl -i https://lumi-reading.com/.well-known/assetlinks.json
+```
 
-## Verifying on device
-- Build a signed app **with** the capability (step 1) and install it.
-- Save a Lumi login in Safari/Chrome on `lumi-ninc-au.web.app`.
-- Reopen the app login screen → the keyboard QuickType bar offers the saved
-  credential; after a successful login the OS offers to save/update it.
-- iOS caches the AASA at install/update — reinstall after the file goes live.
+Also verify the retired placeholder remains unavailable:
+
+```sh
+curl -o /dev/null -w '%{http_code}\n' https://lumi-ninc-au.web.app/
+```
+
+Run `pnpm test:domain-associations` whenever the domain, bundle/package ID,
+paths, signing certificates, or Firebase Hosting configuration changes.

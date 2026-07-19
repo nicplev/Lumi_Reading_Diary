@@ -14,6 +14,7 @@
     "test:demo-controls": "tsx --test admin/test/demo-control-model.test.ts admin/test/demo-reprovision-contract.test.ts",
     "test:demo-plan": "tsx --test packages/server-ops/test/demoSchool.plan.test.ts",
     "test:audio-authority": "tsx --test packages/server-ops/test/comprehensionRetention.parity.test.ts packages/server-ops/test/retentionRunStats.test.ts",
+    "test:domain-associations": "node --test test/domain_associations.test.mjs",
     "test:audio-retention:integration": "JAVA_HOME=\"${JAVA_HOME:-/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home}\" PATH=\"$JAVA_HOME/bin:$PATH\" functions/node_modules/.bin/firebase emulators:exec --config firebase.deletion.json --only firestore --project demo-lumi-server-ops-audio \"pnpm exec tsx --test packages/server-ops/test/comprehensionRetention.integration.test.ts\"",
     "test:demo-readiness": "bash scripts/demo-readiness-local.sh"
   },
