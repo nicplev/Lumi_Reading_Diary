@@ -1,14 +1,10 @@
 import 'dart:async';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../../core/widgets/inline_stream_error.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/achievements/achievement_presentation.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/teacher_constants.dart';
 import '../../core/widgets/comments/teacher_comments_sheet.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
@@ -18,8 +14,6 @@ import '../../core/widgets/lumi/teacher_book_assignment_card.dart';
 import '../../core/widgets/lumi/teacher_reading_level_pill.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
 import '../../core/widgets/lumi/lumi_toast.dart';
-import '../../core/widgets/feelings/feelings_tracker_card.dart';
-import '../../data/models/achievement_model.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/reading_level_option.dart';
@@ -33,12 +27,19 @@ import '../../services/book_cover_cache_service.dart';
 import '../../services/book_lookup_service.dart';
 import '../../services/school_library_service.dart';
 import '../../services/book_metadata_resolver.dart';
-import '../../data/models/reading_group_model.dart';
 import '../../services/allocation_crud_service.dart';
 import '../../services/firebase_service.dart';
 import '../../services/isbn_assignment_service.dart';
 import '../../services/reading_level_service.dart';
 import '../../services/student_reading_level_service.dart';
+import '../../data/providers/student_detail_providers.dart';
+import 'student_detail/achievements_section.dart';
+import 'student_detail/parent_comment_section.dart';
+import 'student_detail/reading_history_section.dart';
+import 'student_detail/reading_log_snapshot.dart';
+import 'student_detail/feelings_section.dart';
+import 'student_detail/group_badges_section.dart';
+import 'student_detail/stats_row_section.dart';
 import 'teacher_log_reading_sheet.dart';
 
 /// Student Detail Screen
@@ -79,7 +80,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   late final BookLookupService _bookLookupService;
   late final ReadingLevelService _readingLevelService;
   late final StudentReadingLevelService _studentReadingLevelService;
-  final Map<String, Future<String>> _parentNameFutures = {};
   BookMetadataResolver? _metadataResolverInstance;
   // Screen-local ISBN API results (separate from Firestore-doc-based data
   // which is owned by BookCoverCacheService).
@@ -90,10 +90,14 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   bool _levelsEnabled = false;
   StudentModel? _studentOverride;
   bool _readingLevelExpanded = false;
-  Future<List<ReadingGroupModel>>? _studentGroupsFuture;
-  Future<List<EarnedAchievementDisplay>>? _achievementsFuture;
 
   StudentModel get _currentStudent => _studentOverride ?? widget.student;
+
+  StudentDetailLookup get _lookup => StudentDetailLookup(
+        schoolId: widget.student.schoolId,
+        classId: widget.student.classId,
+        studentId: widget.student.id,
+      );
 
   BookMetadataResolver get _metadataResolver {
     final existing = _metadataResolverInstance;
@@ -123,49 +127,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     BookCoverCacheService.instance.addListener(_onCoversUpdated);
     _ensureMetadataResolver();
     _loadReadingLevelOptions();
-    _studentGroupsFuture = _loadStudentGroups();
-    _achievementsFuture = _loadStudentAchievementDisplays();
-  }
-
-  Future<List<ReadingGroupModel>> _loadStudentGroups() async {
-    try {
-      final snapshot = await _firestore
-          .collection('schools')
-          .doc(widget.student.schoolId)
-          .collection('readingGroups')
-          .where('classId', isEqualTo: widget.student.classId)
-          .where('studentIds', arrayContains: widget.student.id)
-          .where('isActive', isEqualTo: true)
-          .get();
-      return snapshot.docs
-          .map((doc) => ReadingGroupModel.fromFirestore(doc))
-          .toList();
-    } catch (e) {
-      debugPrint('Error loading student groups: $e');
-      return [];
-    }
-  }
-
-  Future<List<EarnedAchievementDisplay>>
-      _loadStudentAchievementDisplays() async {
-    try {
-      final doc = await _firestore
-          .collection('schools')
-          .doc(widget.student.schoolId)
-          .collection('students')
-          .doc(widget.student.id)
-          .get();
-      final data = doc.data();
-      if (data == null) return [];
-      final raw = data['achievements'] as List<dynamic>? ?? [];
-      final earnedById = earnedAchievementMap(
-        raw.map((a) => AchievementModel.fromMap(Map<String, dynamic>.from(a))),
-      );
-      return earnedAchievementDisplays(earnedById: earnedById);
-    } catch (e) {
-      debugPrint('Error loading student achievements: $e');
-      return [];
-    }
   }
 
   @override
@@ -178,8 +139,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
     if (studentChanged) {
       _studentOverride = null;
-      _studentGroupsFuture = _loadStudentGroups();
-      _achievementsFuture = _loadStudentAchievementDisplays();
     }
 
     if (oldWidget.student.schoolId != widget.student.schoolId) {
@@ -1244,83 +1203,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     );
   }
 
-  Future<String> _getParentName(String? parentId) {
-    if (parentId == null || parentId.isEmpty) {
-      return Future.value('Parent');
-    }
-    return _parentNameFutures.putIfAbsent(parentId, () async {
-      final schoolRef = _firestore
-          .collection('schools')
-          .doc(widget.student.schoolId);
-
-      final parentDoc =
-          await schoolRef.collection('parents').doc(parentId).get();
-      if (parentDoc.exists) {
-        final data = parentDoc.data() ?? {};
-        final name = data['fullName'] as String?;
-        if (name != null && name.trim().isNotEmpty) return name;
-      }
-
-      final userDoc = await schoolRef.collection('users').doc(parentId).get();
-      if (userDoc.exists) {
-        final data = userDoc.data() ?? {};
-        final name = data['fullName'] as String?;
-        if (name != null && name.trim().isNotEmpty) return name;
-      }
-
-      return 'Parent';
-    });
-  }
-
-  List<_ReadingLogSnapshot> _toReadingLogs(QuerySnapshot snapshot) {
-    return snapshot.docs.map((doc) {
-      final data = doc.data() as Map<String, dynamic>;
-      final dateTimestamp = data['date'] as Timestamp?;
-      final commentSelections = data['parentCommentSelections'];
-      final viewedRaw = data['commentsViewedAt'] as Map<String, dynamic>?;
-      return _ReadingLogSnapshot(
-        id: doc.id,
-        date: dateTimestamp?.toDate() ?? DateTime.fromMillisecondsSinceEpoch(0),
-        createdAt: (data['createdAt'] as Timestamp?)?.toDate() ??
-            dateTimestamp?.toDate() ??
-            DateTime.fromMillisecondsSinceEpoch(0),
-        allocationId: data['allocationId'] as String?,
-        bookTitles: List<String>.from(data['bookTitles'] ?? const []),
-        status: (data['status'] as String?) ?? '',
-        minutesRead: (data['minutesRead'] as num?)?.toInt() ?? 0,
-        targetMinutes: (data['targetMinutes'] as num?)?.toInt() ?? 0,
-        notes: (data['notes'] as String?)?.trim(),
-        parentId: data['parentId'] as String?,
-        parentComment: (data['parentComment'] as String?)?.trim(),
-        parentCommentSelections: commentSelections is List
-            ? commentSelections.whereType<String>().toList()
-            : const [],
-        parentCommentFreeText:
-            (data['parentCommentFreeText'] as String?)?.trim(),
-        childFeeling: data['childFeeling'] as String?,
-        comprehensionAudioPath: data['comprehensionAudioPath'] as String?,
-        comprehensionAudioDurationSec:
-            (data['comprehensionAudioDurationSec'] as num?)?.toInt(),
-        comprehensionAudioUploaded:
-            data['comprehensionAudioUploaded'] as bool? ?? false,
-        isQuickLog:
-            (data['metadata'] as Map<String, dynamic>?)?['quickLog'] == true,
-        lastCommentAt: (data['lastCommentAt'] as Timestamp?)?.toDate(),
-        lastCommentByRole: data['lastCommentByRole'] as String?,
-        commentsViewedAt: viewedRaw == null
-            ? const {}
-            : {
-                for (final entry in viewedRaw.entries)
-                  if (entry.value is Timestamp)
-                    entry.key: (entry.value as Timestamp).toDate(),
-              },
-      );
-    }).toList();
-  }
-
   List<_AssignedBookViewData> _mapAssignedBooks(
     List<AllocationModel> allocations,
-    List<_ReadingLogSnapshot> logs,
+    List<ReadingLogSnapshot> logs,
   ) {
     final now = DateTime.now();
     final seen = <String>{};
@@ -1610,7 +1495,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
   String _deriveStatusForTitle(
     AllocationModel allocation,
-    List<_ReadingLogSnapshot> logs,
+    List<ReadingLogSnapshot> logs,
     String title,
   ) {
     final titleKey = title.trim().toLowerCase();
@@ -1631,7 +1516,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
   String _deriveStatusForAllocation(
     AllocationModel allocation,
-    List<_ReadingLogSnapshot> logs,
+    List<ReadingLogSnapshot> logs,
   ) {
     final matching = logs.where((log) {
       if (log.allocationId != allocation.id) return false;
@@ -1696,30 +1581,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     return const [AppColors.libraryGreen, Color(0xFF388E3C)];
   }
 
-  _LatestParentCommentViewData? _latestParentComment(
-    List<_ReadingLogSnapshot> logs,
-  ) {
-    for (final log in logs) {
-      final hasChips = log.parentCommentSelections.isNotEmpty;
-      final freeText = _extractFreeText(log);
-      final hasFreeText = freeText.isNotEmpty;
-      if (!hasChips && !hasFreeText) continue;
-
-      return _LatestParentCommentViewData(
-        log: log,
-        parentId: log.parentId,
-        commentText: freeText,
-        date: log.date,
-        selections: log.parentCommentSelections,
-        feeling: log.childFeeling,
-      );
-    }
-    return null;
-  }
-
   /// Builds a full [ReadingLogModel] from a row snapshot, carrying the ids and
   /// denormalized comment state the [CommentThread] needs to read and post.
-  ReadingLogModel _toReadingLogModel(_ReadingLogSnapshot snap) {
+  ReadingLogModel _toReadingLogModel(ReadingLogSnapshot snap) {
     return ReadingLogModel(
       id: snap.id,
       studentId: _currentStudent.id,
@@ -1746,36 +1610,12 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   }
 
   /// Opens the comment thread for [snap]'s log in the shared teacher sheet.
-  void _openLogComments(_ReadingLogSnapshot snap) {
+  void _openLogComments(ReadingLogSnapshot snap) {
     openTeacherCommentsSheet(
       context,
       log: _toReadingLogModel(snap),
       studentName: _currentStudent.fullName,
     );
-  }
-
-  /// Returns only the parent's typed free-text comment, excluding chip
-  /// selections. Falls back to the legacy `parentComment` field if no
-  /// structured data exists.
-  String _extractFreeText(_ReadingLogSnapshot log) {
-    final freeText = log.parentCommentFreeText?.trim() ?? '';
-    if (freeText.isNotEmpty) return freeText;
-    // Legacy logs stored everything in parentComment. Only use it if there
-    // are no structured selections (otherwise it's a duplicate).
-    if (log.parentCommentSelections.isEmpty) {
-      return log.parentComment?.trim() ?? '';
-    }
-    return '';
-  }
-
-  String _formatCommentDate(DateTime date) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(days: 1));
-    final dateOnly = DateTime(date.year, date.month, date.day);
-    if (dateOnly == today) return 'Today';
-    if (dateOnly == yesterday) return 'Yesterday';
-    return '${date.day}/${date.month}/${date.year}';
   }
 
   String _readingLevelDisplayLabel(StudentModel student) {
@@ -2027,10 +1867,15 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Group badges
-            _buildGroupBadges(),
+            GroupBadgesSection(
+              firestore: _firestore,
+              schoolId: widget.student.schoolId,
+              classId: widget.student.classId,
+              studentId: widget.student.id,
+            ),
 
             // Stats
-            _buildStatsRow(),
+            StatsRowSection(student: _currentStudent),
             const SizedBox(height: 20),
 
             if (_levelsEnabled) ...[
@@ -2043,78 +1888,39 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             const SizedBox(height: 20),
 
             // Reading Feelings tracker
-            _buildFeelingsTrackerSection(),
+            FeelingsSection(lookup: _lookup),
             const SizedBox(height: 20),
 
             // Reading History
-            _buildReadingHistorySection(),
+            ReadingHistorySection(
+              lookup: _lookup,
+              onViewAll: () => context.push(
+                '/teacher/student-reading-history/${widget.student.id}',
+                extra: {'student': _currentStudent},
+              ),
+              onOpenLogComments: _openLogComments,
+            ),
             const SizedBox(height: 20),
 
             // Latest Parent Comment
-            _buildParentCommentSection(),
+            ParentCommentSection(
+              lookup: _lookup,
+              firestore: _firestore,
+              onOpenLogComments: _openLogComments,
+            ),
             const SizedBox(height: 20),
 
             // Achievements
-            _buildAchievementsSection(),
+            AchievementsSection(
+              firestore: _firestore,
+              schoolId: widget.student.schoolId,
+              studentId: widget.student.id,
+              onOpenAchievements: _openAchievements,
+            ),
             const SizedBox(height: 20),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildGroupBadges() {
-    return FutureBuilder<List<ReadingGroupModel>>(
-      future: _studentGroupsFuture,
-      builder: (context, snapshot) {
-        final groups = snapshot.data;
-        if (groups == null || groups.isEmpty) return const SizedBox.shrink();
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: groups.map((group) {
-              final groupColor = group.color != null
-                  ? Color(int.parse(group.color!.replaceFirst('#', '0xFF')))
-                  : LumiTokens.green;
-              return Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: groupColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
-                  border: Border.all(
-                    color: groupColor.withValues(alpha: 0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: groupColor,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      group.name,
-                      style: LumiType.caption.copyWith(
-                        color: groupColor,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
-        );
-      },
     );
   }
 
@@ -2164,250 +1970,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
           style: LumiType.caption.copyWith(color: LumiTokens.muted),
         ),
       ],
-    );
-  }
-
-  Widget _buildFeelingsTrackerSection() {
-    // Pull up to ~12 months of logs so the tracker can cover its widest
-    // (all-time) window. Unlike the Recent Reading list this is NOT limited to
-    // 5, and it maps to the full ReadingLogModel so we can read childFeeling.
-    final floor = DateTime.now().subtract(const Duration(days: 366));
-    return StreamBuilder<QuerySnapshot>(
-      stream: _firestore
-          .collection('schools')
-          .doc(widget.student.schoolId)
-          .collection('readingLogs')
-          .where('classId', isEqualTo: widget.student.classId)
-          .where('studentId', isEqualTo: widget.student.id)
-          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(floor))
-          .orderBy('date', descending: true)
-          .limit(400)
-          .snapshots(),
-      builder: (context, snapshot) {
-        // While loading (or on error), render an empty tracker rather than a
-        // spinner so the section never janks the scroll position.
-        final docs = snapshot.data?.docs ?? const [];
-        final logs = docs
-            .map((d) => ReadingLogModel.fromFirestore(d))
-            .toList(growable: false);
-        return FeelingsTrackerCard(logs: logs, accentColor: LumiTokens.ink);
-      },
-    );
-  }
-
-  Widget _buildReadingHistorySection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Recent Reading', style: LumiType.subhead),
-            GestureDetector(
-              onTap: () => context.push(
-                '/teacher/student-reading-history/${widget.student.id}',
-                extra: {'student': _currentStudent},
-              ),
-              child: Text(
-                'View all',
-                style: LumiType.caption.copyWith(
-                  color: LumiTokens.green,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        StreamBuilder<QuerySnapshot>(
-          stream: _firestore
-              .collection('schools')
-              .doc(widget.student.schoolId)
-              .collection('readingLogs')
-              .where('classId', isEqualTo: widget.student.classId)
-              .where('studentId', isEqualTo: widget.student.id)
-              .orderBy('date', descending: true)
-              .limit(20)
-              .snapshots(),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return InlineStreamError(
-                message: "Couldn't load reading history.",
-                onRetry: () => setState(() {}),
-              );
-            }
-            if (!snapshot.hasData) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Center(child: CircularProgressIndicator()),
-              );
-            }
-
-            final logs = _toReadingLogs(snapshot.data!);
-            if (logs.isEmpty) {
-              return Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                decoration: BoxDecoration(
-                  color: LumiTokens.paper,
-                  borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
-                  border: Border.all(color: LumiTokens.rule),
-                ),
-                child: Center(
-                  child: Text(
-                    'No reading history yet',
-                    style: LumiType.caption,
-                  ),
-                ),
-              );
-            }
-
-            return Container(
-              decoration: BoxDecoration(
-                color: LumiTokens.paper,
-                borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
-                border: Border.all(color: LumiTokens.rule),
-              ),
-              child: Builder(builder: (context) {
-                final groups = _groupRecentLogs(logs).take(5).toList();
-                return Column(
-                  children: [
-                    for (int i = 0; i < groups.length; i++) ...[
-                      _buildReadingGroupRow(groups[i]),
-                      if (i < groups.length - 1)
-                        Divider(
-                          height: 1,
-                          color: LumiTokens.rule,
-                          indent: 14,
-                          endIndent: 14,
-                        ),
-                    ],
-                  ],
-                );
-              }),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  /// Groups consecutive logs of the same book on the same day so repeated
-  /// sessions collapse into one "N sessions · total min" row.
-  List<List<_ReadingLogSnapshot>> _groupRecentLogs(
-      List<_ReadingLogSnapshot> logs) {
-    String key(_ReadingLogSnapshot l) {
-      final day = '${l.date.year}-${l.date.month}-${l.date.day}';
-      final book =
-          l.bookTitles.isNotEmpty ? l.bookTitles.join('|') : '__free__';
-      return '$day::$book';
-    }
-
-    final groups = <List<_ReadingLogSnapshot>>[];
-    for (final log in logs) {
-      List<_ReadingLogSnapshot>? target;
-      for (final grp in groups) {
-        if (key(grp.first) == key(log)) {
-          target = grp;
-          break;
-        }
-      }
-      if (target != null) {
-        target.add(log);
-      } else {
-        groups.add([log]);
-      }
-    }
-    return groups;
-  }
-
-  Widget _buildReadingGroupRow(List<_ReadingLogSnapshot> group) {
-    final rep = group.first; // most recent in the group
-    final dateStr = _formatCommentDate(rep.date);
-    final books =
-        rep.bookTitles.isNotEmpty ? rep.bookTitles.join(', ') : 'Free reading';
-    final totalMinutes = group.fold<int>(0, (acc, l) => acc + l.minutesRead);
-    final sessions = group.length;
-    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-
-    // Meta line: "16 Jun · 5 sessions · 85 min" (sessions omitted when 1).
-    final meta = sessions > 1
-        ? '$dateStr · $sessions sessions · $totalMinutes min'
-        : '$dateStr · $totalMinutes min';
-
-    final hasAudio = group.any((l) => l.comprehensionAudioPath != null);
-    final audioPending = group.every((l) =>
-        l.comprehensionAudioPath == null || !l.comprehensionAudioUploaded);
-    final hasUnread = group.any((l) => l.hasUnreadForTeacher(uid));
-
-    return InkWell(
-      onTap: () => _openLogComments(rep),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          children: [
-            // Left: title + meta stacked
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          books,
-                          style: LumiType.body,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      // Subtle one-tap marker: books inferred from assignments,
-                      // not parent-confirmed.
-                      if (group.any((l) => l.isQuickLog)) ...[
-                        const SizedBox(width: 6),
-                        Tooltip(
-                          message:
-                              'Quick log — books inferred from assignments, '
-                              'not confirmed by the parent',
-                          triggerMode: TooltipTriggerMode.tap,
-                          child: Icon(
-                            Icons.bolt,
-                            size: 15,
-                            color: LumiTokens.muted.withValues(alpha: 0.8),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    meta,
-                    style: LumiType.caption.copyWith(color: LumiTokens.muted),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            // Right: feeling blob + recording + comment indicators
-            if (rep.childFeeling != null)
-              Image.asset(
-                'assets/blobs/blob-${rep.childFeeling}.png',
-                width: 18,
-                height: 18,
-              ),
-            if (hasAudio) ...[
-              const SizedBox(width: 8),
-              RecordingAffordance(pending: audioPending),
-            ],
-            const SizedBox(width: 10),
-            CommentAffordance(
-              hasUnread: hasUnread,
-              schoolId: _currentStudent.schoolId,
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -2494,7 +2056,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                         ),
                         if (_currentStudent.readingLevelUpdatedAt != null) ...[
                           Text(
-                            '  ·  Updated ${_formatCommentDate(_currentStudent.readingLevelUpdatedAt!)}',
+                            '  ·  Updated ${formatCommentDate(_currentStudent.readingLevelUpdatedAt!)}',
                             style: LumiType.caption,
                           ),
                         ],
@@ -2632,127 +2194,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   }
 
   /// Returns the current streak only if the student read today or yesterday.
-  int _activeStreak(StudentStats? stats) {
-    if (stats == null) return 0;
-    final stored = stats.currentStreak;
-    if (stored <= 0) return 0;
-    final lastRead = stats.lastReadingDate;
-    if (lastRead == null) return 0;
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(days: 1));
-    final lastDay = DateTime(lastRead.year, lastRead.month, lastRead.day);
-    if (lastDay.isAtSameMomentAs(today) ||
-        lastDay.isAtSameMomentAs(yesterday)) {
-      return stored;
-    }
-    return 0;
-  }
-
-  Widget _buildStatsRow() {
-    final streak = _activeStreak(_currentStudent.stats);
-    final totalNights = _currentStudent.stats?.totalReadingDays ?? 0;
-    final totalBooks = _currentStudent.stats?.totalBooksRead ?? 0;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: LumiTokens.paper,
-        borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
-        border: Border.all(color: LumiTokens.rule),
-        boxShadow: LumiTokens.shadowCard,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Reading Stats', style: LumiType.subhead),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              // Total nights (cumulative) is the hero metric — shown first.
-              _buildCompactStat(
-                '$totalNights',
-                'Total nights',
-                icon: Icons.nights_stay_outlined,
-                iconColor: LumiTokens.blue,
-                circleColor: LumiTokens.tintBlue,
-              ),
-              _compactDivider(),
-              // Streak is a gentle, secondary signal.
-              _buildCompactStat(
-                '$streak',
-                'Day streak',
-                icon: Icons.local_fire_department_outlined,
-                iconSize: 20,
-                iconColor: LumiTokens.orange,
-                circleColor: LumiTokens.tintOrange,
-              ),
-              _compactDivider(),
-              _buildCompactStat(
-                '$totalBooks',
-                'Total books',
-                icon: Icons.menu_book_outlined,
-                iconSize: 16,
-                iconColor: LumiTokens.green,
-                circleColor: LumiTokens.tintGreen,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCompactStat(
-    String value,
-    String label, {
-    required IconData icon,
-    double iconSize = 18,
-    Color iconColor = LumiTokens.ink,
-    Color? circleColor,
-  }) {
-    final bg = circleColor ?? LumiTokens.muted.withValues(alpha: 0.08);
-    return Expanded(
-      child: Column(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-            child: Icon(icon, size: iconSize, color: iconColor),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: const TextStyle(
-              fontFamily: 'Nunito',
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: LumiTokens.ink,
-              height: 1,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: LumiType.caption.copyWith(
-              color: LumiTokens.muted,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _compactDivider() {
-    return Container(
-      width: 1,
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-      color: LumiTokens.rule,
-    );
-  }
-
   Widget _buildAssignedBooksSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2815,7 +2256,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                   );
                 }
 
-                final logs = _toReadingLogs(logSnapshot.data!);
+                final logs = toReadingLogSnapshots(logSnapshot.data!);
                 final books = _mapAssignedBooks(allocations, logs);
                 _resolveMissingBookMetadata(books);
 
@@ -2868,347 +2309,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     );
   }
 
-  Widget _buildAchievementsSection() {
-    return FutureBuilder<List<EarnedAchievementDisplay>>(
-      future: _achievementsFuture,
-      builder: (context, snapshot) {
-        final achievements = snapshot.data ?? [];
-        if (snapshot.connectionState == ConnectionState.waiting &&
-            achievements.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Achievements', style: LumiType.subhead),
-                if (achievements.isNotEmpty)
-                  GestureDetector(
-                    onTap: _openAchievements,
-                    child: Text(
-                      'View all',
-                      style: LumiType.caption.copyWith(
-                        color: LumiTokens.green,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (achievements.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    const Icon(Icons.emoji_events_outlined,
-                        size: 20, color: LumiTokens.muted),
-                    const SizedBox(width: 8),
-                    Text(
-                      'No achievements yet',
-                      style: LumiType.caption,
-                    ),
-                  ],
-                ),
-              )
-            else
-              SizedBox(
-                height: 88,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: achievements.length > 8 ? 8 : achievements.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
-                    final display = achievements[index];
-                    final template = display.template;
-                    return GestureDetector(
-                      onTap: _openAchievements,
-                      child: Container(
-                        width: 72,
-                        decoration: BoxDecoration(
-                          color: LumiTokens.paper,
-                          borderRadius:
-                              BorderRadius.circular(LumiTokens.radiusMedium),
-                          border: Border.all(
-                            color: Color(template.effectiveColor)
-                                .withValues(alpha: 0.5),
-                            width: 1.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Color(template.effectiveColor)
-                                  .withValues(alpha: 0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              achievementIconFor(template),
-                              size: 28,
-                              color: achievementCategoryColor(
-                                template.category,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 4),
-                              child: Text(
-                                template.name,
-                                style: LumiType.caption.copyWith(fontSize: 9),
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildParentCommentSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Latest Parent Comment', style: LumiType.subhead),
-        const SizedBox(height: 8),
-        StreamBuilder<QuerySnapshot>(
-          stream: _firestore
-              .collection('schools')
-              .doc(widget.student.schoolId)
-              .collection('readingLogs')
-              .where('classId', isEqualTo: widget.student.classId)
-              .where('studentId', isEqualTo: widget.student.id)
-              .orderBy('date', descending: true)
-              .limit(50)
-              .snapshots(),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return _buildSectionInfoCard(
-                'Could not load parent comments',
-                isError: true,
-              );
-            }
-
-            if (!snapshot.hasData) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Center(child: CircularProgressIndicator()),
-              );
-            }
-
-            final logs = _toReadingLogs(snapshot.data!);
-            final latest = _latestParentComment(logs);
-            if (latest == null) {
-              return ClipRRect(
-                borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: LumiTokens.paper,
-                    borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
-                    border: Border.all(color: LumiTokens.rule),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(width: 4, height: 48, color: LumiTokens.rule),
-                      const SizedBox(width: 12),
-                      Icon(
-                        Icons.chat_bubble_outline_rounded,
-                        size: 16,
-                        color: LumiTokens.muted.withValues(alpha: 0.5),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'No parent comments yet',
-                        style: LumiType.caption,
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-
-            return FutureBuilder<String>(
-              future: _getParentName(latest.parentId),
-              builder: (context, parentSnapshot) {
-                final parentName = parentSnapshot.data ?? 'Parent';
-                final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-                final unread = latest.log.hasUnreadForTeacher(uid);
-                return InkWell(
-                  onTap: () => _openLogComments(latest.log),
-                  borderRadius:
-                      BorderRadius.circular(TeacherDimensions.radiusL),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                    decoration: BoxDecoration(
-                      color: LumiTokens.paper,
-                      borderRadius:
-                          BorderRadius.circular(LumiTokens.radiusLarge),
-                      border: Border.all(color: LumiTokens.rule),
-                      // Left accent via a gradient trick won't work with
-                      // Border.all, so we overlay it below.
-                    ),
-                    child: IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Comment icon — green only when unread for the teacher
-                          // (green = needs attention), neutral once read.
-                          Container(
-                            width: 28,
-                            height: 28,
-                            decoration: BoxDecoration(
-                              color: unread
-                                  ? LumiTokens.tintGreen
-                                  : LumiTokens.muted.withValues(alpha: 0.08),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.chat_bubble_outline_rounded,
-                              size: 14,
-                              color:
-                                  unread ? LumiTokens.green : LumiTokens.muted,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          // Content
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Child's feeling — its own line, distinct from
-                                // the parent's topic chips below.
-                                if (latest.feeling != null) ...[
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Image.asset(
-                                        'assets/blobs/blob-${latest.feeling}.png',
-                                        width: 22,
-                                        height: 22,
-                                      ),
-                                      const SizedBox(width: 5),
-                                      Text(
-                                        latest.feeling![0].toUpperCase() +
-                                            latest.feeling!.substring(1),
-                                        style: LumiType.caption.copyWith(
-                                          color: LumiTokens.ink,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  if (latest.selections.isNotEmpty ||
-                                      latest.commentText.isNotEmpty)
-                                    const SizedBox(height: 8),
-                                ],
-                                // Parent's topic selections — up to 3, wrap cleanly.
-                                if (latest.selections.isNotEmpty) ...[
-                                  Wrap(
-                                    spacing: 6,
-                                    runSpacing: 6,
-                                    children: latest.selections.map((chip) {
-                                      return Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 3,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: LumiTokens.muted
-                                              .withValues(alpha: 0.08),
-                                          borderRadius: BorderRadius.circular(
-                                              LumiTokens.radiusSmall),
-                                        ),
-                                        child: Text(
-                                          chip,
-                                          style: LumiType.caption.copyWith(
-                                            color: LumiTokens.ink,
-                                          ),
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
-                                  if (latest.commentText.isNotEmpty)
-                                    const SizedBox(height: 8),
-                                ],
-                                // Free-text comment — wraps, but capped to a short
-                                // preview (the row taps through to the full thread).
-                                if (latest.commentText.isNotEmpty) ...[
-                                  Text(
-                                    latest.commentText,
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: LumiType.body.copyWith(
-                                      fontStyle: FontStyle.italic,
-                                      color: LumiTokens.muted,
-                                    ),
-                                  ),
-                                ],
-                                const SizedBox(height: 6),
-                                Row(
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        '— $parentName · ${_formatCommentDate(latest.date)}',
-                                        style: LumiType.caption,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    if (unread) ...[
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 7, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: LumiTokens.tintGreen,
-                                          borderRadius: BorderRadius.circular(
-                                              LumiTokens.radiusPill),
-                                        ),
-                                        child: Text(
-                                          'New',
-                                          style: LumiType.caption.copyWith(
-                                            color: LumiTokens.green,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 11,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            );
-          },
-        ),
-      ],
-    );
-  }
 
   Widget _buildSectionInfoCard(String message, {bool isError = false}) {
     return Container(
@@ -3336,91 +2436,6 @@ class _CachedBookCover {
   final String title;
   final String? isbn;
   final String? coverImageUrl;
-}
-
-class _ReadingLogSnapshot {
-  final String id;
-  final DateTime date;
-  final DateTime createdAt;
-  final String? allocationId;
-  final List<String> bookTitles;
-  final String status;
-  final int minutesRead;
-  final int targetMinutes;
-  final String? notes;
-  final String? parentId;
-  final String? parentComment;
-  final List<String> parentCommentSelections;
-  final String? parentCommentFreeText;
-  final String? childFeeling;
-  // Comprehension recording fields denormalized from the reading log doc.
-  // [comprehensionAudioPath] is the Storage object path; the player resolves
-  // a signed URL on demand. The player is only rendered when
-  // [comprehensionAudioUploaded] is true.
-  final String? comprehensionAudioPath;
-  final int? comprehensionAudioDurationSec;
-  final bool comprehensionAudioUploaded;
-  // One-tap log: books inferred from assignments, not parent-confirmed.
-  final bool isQuickLog;
-  // Denormalized comment-thread state, so a row can open the thread and show an
-  // unread dot without an extra read.
-  final DateTime? lastCommentAt;
-  final String? lastCommentByRole;
-  final Map<String, DateTime> commentsViewedAt;
-
-  const _ReadingLogSnapshot({
-    required this.id,
-    required this.date,
-    required this.createdAt,
-    required this.allocationId,
-    required this.bookTitles,
-    required this.status,
-    required this.minutesRead,
-    required this.targetMinutes,
-    required this.parentId,
-    required this.parentComment,
-    required this.parentCommentSelections,
-    required this.parentCommentFreeText,
-    required this.childFeeling,
-    this.notes,
-    this.comprehensionAudioPath,
-    this.comprehensionAudioDurationSec,
-    this.comprehensionAudioUploaded = false,
-    this.isQuickLog = false,
-    this.lastCommentAt,
-    this.lastCommentByRole,
-    this.commentsViewedAt = const {},
-  });
-
-  bool get hasComprehensionAudio =>
-      comprehensionAudioUploaded && comprehensionAudioPath != null;
-
-  /// Whether the teacher [uid] has an unseen reply: the newest comment is from
-  /// a parent and postdates this teacher's last view of the thread.
-  bool hasUnreadForTeacher(String uid) {
-    if (lastCommentAt == null || lastCommentByRole == 'teacher') return false;
-    final viewed = commentsViewedAt[uid];
-    return viewed == null || viewed.isBefore(lastCommentAt!);
-  }
-}
-
-class _LatestParentCommentViewData {
-  /// The log this comment belongs to, so tapping the card can open its thread.
-  final _ReadingLogSnapshot log;
-  final String? parentId;
-  final String commentText;
-  final DateTime date;
-  final List<String> selections;
-  final String? feeling;
-
-  const _LatestParentCommentViewData({
-    required this.log,
-    required this.parentId,
-    required this.commentText,
-    required this.date,
-    required this.selections,
-    this.feeling,
-  });
 }
 
 class _RenewableBookItem {
