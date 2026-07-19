@@ -1,5 +1,9 @@
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { adminDb, adminStorage } from '@/lib/firebase/admin';
+import {
+  comprehensionAudioObjectPath,
+  comprehensionAudioUploadObjectPath,
+} from '@/lib/comprehension-audio-policy';
 
 // Manual cleanup helpers used by Settings > Comprehension Audio in the
 // school-admin portal. school-admin-web is intentionally outside the pnpm
@@ -58,8 +62,8 @@ async function deleteStorageObjectIfExists(path: string): Promise<void> {
   try {
     await adminStorage.bucket().file(path).delete();
   } catch (err: unknown) {
-    const code = (err as { code?: number }).code;
-    if (code === 404) return;
+    const code = (err as { code?: number | string }).code;
+    if (code === 404 || code === '404') return;
     throw err;
   }
 }
@@ -85,14 +89,21 @@ export async function bulkDeleteComprehensionAudio(
     const snap = await buildQuery(filter).limit(BATCH_SIZE).get();
     if (snap.empty) break;
     for (const doc of snap.docs) {
-      const data = doc.data();
-      const storagePath = data.comprehensionAudioPath as string | undefined;
+      const storagePath = comprehensionAudioObjectPath(filter.schoolId, doc.id);
+      const uploadPath = comprehensionAudioUploadObjectPath(filter.schoolId, doc.id);
       try {
-        if (storagePath) await deleteStorageObjectIfExists(storagePath);
+        await deleteStorageObjectIfExists(storagePath);
+        await deleteStorageObjectIfExists(uploadPath);
         await doc.ref.update({
           comprehensionAudioPath: FieldValue.delete(),
           comprehensionAudioDurationSec: FieldValue.delete(),
           comprehensionAudioUploaded: false,
+          comprehensionAudioUploadedAt: FieldValue.delete(),
+          comprehensionAudioObjectGeneration: FieldValue.delete(),
+          comprehensionAudioSourceGeneration: FieldValue.delete(),
+          comprehensionAudioValidationVersion: FieldValue.delete(),
+          comprehensionAudioValidatedDurationMs: FieldValue.delete(),
+          comprehensionAudioSha256: FieldValue.delete(),
           comprehensionAudioDeletedAt: FieldValue.serverTimestamp(),
         });
         deletedCount++;

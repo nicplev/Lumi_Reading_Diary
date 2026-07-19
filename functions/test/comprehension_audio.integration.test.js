@@ -76,7 +76,7 @@ async function seedLog({
   uploaded = false,
   storedPath,
   createdAt = admin.firestore.Timestamp.now(),
-  retentionDays = 7,
+  retentionDays = 30,
 } = {}) {
   await admin.firestore().doc(`schools/${schoolId}`).set({
     settings: {
@@ -318,6 +318,16 @@ test('playback callable enforces class/school scope, kill switch and canonical p
       }),
       'failed-precondition'
     );
+    await seedFlag(true);
+    await admin.firestore().doc('schools/school_x').update({
+      'settings.comprehensionRecording.enabled': false,
+    });
+    await rejectsCode(
+      invoke(audio.getComprehensionAudioUrl, 'teacher_assigned', {
+        schoolId: 'school_x', logId: 'log_x',
+      }),
+      'failed-precondition'
+    );
   } finally {
     File.prototype.getSignedUrl = originalGetSignedUrl;
   }
@@ -376,17 +386,18 @@ test('scheduled retention deletes canonical objects and quarantines injected pat
     Date.now() - 30 * 24 * 60 * 60 * 1000
   );
   await admin.firestore().doc('platformConfig/comprehensionRetention').set({
-    enabled: true,
-    retentionDays: 7,
+    enabled: false,
+    retentionDays: 30,
   });
   const canonicalLog = await seedLog({
-    logId: 'expired_good', uploaded: true, createdAt: old,
+    logId: 'expired_good', uploaded: true, createdAt: old, retentionDays: 7,
   });
   const rejectedLog = await seedLog({
     logId: 'expired_injected',
     uploaded: true,
     createdAt: old,
     storedPath: 'schools/school_y/comprehension_audio/do_not_delete.m4a',
+    retentionDays: 7,
   });
   const retainedLog = await seedLog({
     schoolId: 'school_long_retention',
@@ -422,4 +433,6 @@ test('scheduled retention deletes canonical objects and quarantines injected pat
   assert.equal(config.lastRunStats.deletedCount, 1);
   assert.equal(config.lastRunStats.failedCount, 1);
   assert.deepEqual(config.lastRunStats.retentionPolicyCounts, {7: 1, 90: 1});
+  assert.equal(config.lastRunStats.legacySevenDaySchoolCount, 1);
+  assert.equal(config.lastRunStats.trigger, 'cron');
 });

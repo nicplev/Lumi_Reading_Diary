@@ -103,7 +103,7 @@ const updateSchema = z.object({
         authorisedBySchool: z.literal(true),
         familyNoticeConfirmed: z.literal(true),
         retentionDays: z.union([
-          z.literal(7), z.literal(30), z.literal(90), z.literal(365),
+          z.literal(30), z.literal(90), z.literal(365),
         ]),
       }).strict().optional(),
     }).strict(),

@@ -58,7 +58,7 @@ export default async function FeatureControlsPage() {
     <>
       <PageHeader
         title="Feature Controls"
-        description="Platform-wide kill switches and retention policy. These override every school's own settings."
+        description="Platform-wide safety controls. The recording switch can pause every school; retention is a fallback for schools without a valid stored choice."
       />
       <div className="space-y-6">
         <FeatureControlsPanel initialFlag={comprehensionRecording} />

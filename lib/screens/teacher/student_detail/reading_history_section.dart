@@ -230,7 +230,10 @@ class _ReadingGroupRow extends StatelessWidget {
               ),
             if (hasAudio) ...[
               const SizedBox(width: 8),
-              RecordingAffordance(pending: audioPending),
+              RecordingAffordance(
+                schoolId: schoolId,
+                pending: audioPending,
+              ),
             ],
             const SizedBox(width: 10),
             CommentAffordance(

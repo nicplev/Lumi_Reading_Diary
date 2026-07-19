@@ -1,7 +1,7 @@
 // Scheduled cleanup for comprehension audio recordings.
 //
 // Reads /platformConfig/comprehensionRetention (written by the super-admin
-// portal). When enabled, deletes Storage objects + clears the audio fields
+// portal). Cleanup is always active: it deletes Storage objects + clears the audio fields
 // on reading-log docs older than `retentionDays`. The reading-log doc itself
 // is preserved — only the audio is removed.
 //
@@ -18,8 +18,9 @@ import {assertNotReadOnly} from "./read_only_guard";
 import {recordCronRun} from "./ops_heartbeat";
 import {errorCodeForLog} from "./log_safety";
 import {
-  retentionDaysForSchool,
+  retentionDecisionForSchool,
   schoolAudioCollectionIsAuthorised,
+  schoolAudioPlaybackIsEnabled,
 } from "./audio_authority";
 import {
   AUDIO_VALIDATION_VERSION,
@@ -90,11 +91,11 @@ const PENDING_AUDIO_MAX_PER_RUN = 5000;
 
 // Bounds match those enforced server-side in @lumi/server-ops. The function
 // re-validates so a hand-edited Firestore doc cannot deliver an absurd value.
-const MIN_RETENTION_DAYS = 7;
+const MIN_RETENTION_DAYS = 30;
 const MAX_RETENTION_DAYS = 730;
+const DEFAULT_RETENTION_DAYS = 90;
 
 interface RetentionConfig {
-  enabled: boolean;
   retentionDays: number;
 }
 
@@ -105,11 +106,9 @@ interface RunStats {
   schoolCount: number;
   legacyDefaultRetentionDays: number;
   retentionPolicyCounts: Record<string, number>;
-}
-
-interface SkippedReason {
-  skipped: true;
-  reason: string;
+  fallbackSchoolCount: number;
+  legacySevenDaySchoolCount: number;
+  trigger: "cron" | "manual";
 }
 
 /**
@@ -186,14 +185,15 @@ function schoolIdForReadingLogRef(
 
 async function readRetentionConfig(
   db: FirebaseFirestore.Firestore
-): Promise<RetentionConfig | null> {
+): Promise<RetentionConfig> {
   const snap = await db.doc(RETENTION_DOC).get();
   const data = snap.data();
-  if (!snap.exists || !data) return null;
-  const enabled = data.enabled === true;
-  const retentionDays =
-    typeof data.retentionDays === "number" ? data.retentionDays : 0;
-  return {enabled, retentionDays};
+  const raw = data?.retentionDays;
+  const retentionDays = typeof raw === "number" &&
+    Number.isInteger(raw) &&
+    raw >= MIN_RETENTION_DAYS &&
+    raw <= MAX_RETENTION_DAYS ? raw : DEFAULT_RETENTION_DAYS;
+  return {retentionDays};
 }
 
 async function assertComprehensionRecordingEnabled(
@@ -214,8 +214,8 @@ async function deleteStorageObjectIfExists(path: string): Promise<void> {
   try {
     await admin.storage().bucket().file(path).delete();
   } catch (err: unknown) {
-    const code = (err as {code?: number}).code;
-    if (code === 404) return;
+    const code = (err as {code?: number | string}).code;
+    if (code === 404 || code === "404") return;
     throw err;
   }
 }
@@ -241,23 +241,15 @@ async function deleteStorageObjectGenerationIfExists(
 async function performCleanup(
   performedBy: string,
   performedByEmail: string | null
-): Promise<RunStats | SkippedReason> {
+): Promise<RunStats> {
   const startedAtMs = Date.now();
   const db = admin.firestore();
   const config = await readRetentionConfig(db);
 
-  if (!config) return {skipped: true, reason: "config_missing"} as const;
-  if (!config.enabled) return {skipped: true, reason: "disabled"} as const;
-  if (
-    !Number.isInteger(config.retentionDays) ||
-    config.retentionDays < MIN_RETENTION_DAYS ||
-    config.retentionDays > MAX_RETENTION_DAYS
-  ) {
-    return {skipped: true, reason: "invalid_retentionDays"} as const;
-  }
-
   let deletedCount = 0;
   let failedCount = 0;
+  let fallbackSchoolCount = 0;
+  let legacySevenDaySchoolCount = 0;
   const retentionPolicyCounts: Record<string, number> = {};
   // Defence-in-depth: the page loop cannot exceed (BATCH_SIZE × N) per run.
   // The collection-group query keeps returning expired docs until they get
@@ -268,10 +260,15 @@ async function performCleanup(
 
   const schools = await db.collection("schools").get();
   for (const school of schools.docs) {
-    const retentionDays = retentionDaysForSchool(
+    const retentionDecision = retentionDecisionForSchool(
       school.data(),
       config.retentionDays
     );
+    const retentionDays = retentionDecision.days;
+    if (retentionDecision.source === "fallback") fallbackSchoolCount++;
+    if (retentionDecision.source === "legacySchool") {
+      legacySevenDaySchoolCount++;
+    }
     retentionPolicyCounts[String(retentionDays)] =
       (retentionPolicyCounts[String(retentionDays)] ?? 0) + 1;
     const cutoff = Timestamp.fromMillis(
@@ -308,10 +305,17 @@ async function performCleanup(
             !expectedPath ||
             audioPathMustBeQuarantined(storedPath, expectedPath)
           ) {
+            if (schoolId && expectedPath) {
+              await deleteStorageObjectIfExists(expectedPath);
+              await deleteStorageObjectIfExists(
+                comprehensionAudioUploadObjectPath(schoolId, doc.id)
+              );
+            }
             await doc.ref.update({
               comprehensionAudioPath: FieldValue.delete(),
               comprehensionAudioDurationSec: FieldValue.delete(),
               comprehensionAudioUploaded: false,
+              comprehensionAudioUploadedAt: FieldValue.delete(),
               comprehensionAudioObjectGeneration: FieldValue.delete(),
               comprehensionAudioSourceGeneration: FieldValue.delete(),
               comprehensionAudioValidationVersion: FieldValue.delete(),
@@ -333,6 +337,7 @@ async function performCleanup(
             comprehensionAudioPath: FieldValue.delete(),
             comprehensionAudioDurationSec: FieldValue.delete(),
             comprehensionAudioUploaded: false,
+            comprehensionAudioUploadedAt: FieldValue.delete(),
             comprehensionAudioObjectGeneration: FieldValue.delete(),
             comprehensionAudioSourceGeneration: FieldValue.delete(),
             comprehensionAudioValidationVersion: FieldValue.delete(),
@@ -361,6 +366,9 @@ async function performCleanup(
     schoolCount: schools.size,
     legacyDefaultRetentionDays: config.retentionDays,
     retentionPolicyCounts,
+    fallbackSchoolCount,
+    legacySevenDaySchoolCount,
+    trigger: "cron",
   };
 
   await db.doc(RETENTION_DOC).set(
@@ -396,20 +404,15 @@ export const cleanupComprehensionAudio = onSchedule(
       "system:cleanupComprehensionAudio",
       null
     );
-    if ("skipped" in result) {
-      functions.logger.info("comprehensionAudio.retention.skipped", result);
-      await recordCronRun("cleanupComprehensionAudio", "skipped", result.reason);
-    } else {
-      functions.logger.info("comprehensionAudio.retention.completed", result);
-      await recordCronRun("cleanupComprehensionAudio", "ok");
-    }
+    functions.logger.info("comprehensionAudio.retention.completed", result);
+    await recordCronRun("cleanupComprehensionAudio", "ok");
     return;
   });
 
 // Unconfirmed uploads can be stranded if the app is killed after Storage
 // succeeds but before the receipt callable runs. They contain a child's voice,
 // so a separate fail-safe removes pending objects after 24 hours even when the
-// school's normal recording-retention job is disabled.
+// the school's normal retention window has not elapsed.
 export const cleanupPendingComprehensionAudio = onSchedule(
   {
     schedule: "every 24 hours",
@@ -1075,6 +1078,7 @@ export const deleteComprehensionAudio = onCall(
       comprehensionAudioPath: FieldValue.delete(),
       comprehensionAudioDurationSec: FieldValue.delete(),
       comprehensionAudioUploaded: false,
+      comprehensionAudioUploadedAt: FieldValue.delete(),
       comprehensionAudioObjectGeneration: FieldValue.delete(),
       comprehensionAudioSourceGeneration: FieldValue.delete(),
       comprehensionAudioValidationVersion: FieldValue.delete(),
@@ -1163,13 +1167,18 @@ export const getComprehensionAudioUrl = onCall(
     // remove already-collected recordings.
     await assertComprehensionRecordingEnabled(admin.firestore());
 
-    const snap = await admin
-      .firestore()
-      .collection("schools")
-      .doc(schoolId)
-      .collection("readingLogs")
-      .doc(logId)
-      .get();
+    const db = admin.firestore();
+    const [schoolSnap, snap] = await Promise.all([
+      db.doc(`schools/${schoolId}`).get(),
+      db.doc(`schools/${schoolId}/readingLogs/${logId}`).get(),
+    ]);
+    if (!schoolSnap.exists ||
+        !schoolAudioPlaybackIsEnabled(schoolSnap.data())) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Recording playback is turned off for this school"
+      );
+    }
     if (!snap.exists) {
       throw new HttpsError("not-found", "Reading log not found");
     }

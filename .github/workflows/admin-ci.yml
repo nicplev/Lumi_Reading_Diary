@@ -6,6 +6,7 @@ on:
     paths:
       - 'admin/**'
       - 'packages/**'
+      - 'functions/src/audio_authority.ts'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'package.json'
@@ -14,6 +15,7 @@ on:
     paths:
       - 'admin/**'
       - 'packages/**'
+      - 'functions/src/audio_authority.ts'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'package.json'
@@ -42,6 +44,8 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      - name: Audio authority parity
+        run: pnpm test:audio-authority
       - name: Typecheck
         run: pnpm --filter lumi-admin-scaffold exec tsc --noEmit
       - name: Lint

@@ -14,6 +14,7 @@ import { FEELINGS, FEELING_ORDER } from '@/lib/feelings';
 import { CommentThread } from './comment-thread';
 import { LogMedia } from './log-media';
 import { useReadingLogs } from '@/lib/hooks/use-reading-logs';
+import { useSchool } from '@/lib/hooks/use-school';
 
 const STATUS_DOT: Record<string, string> = {
   completed: 'bg-lumi-green',
@@ -79,6 +80,13 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
   const [feelings, setFeelings] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const { data: school } = useSchool();
+  const audioSettings = school?.settings?.comprehensionRecording as
+    | { enabled?: boolean }
+    | undefined;
+  const audioPlaybackEnabled =
+    school?.platformFlags?.comprehensionRecordingEnabled === true &&
+    audioSettings?.enabled === true;
 
   // Date inputs are bounded to [2 years ago, today] — the same hard floor the
   // server enforces, so the picker can never request data that's been cleaned up.
@@ -264,7 +272,7 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {log.childFeeling && <FeelingBlob feeling={log.childFeeling} size={18} />}
-                        {log.hasComprehensionAudio && (
+                        {audioPlaybackEnabled && log.hasComprehensionAudio && (
                           <Icon name="mic" size={16} className="text-muted" />
                         )}
                         <span className="relative inline-flex items-center">
@@ -280,7 +288,7 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
                     <>
                       <LogMedia
                         logId={log.id}
-                        hasAudio={log.hasComprehensionAudio}
+                        hasAudio={audioPlaybackEnabled && log.hasComprehensionAudio}
                         durationSec={log.comprehensionAudioDurationSec}
                       />
                       <CommentThread logId={log.id} hasUnread={log.hasUnread} />

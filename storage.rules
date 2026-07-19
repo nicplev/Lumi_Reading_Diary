@@ -30,7 +30,7 @@ service firebase.storage {
       return audio.get('enabled', false) == true
           && audio.get('authorityVersion', '') == 'school-audio-v1-2026-07-17'
           && audio.get('authorityConfirmedAt', null) is timestamp
-          && audio.get('retentionDays', 0) in [7, 30, 90, 365];
+          && audio.get('retentionDays', 0) in [30, 90, 365];
     }
 
     function ownsAudioLog(schoolId, fileName) {

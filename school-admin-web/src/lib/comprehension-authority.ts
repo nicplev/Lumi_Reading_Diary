@@ -2,11 +2,6 @@ export const AUDIO_AUTHORITY_VERSION = 'school-audio-v1-2026-07-17';
 
 export const AUDIO_RETENTION_OPTIONS = [
   {
-    days: 7,
-    label: '7 days',
-    description: 'Shortest storage period; best for one-off teacher review.',
-  },
-  {
     days: 30,
     label: '30 days — recommended',
     description: 'Enough time for ordinary review while minimising child voice storage.',

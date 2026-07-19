@@ -9,18 +9,17 @@ import { logAuditEvent, ServerOpsValidationError, type Actor } from "./audit";
 // the stale `reason` field on re-enable, which would otherwise wipe retention
 // fields on every toggle.
 //
-// A missing doc means "retention disabled" — no cleanup runs and storage
-// grows unbounded. The mobile client never reads this doc; only the cron and
-// the super-admin UI do.
+// Automatic cleanup is always active. A missing/legacy-invalid doc uses the
+// 90-day fallback so an operational toggle cannot suspend a school's recorded
+// deletion commitment. The mobile client never reads this doc.
 const RETENTION_COLLECTION = "platformConfig";
 const RETENTION_DOC_ID = "comprehensionRetention";
 
-export const MIN_RETENTION_DAYS = 7;
+export const MIN_RETENTION_DAYS = 30;
 export const MAX_RETENTION_DAYS = 730;
 export const DEFAULT_RETENTION_DAYS = 90;
 
 const paramsSchema = z.object({
-  enabled: z.boolean(),
   retentionDays: z
     .number()
     .int()
@@ -29,7 +28,6 @@ const paramsSchema = z.object({
 });
 
 export interface SetComprehensionRetentionConfigParams {
-  enabled: boolean;
   retentionDays: number;
 }
 
@@ -37,7 +35,14 @@ export interface ComprehensionRetentionRunStats {
   deletedCount: number;
   failedCount: number;
   durationMs: number;
-  cutoffISO: string;
+  schoolCount?: number;
+  legacyDefaultRetentionDays?: number;
+  retentionPolicyCounts?: Record<string, number>;
+  fallbackSchoolCount?: number;
+  legacySevenDaySchoolCount?: number;
+  trigger?: "cron" | "manual";
+  cutoffISO?: string;
+  retentionDays?: number;
 }
 
 export interface ComprehensionRetentionConfig {
@@ -61,22 +66,51 @@ function toISO(ts: unknown): string | null {
   return null;
 }
 
-function readRunStats(raw: unknown): ComprehensionRetentionRunStats | null {
+export function readComprehensionRetentionRunStats(
+  raw: unknown
+): ComprehensionRetentionRunStats | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
-  const deletedCount = typeof r.deletedCount === "number" ? r.deletedCount : null;
-  const failedCount = typeof r.failedCount === "number" ? r.failedCount : null;
-  const durationMs = typeof r.durationMs === "number" ? r.durationMs : null;
-  const cutoffISO = typeof r.cutoffISO === "string" ? r.cutoffISO : null;
+  const requiredNumber = (value: unknown): number | null =>
+    typeof value === "number" && Number.isFinite(value) ? value : null;
+  const deletedCount = requiredNumber(r.deletedCount);
+  const failedCount = requiredNumber(r.failedCount);
+  const durationMs = requiredNumber(r.durationMs);
   if (
     deletedCount === null ||
     failedCount === null ||
-    durationMs === null ||
-    cutoffISO === null
+    durationMs === null
   ) {
     return null;
   }
-  return { deletedCount, failedCount, durationMs, cutoffISO };
+  const optionalNumber = (key: string): number | undefined =>
+    typeof r[key] === "number" && Number.isFinite(r[key])
+      ? r[key] as number
+      : undefined;
+  const countsRaw = r.retentionPolicyCounts;
+  const retentionPolicyCounts = countsRaw && typeof countsRaw === "object"
+    ? Object.fromEntries(
+        Object.entries(countsRaw).filter(
+          ([, value]) => typeof value === "number" && Number.isFinite(value)
+        )
+      )
+    : undefined;
+  const trigger = r.trigger === "cron" || r.trigger === "manual"
+    ? r.trigger
+    : undefined;
+  return {
+    deletedCount,
+    failedCount,
+    durationMs,
+    schoolCount: optionalNumber("schoolCount"),
+    legacyDefaultRetentionDays: optionalNumber("legacyDefaultRetentionDays"),
+    retentionPolicyCounts,
+    fallbackSchoolCount: optionalNumber("fallbackSchoolCount"),
+    legacySevenDaySchoolCount: optionalNumber("legacySevenDaySchoolCount"),
+    trigger,
+    cutoffISO: typeof r.cutoffISO === "string" ? r.cutoffISO : undefined,
+    retentionDays: optionalNumber("retentionDays"),
+  };
 }
 
 export async function getComprehensionRetentionConfig(
@@ -86,7 +120,7 @@ export async function getComprehensionRetentionConfig(
   const data = snap.data();
   if (!snap.exists || !data) {
     return {
-      enabled: false,
+      enabled: true,
       retentionDays: DEFAULT_RETENTION_DAYS,
       updatedAt: null,
       lastRunAt: null,
@@ -95,16 +129,19 @@ export async function getComprehensionRetentionConfig(
   }
   const retentionDaysRaw = data.retentionDays;
   return {
-    enabled: (data.enabled as boolean | undefined) ?? false,
+    enabled: true,
     retentionDays:
-      typeof retentionDaysRaw === "number" && Number.isInteger(retentionDaysRaw)
+      typeof retentionDaysRaw === "number" &&
+      Number.isInteger(retentionDaysRaw) &&
+      retentionDaysRaw >= MIN_RETENTION_DAYS &&
+      retentionDaysRaw <= MAX_RETENTION_DAYS
         ? retentionDaysRaw
         : DEFAULT_RETENTION_DAYS,
     updatedAt: toISO(data.updatedAt),
     updatedBy: data.updatedBy as string | undefined,
     updatedByEmail: data.updatedByEmail as string | undefined,
     lastRunAt: toISO(data.lastRunAt),
-    lastRunStats: readRunStats(data.lastRunStats),
+    lastRunStats: readComprehensionRetentionRunStats(data.lastRunStats),
   };
 }
 
@@ -119,10 +156,10 @@ export async function setComprehensionRetentionConfig(
       parsed.error.issues[0]?.message ?? "Invalid retention config"
     );
   }
-  const { enabled, retentionDays } = parsed.data;
+  const { retentionDays } = parsed.data;
 
   const payload: Record<string, unknown> = {
-    enabled,
+    enabled: true,
     retentionDays,
     updatedAt: new Date(),
     updatedBy: actor.uid,
@@ -144,7 +181,7 @@ export async function setComprehensionRetentionConfig(
     performedByEmail: actor.email,
     targetType: "platformConfig",
     targetId: RETENTION_DOC_ID,
-    after: { enabled, retentionDays },
+    after: { enabled: true, retentionDays },
   }).catch((e) => {
     console.error(
       "[server-ops] audit log failed for platformConfig.comprehensionRetention",

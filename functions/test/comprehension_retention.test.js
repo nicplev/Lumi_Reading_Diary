@@ -14,8 +14,10 @@ const {
 } = require('../lib/comprehension_retention.js');
 const {
   AUDIO_AUTHORITY_VERSION,
+  retentionDecisionForSchool,
   retentionDaysForSchool,
   schoolAudioCollectionIsAuthorised,
+  schoolAudioPlaybackIsEnabled,
 } = require('../lib/audio_authority.js');
 const {
   AudioMediaValidationError,
@@ -153,12 +155,28 @@ test('school audio collection requires current server-recorded authority', () =>
   assert.equal(schoolAudioCollectionIsAuthorised({
     settings: {comprehensionRecording: {enabled: true}},
   }), false);
+  assert.equal(schoolAudioCollectionIsAuthorised({
+    settings: {comprehensionRecording: {
+      ...valid.settings.comprehensionRecording,
+      retentionDays: 7,
+    }},
+  }), false);
 });
 
-test('school retention uses an allowed school choice or the legacy default', () => {
+test('school playback requires explicit school enablement', () => {
+  assert.equal(schoolAudioPlaybackIsEnabled({
+    settings: {comprehensionRecording: {enabled: true}},
+  }), true);
+  assert.equal(schoolAudioPlaybackIsEnabled({}), false);
+});
+
+test('school retention preserves legacy seven-day deletion commitments', () => {
   assert.equal(retentionDaysForSchool({
     settings: {comprehensionRecording: {retentionDays: 7}},
   }, 90), 7);
+  assert.deepEqual(retentionDecisionForSchool({
+    settings: {comprehensionRecording: {retentionDays: 7}},
+  }, 90), {days: 7, source: 'legacySchool'});
   assert.equal(retentionDaysForSchool({
     settings: {comprehensionRecording: {retentionDays: 14}},
   }, 90), 90);

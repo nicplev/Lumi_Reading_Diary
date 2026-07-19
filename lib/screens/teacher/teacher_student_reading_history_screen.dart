@@ -625,7 +625,10 @@ class _TeacherStudentReadingHistoryScreenState
                 ],
                 if (log.hasRecording) ...[
                   const SizedBox(width: 8),
-                  RecordingAffordance(pending: !log.comprehensionAudioUploaded),
+                  RecordingAffordance(
+                    schoolId: widget.student.schoolId,
+                    pending: !log.comprehensionAudioUploaded,
+                  ),
                 ],
                 const SizedBox(width: 8),
                 CommentAffordance(

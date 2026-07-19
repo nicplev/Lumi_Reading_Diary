@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
 import { getComprehensionAudio } from '@/lib/firestore/reading-logs';
-import { adminStorage } from '@/lib/firebase/admin';
+import { adminDb, adminStorage } from '@/lib/firebase/admin';
+import {
+  AUDIO_VALIDATION_VERSION,
+  comprehensionAudioObjectPath,
+  platformAudioPlaybackIsEnabled,
+  schoolAudioPlaybackIsEnabled,
+} from '@/lib/comprehension-audio-policy';
 
 // admin.ts now sets a default storageBucket; naming it here anyway keeps
 // the route self-documenting and independent of app-init options.
@@ -43,14 +49,35 @@ export async function GET(
 
   const { logId } = await params;
   try {
-    const audio = await getComprehensionAudio(session.schoolId, logId);
+    const [flagSnap, schoolSnap, audio] = await Promise.all([
+      adminDb.doc('platformConfig/comprehensionRecording').get(),
+      adminDb.doc(`schools/${session.schoolId}`).get(),
+      getComprehensionAudio(session.schoolId, logId),
+    ]);
+    if (
+      !flagSnap.exists ||
+      !platformAudioPlaybackIsEnabled(flagSnap.data()) ||
+      !schoolSnap.exists ||
+      !schoolAudioPlaybackIsEnabled(schoolSnap.data())
+    ) {
+      return NextResponse.json(
+        { error: 'Recording playback is turned off' },
+        { status: 409 },
+      );
+    }
     if (!audio) return NextResponse.json({ error: 'No audio for this log' }, { status: 404 });
+    if (audio.validationVersion !== AUDIO_VALIDATION_VERSION) {
+      return NextResponse.json({ error: 'Audio validation is incomplete' }, { status: 409 });
+    }
 
-    const file = adminStorage.bucket(BUCKET).file(audio.path);
+    const path = comprehensionAudioObjectPath(session.schoolId, logId);
+    const file = adminStorage.bucket(BUCKET).file(path, {
+      generation: audio.objectGeneration,
+    });
     const [exists] = await file.exists();
     if (!exists) return NextResponse.json({ error: 'Audio file missing' }, { status: 404 });
 
-    let contentType = inferContentType(audio.path);
+    let contentType = inferContentType(path);
     try {
       const [meta] = await file.getMetadata();
       if (meta.contentType) contentType = meta.contentType;
@@ -64,7 +91,7 @@ export async function GET(
       headers: {
         'Content-Type': contentType,
         'Content-Length': String(buf.length),
-        'Cache-Control': 'private, max-age=300',
+        'Cache-Control': 'private, no-store',
       },
     });
   } catch {

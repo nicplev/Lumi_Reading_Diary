@@ -113,14 +113,23 @@ export async function getReadingLogsForStudent(
 export async function getComprehensionAudio(
   schoolId: string,
   logId: string
-): Promise<{ path: string; durationSec: number | null } | null> {
+): Promise<{
+  durationSec: number | null;
+  objectGeneration: string;
+  validationVersion: string;
+} | null> {
   const snap = await logsCol(schoolId).doc(logId).get();
   if (!snap.exists) return null;
   const d = snap.data()!;
-  if (d.comprehensionAudioUploaded !== true || !d.comprehensionAudioPath) return null;
+  if (
+    d.comprehensionAudioUploaded !== true ||
+    typeof d.comprehensionAudioObjectGeneration !== 'string' ||
+    typeof d.comprehensionAudioValidationVersion !== 'string'
+  ) return null;
   return {
-    path: d.comprehensionAudioPath as string,
     durationSec: typeof d.comprehensionAudioDurationSec === 'number' ? d.comprehensionAudioDurationSec : null,
+    objectGeneration: d.comprehensionAudioObjectGeneration,
+    validationVersion: d.comprehensionAudioValidationVersion,
   };
 }
 

@@ -14,16 +14,15 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { formatDateTime } from "@/lib/utils";
 import type {
   ComprehensionRetentionConfig,
   RunRetentionNowOutcome,
 } from "@lumi/server-ops";
 
-// UI guidance only. The API independently enforces the authoritative 7–730 day
+// UI guidance only. The API independently enforces the authoritative 30–730 day
 // bounds, so these values are not part of the security boundary.
-const MIN_RETENTION_DAYS = 7;
+const MIN_RETENTION_DAYS = 30;
 const MAX_RETENTION_DAYS = 730;
 
 interface Props {
@@ -32,7 +31,6 @@ interface Props {
 
 export function RetentionControlsCard({ initialConfig }: Props) {
   const [config, setConfig] = useState(initialConfig);
-  const [enabled, setEnabled] = useState(initialConfig.enabled);
   const [daysInput, setDaysInput] = useState(String(initialConfig.retentionDays));
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(false);
@@ -43,8 +41,7 @@ export function RetentionControlsCard({ initialConfig }: Props) {
     parsedDays >= MIN_RETENTION_DAYS &&
     parsedDays <= MAX_RETENTION_DAYS;
 
-  const dirty =
-    enabled !== config.enabled || parsedDays !== config.retentionDays;
+  const dirty = parsedDays !== config.retentionDays;
 
   const handleSave = async () => {
     if (!daysValid) {
@@ -58,7 +55,7 @@ export function RetentionControlsCard({ initialConfig }: Props) {
       const res = await fetch("/api/platform-config/comprehension-retention", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled, retentionDays: parsedDays }),
+        body: JSON.stringify({ retentionDays: parsedDays }),
       });
       const json = (await res.json()) as
         | ComprehensionRetentionConfig
@@ -70,7 +67,6 @@ export function RetentionControlsCard({ initialConfig }: Props) {
       }
       const next = json as ComprehensionRetentionConfig;
       setConfig(next);
-      setEnabled(next.enabled);
       setDaysInput(String(next.retentionDays));
       toast.success("Retention policy saved");
     } catch (err) {
@@ -81,10 +77,6 @@ export function RetentionControlsCard({ initialConfig }: Props) {
   };
 
   const handleRunNow = async () => {
-    if (!config.enabled) {
-      toast.error("Enable scheduled cleanup first");
-      return;
-    }
     setRunning(true);
     try {
       const res = await fetch(
@@ -99,24 +91,16 @@ export function RetentionControlsCard({ initialConfig }: Props) {
           (json as { error?: string }).error ?? "Run failed"
         );
       }
-      const outcome = json as RunRetentionNowOutcome;
-      if ("skipped" in outcome && outcome.skipped) {
-        toast.message(`Skipped: ${outcome.reason}`);
-      } else {
-        const stats = outcome as Extract<
-          RunRetentionNowOutcome,
-          { deletedCount: number }
-        >;
-        toast.success(
-          `Run complete — deleted ${stats.deletedCount}, failed ${stats.failedCount}`
-        );
-        // Refresh server-rendered state so lastRun timestamp shows up
-        // without a hard reload.
-        const refreshed = await fetch(
-          "/api/platform-config/comprehension-retention"
-        ).then((r) => r.json() as Promise<ComprehensionRetentionConfig>);
-        setConfig(refreshed);
-      }
+      const stats = json as RunRetentionNowOutcome;
+      toast.success(
+        `Run complete — deleted ${stats.deletedCount}, failed ${stats.failedCount}`
+      );
+      // Refresh server-rendered state so lastRun timestamp shows up
+      // without a hard reload.
+      const refreshed = await fetch(
+        "/api/platform-config/comprehension-retention"
+      ).then((r) => r.json() as Promise<ComprehensionRetentionConfig>);
+      setConfig(refreshed);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Run failed");
     } finally {
@@ -135,6 +119,13 @@ export function RetentionControlsCard({ initialConfig }: Props) {
   const updated = config.updatedAt
     ? `Updated by ${config.updatedByEmail ?? config.updatedBy ?? "unknown"} on ${formatDateTime(config.updatedAt)}`
     : null;
+  const stats = config.lastRunStats;
+  const retentionBuckets = stats?.retentionPolicyCounts
+    ? Object.entries(stats.retentionPolicyCounts)
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .map(([days, count]) => `${days}d: ${count} school${count === 1 ? "" : "s"}`)
+        .join(" · ")
+    : null;
 
   return (
     <Card>
@@ -144,42 +135,21 @@ export function RetentionControlsCard({ initialConfig }: Props) {
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
               Comprehension Audio Retention
-              <Badge variant={config.enabled ? "secondary" : "outline"}>
-                {config.enabled ? "Active" : "Disabled"}
-              </Badge>
+              <Badge variant="secondary">Always active</Badge>
             </CardTitle>
             <CardDescription className="mt-1 max-w-2xl">
-              Daily cleanup that deletes comprehension audio Storage objects
-              older than the configured number of days. The reading-log doc
-              itself is preserved — only the audio file and its pointer fields
-              are cleared. The cron writes a summary entry to{" "}
-              <code>adminAuditLog</code> on every run.
+              Daily cleanup honours each school&apos;s 30, 90 or 365-day choice.
+              This value is used only when a school has no valid stored choice.
+              Reading logs are preserved; only audio and its receipt fields are
+              removed. Cleanup cannot be disabled from the portal.
             </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <Label htmlFor="retention-enabled" className="text-sm">
-              Enable scheduled cleanup
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              While off, no recordings are deleted by the cron. Existing files
-              remain in Storage.
-            </p>
-          </div>
-          <Switch
-            id="retention-enabled"
-            checked={enabled}
-            disabled={saving}
-            onCheckedChange={setEnabled}
-          />
-        </div>
-
         <div className="space-y-2">
           <Label htmlFor="retention-days" className="text-sm">
-            Retain for (days)
+            Fallback retention (days)
           </Label>
           <Input
             id="retention-days"
@@ -194,9 +164,8 @@ export function RetentionControlsCard({ initialConfig }: Props) {
             className="max-w-[200px]"
           />
           <p className="text-xs text-muted-foreground">
-            Between {MIN_RETENTION_DAYS} and {MAX_RETENTION_DAYS} days.
-            Recordings older than this are eligible for deletion on the next
-            cron run.
+            Between {MIN_RETENTION_DAYS} and {MAX_RETENTION_DAYS} days. This
+            does not replace a school&apos;s explicit 30/90/365-day choice.
           </p>
         </div>
 
@@ -204,6 +173,22 @@ export function RetentionControlsCard({ initialConfig }: Props) {
           <p>
             <span className="font-medium">Last run:</span> {lastRun}
           </p>
+          {retentionBuckets && <p>{retentionBuckets}</p>}
+          {stats?.fallbackSchoolCount !== undefined && (
+            <p>
+              Platform fallback used by {stats.fallbackSchoolCount} school
+              {stats.fallbackSchoolCount === 1 ? "" : "s"}.
+            </p>
+          )}
+          {stats?.legacySevenDaySchoolCount !== undefined &&
+            stats.legacySevenDaySchoolCount > 0 && (
+              <p>
+                Legacy 7-day deletion commitments still honoured for{" "}
+                {stats.legacySevenDaySchoolCount} school
+                {stats.legacySevenDaySchoolCount === 1 ? "" : "s"}; new
+                collection requires a 30+ day choice.
+              </p>
+            )}
           {updated && <p>{updated}</p>}
         </div>
 
@@ -211,12 +196,8 @@ export function RetentionControlsCard({ initialConfig }: Props) {
           <Button
             variant="outline"
             onClick={handleRunNow}
-            disabled={running || saving || !config.enabled}
-            title={
-              config.enabled
-                ? "Run the same cleanup the daily cron runs, attributed to you"
-                : "Enable scheduled cleanup first"
-            }
+            disabled={running || saving}
+            title="Run the same cleanup the daily cron runs, attributed to you"
           >
             {running ? "Running…" : "Run now"}
           </Button>

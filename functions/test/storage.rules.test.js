@@ -78,7 +78,11 @@ async function seedFlag(enabled) {
   });
 }
 
-async function seedAudioLog(uploaded = false, authorised = true) {
+async function seedAudioLog(
+  uploaded = false,
+  authorised = true,
+  retentionDays = 30,
+) {
   await testEnv.withSecurityRulesDisabled(async (context) => {
     const school = context.firestore().collection('schools').doc('school_1');
     await school.set({
@@ -87,7 +91,7 @@ async function seedAudioLog(uploaded = false, authorised = true) {
           enabled: true,
           authorityVersion: 'school-audio-v1-2026-07-17',
           authorityConfirmedAt: new Date(),
-          retentionDays: 30,
+          retentionDays,
         } : {enabled: true},
       },
     });
@@ -161,6 +165,12 @@ test('comprehension audio: disabled kill switch denies upload', async () => {
 
 test('comprehension audio: school authority and retention evidence fail closed', async () => {
   await seedAudioLog(false, false);
+  await seedFlag(true);
+  await assertFails(uploadBytes(audioRef('parent_1'), AUDIO_BYTES, AUDIO_METADATA));
+});
+
+test('comprehension audio: legacy seven-day retention cannot authorise a new upload', async () => {
+  await seedAudioLog(false, true, 7);
   await seedFlag(true);
   await assertFails(uploadBytes(audioRef('parent_1'), AUDIO_BYTES, AUDIO_METADATA));
 });

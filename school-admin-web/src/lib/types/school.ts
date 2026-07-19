@@ -98,7 +98,7 @@ export type ComprehensionRecordingUpdate =
       authorityDecision?: {
         authorisedBySchool: true;
         familyNoticeConfirmed: true;
-        retentionDays: 7 | 30 | 90 | 365;
+        retentionDays: 30 | 90 | 365;
       };
     };
 

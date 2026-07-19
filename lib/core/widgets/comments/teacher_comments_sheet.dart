@@ -58,19 +58,26 @@ class CommentAffordance extends ConsumerWidget {
 /// a teacher can spot at a glance which logs have audio. When the recording is
 /// still uploading it renders muted ([pending]) — surfacing recordings that
 /// exist but haven't landed in Storage yet.
-class RecordingAffordance extends StatelessWidget {
+class RecordingAffordance extends ConsumerWidget {
   final bool pending;
+  final String schoolId;
 
-  const RecordingAffordance({super.key, this.pending = false});
+  const RecordingAffordance({
+    super.key,
+    required this.schoolId,
+    this.pending = false,
+  });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!ref.watch(comprehensionAudioEnabledProvider(schoolId))) {
+      return const SizedBox.shrink();
+    }
     return Icon(
       pending ? Icons.mic_none_rounded : Icons.mic_rounded,
       size: 18,
-      color: pending
-          ? LumiTokens.muted.withValues(alpha: 0.5)
-          : LumiTokens.muted,
+      color:
+          pending ? LumiTokens.muted.withValues(alpha: 0.5) : LumiTokens.muted,
     );
   }
 }
@@ -91,14 +98,12 @@ class _RecordingPendingNote extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.mic_none_rounded,
-              size: 18, color: LumiTokens.muted),
+          Icon(Icons.mic_none_rounded, size: 18, color: LumiTokens.muted),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               "Recording is still uploading — it'll appear here once it lands.",
-              style: LumiType.caption
-                  .copyWith(color: LumiTokens.muted),
+              style: LumiType.caption.copyWith(color: LumiTokens.muted),
             ),
           ),
         ],
@@ -122,7 +127,9 @@ void openTeacherCommentsSheet(
   // inside is gated.
   final messagingOn = ProviderScope.containerOf(context, listen: false)
       .read(messagingEnabledProvider(log.schoolId));
-  if (!messagingOn && log.comprehensionAudioPath == null) return;
+  final audioOn = ProviderScope.containerOf(context, listen: false)
+      .read(comprehensionAudioEnabledProvider(log.schoolId));
+  if (!messagingOn && (!audioOn || log.comprehensionAudioPath == null)) return;
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -146,10 +153,12 @@ class TeacherCommentsSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final messagingOn = ref.watch(messagingEnabledProvider(log.schoolId));
+    final audioOn = ref.watch(comprehensionAudioEnabledProvider(log.schoolId));
     final books =
         log.bookTitles.isNotEmpty ? log.bookTitles.join(', ') : 'Free reading';
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: DraggableScrollableSheet(
         initialChildSize: 0.7,
         minChildSize: 0.5,
@@ -210,7 +219,7 @@ class TeacherCommentsSheet extends ConsumerWidget {
                     // The child's comprehension recording, when present. A log
                     // whose audio hasn't finished uploading shows a pending note
                     // rather than a broken player.
-                    if (log.comprehensionAudioPath != null) ...[
+                    if (audioOn && log.comprehensionAudioPath != null) ...[
                       if (log.hasComprehensionAudio)
                         ComprehensionAudioPlayer(
                           storagePath: log.comprehensionAudioPath!,

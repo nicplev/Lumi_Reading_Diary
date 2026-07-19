@@ -7,14 +7,12 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import type { Storage } from "firebase-admin/storage";
 import { z } from "zod";
 import { logAuditEvent, ServerOpsValidationError, type Actor } from "./audit";
-import {
-  MAX_RETENTION_DAYS,
-  MIN_RETENTION_DAYS,
-} from "./setComprehensionRetentionConfig";
+import { retentionDecisionForSchool } from "./audioAuthority";
+import { getComprehensionRetentionConfig } from "./setComprehensionRetentionConfig";
 
-// Manual cleanup helpers for comprehension audio. Used by the super-admin
-// portal (Run Now), the school-admin portal (bulk delete + preview), and the
-// teacher single-delete callable.
+// Manual cleanup helpers for comprehension audio used by the super-admin
+// portal. The school-admin portal and Functions deploy have separate mirrors;
+// parity tests keep their authority and deletion contracts aligned.
 //
 // The scheduled cron in functions/src/comprehension_retention.ts intentionally
 // keeps its own copy of the cleanup loop — functions/ doesn't depend on the
@@ -29,6 +27,34 @@ const DAY_MS = 86_400_000;
 // patched, so a per-batch failure must not loop forever. 50 × 500 = 25k is
 // well beyond any plausible 24-hour backlog.
 const MAX_PAGES = 50;
+
+export function comprehensionAudioObjectPath(
+  schoolId: string,
+  logId: string
+): string {
+  return `schools/${schoolId}/comprehension_audio/${logId}.m4a`;
+}
+
+export function comprehensionAudioUploadObjectPath(
+  schoolId: string,
+  logId: string
+): string {
+  return `comprehension_audio_uploads/${schoolId}/${logId}.m4a`;
+}
+
+function clearedAudioFields(): Record<string, unknown> {
+  return {
+    comprehensionAudioPath: FieldValue.delete(),
+    comprehensionAudioDurationSec: FieldValue.delete(),
+    comprehensionAudioUploaded: false,
+    comprehensionAudioUploadedAt: FieldValue.delete(),
+    comprehensionAudioObjectGeneration: FieldValue.delete(),
+    comprehensionAudioSourceGeneration: FieldValue.delete(),
+    comprehensionAudioValidationVersion: FieldValue.delete(),
+    comprehensionAudioValidatedDurationMs: FieldValue.delete(),
+    comprehensionAudioSha256: FieldValue.delete(),
+  };
+}
 
 // Tags audit-log entries so an operator can tell whether a deletion came
 // from a teacher, the bulk admin tool, or one of the retention runs.
@@ -45,8 +71,8 @@ async function deleteStorageObjectIfExists(
   try {
     await storage.bucket().file(path).delete();
   } catch (err: unknown) {
-    const code = (err as { code?: number }).code;
-    if (code === 404) return;
+    const code = (err as { code?: number | string }).code;
+    if (code === 404 || code === "404") return;
     throw err;
   }
 }
@@ -58,15 +84,19 @@ async function deleteStorageObjectIfExists(
 async function deleteOneCore(args: {
   storage: Storage;
   logRef: DocumentReference;
-  storagePath: string | undefined;
+  schoolId: string;
+  logId: string;
 }): Promise<void> {
-  if (args.storagePath) {
-    await deleteStorageObjectIfExists(args.storage, args.storagePath);
-  }
+  await deleteStorageObjectIfExists(
+    args.storage,
+    comprehensionAudioObjectPath(args.schoolId, args.logId)
+  );
+  await deleteStorageObjectIfExists(
+    args.storage,
+    comprehensionAudioUploadObjectPath(args.schoolId, args.logId)
+  );
   await args.logRef.update({
-    comprehensionAudioPath: FieldValue.delete(),
-    comprehensionAudioDurationSec: FieldValue.delete(),
-    comprehensionAudioUploaded: false,
+    ...clearedAudioFields(),
     comprehensionAudioDeletedAt: FieldValue.serverTimestamp(),
   });
 }
@@ -119,9 +149,17 @@ export async function deleteOneComprehensionAudio(
   if (data.comprehensionAudioUploaded !== true) {
     return { deleted: false, reason: "no_audio" };
   }
-  const storagePath = data.comprehensionAudioPath as string | undefined;
+  const storagePath = comprehensionAudioObjectPath(
+    params.schoolId,
+    params.logId
+  );
 
-  await deleteOneCore({ storage, logRef, storagePath });
+  await deleteOneCore({
+    storage,
+    logRef,
+    schoolId: params.schoolId,
+    logId: params.logId,
+  });
 
   await logAuditEvent(db, {
     action: "comprehensionAudio.manualDelete",
@@ -223,10 +261,13 @@ export async function bulkDeleteComprehensionAudio(
     const snap = await buildReadingLogsQuery(db, filter).limit(BATCH_SIZE).get();
     if (snap.empty) break;
     for (const doc of snap.docs) {
-      const data = doc.data();
-      const storagePath = data.comprehensionAudioPath as string | undefined;
       try {
-        await deleteOneCore({ storage, logRef: doc.ref, storagePath });
+        await deleteOneCore({
+          storage,
+          logRef: doc.ref,
+          schoolId: filter.schoolId,
+          logId: doc.id,
+        });
         deletedCount++;
       } catch (err) {
         failedCount++;
@@ -234,7 +275,7 @@ export async function bulkDeleteComprehensionAudio(
           "[server-ops] bulkDeleteComprehensionAudio: per-doc failure",
           {
             logPath: doc.ref.path,
-            storagePath,
+            storagePath: comprehensionAudioObjectPath(filter.schoolId, doc.id),
             error: err instanceof Error ? err.message : String(err),
           }
         );
@@ -269,22 +310,19 @@ export async function bulkDeleteComprehensionAudio(
 //    operator instead of the system principal
 // =============================================================================
 
-interface RetentionConfigDoc {
-  enabled?: boolean;
-  retentionDays?: number;
-}
-
 export interface RunRetentionNowStats {
   deletedCount: number;
   failedCount: number;
   durationMs: number;
-  cutoffISO: string;
-  retentionDays: number;
+  schoolCount: number;
+  legacyDefaultRetentionDays: number;
+  retentionPolicyCounts: Record<string, number>;
+  fallbackSchoolCount: number;
+  legacySevenDaySchoolCount: number;
+  trigger: "manual";
 }
 
-export type RunRetentionNowOutcome =
-  | { skipped: true; reason: string }
-  | ({ skipped?: false } & RunRetentionNowStats);
+export type RunRetentionNowOutcome = RunRetentionNowStats;
 
 export async function runComprehensionRetentionNow(
   db: Firestore,
@@ -292,64 +330,90 @@ export async function runComprehensionRetentionNow(
   actor: Actor
 ): Promise<RunRetentionNowOutcome> {
   const startedAtMs = Date.now();
-  const configSnap = await db.doc(RETENTION_DOC).get();
-  const config = configSnap.data() as RetentionConfigDoc | undefined;
-  if (!configSnap.exists || !config) {
-    return { skipped: true, reason: "config_missing" };
-  }
-  if (config.enabled !== true) {
-    return { skipped: true, reason: "disabled" };
-  }
-  const retentionDays = config.retentionDays ?? 0;
-  if (
-    !Number.isInteger(retentionDays) ||
-    retentionDays < MIN_RETENTION_DAYS ||
-    retentionDays > MAX_RETENTION_DAYS
-  ) {
-    return { skipped: true, reason: "invalid_retentionDays" };
-  }
-
-  const cutoff = Timestamp.fromMillis(startedAtMs - retentionDays * DAY_MS);
-  const cutoffISO = cutoff.toDate().toISOString();
+  const config = await getComprehensionRetentionConfig(db);
 
   let deletedCount = 0;
   let failedCount = 0;
+  let fallbackSchoolCount = 0;
+  let legacySevenDaySchoolCount = 0;
+  const retentionPolicyCounts: Record<string, number> = {};
+  const schools = await db.collection("schools").get();
 
-  for (let page = 0; page < MAX_PAGES; page++) {
-    const snap = await db
-      .collectionGroup("readingLogs")
-      .where("comprehensionAudioUploaded", "==", true)
-      .where("createdAt", "<", cutoff)
-      .limit(BATCH_SIZE)
-      .get();
-    if (snap.empty) break;
-    for (const doc of snap.docs) {
-      const data = doc.data();
-      const storagePath = data.comprehensionAudioPath as string | undefined;
-      try {
-        await deleteOneCore({ storage, logRef: doc.ref, storagePath });
-        deletedCount++;
-      } catch (err) {
-        failedCount++;
-        console.error(
-          "[server-ops] runComprehensionRetentionNow: per-doc failure",
-          {
-            logPath: doc.ref.path,
-            storagePath,
-            error: err instanceof Error ? err.message : String(err),
+  for (const school of schools.docs) {
+    const decision = retentionDecisionForSchool(
+      school.data(),
+      config.retentionDays
+    );
+    if (decision.source === "fallback") fallbackSchoolCount++;
+    if (decision.source === "legacySchool") legacySevenDaySchoolCount++;
+    retentionPolicyCounts[String(decision.days)] =
+      (retentionPolicyCounts[String(decision.days)] ?? 0) + 1;
+    const cutoff = Timestamp.fromMillis(
+      startedAtMs - decision.days * DAY_MS
+    );
+
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const snap = await school.ref
+        .collection("readingLogs")
+        .where("comprehensionAudioUploaded", "==", true)
+        .where("createdAt", "<", cutoff)
+        .limit(BATCH_SIZE)
+        .get();
+      if (snap.empty) break;
+
+      for (const doc of snap.docs) {
+        const data = doc.data();
+        const expectedPath = comprehensionAudioObjectPath(school.id, doc.id);
+        const storedPath = typeof data.comprehensionAudioPath === "string"
+          ? data.comprehensionAudioPath
+          : null;
+        try {
+          if (storedPath !== expectedPath) {
+            await deleteStorageObjectIfExists(storage, expectedPath);
+            await deleteStorageObjectIfExists(
+              storage,
+              comprehensionAudioUploadObjectPath(school.id, doc.id)
+            );
+            await doc.ref.update({
+              ...clearedAudioFields(),
+              comprehensionAudioPathRejectedAt: FieldValue.serverTimestamp(),
+            });
+            failedCount++;
+            continue;
           }
-        );
+
+          await deleteOneCore({
+            storage,
+            logRef: doc.ref,
+            schoolId: school.id,
+            logId: doc.id,
+          });
+          deletedCount++;
+        } catch (err) {
+          failedCount++;
+          console.error(
+            "[server-ops] runComprehensionRetentionNow: per-doc failure",
+            {
+              logPath: doc.ref.path,
+              error: err instanceof Error ? err.message : String(err),
+            }
+          );
+        }
       }
+      if (snap.size < BATCH_SIZE) break;
     }
-    if (snap.size < BATCH_SIZE) break;
   }
 
   const stats: RunRetentionNowStats = {
     deletedCount,
     failedCount,
     durationMs: Date.now() - startedAtMs,
-    cutoffISO,
-    retentionDays,
+    schoolCount: schools.size,
+    legacyDefaultRetentionDays: config.retentionDays,
+    retentionPolicyCounts,
+    fallbackSchoolCount,
+    legacySevenDaySchoolCount,
+    trigger: "manual",
   };
 
   await db.doc(RETENTION_DOC).set(

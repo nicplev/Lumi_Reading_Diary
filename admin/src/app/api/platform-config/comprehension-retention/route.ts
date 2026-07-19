@@ -27,7 +27,7 @@ export async function PUT(request: Request) {
     const result = await setComprehensionRetentionConfig(
       getAdminDb(),
       { uid: session.uid, email: session.email ?? undefined },
-      { enabled: body.enabled, retentionDays: body.retentionDays }
+      { retentionDays: body.retentionDays }
     );
     return NextResponse.json(result);
   } catch (error) {

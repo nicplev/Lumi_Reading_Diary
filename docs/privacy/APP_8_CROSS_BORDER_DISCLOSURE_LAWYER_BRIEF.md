@@ -223,7 +223,8 @@ retain the following:
 - [x] Dedicated keyless least-privilege runtime identities and Scheduler audit.
 - [x] Firestore/Storage cross-school/class/family denial test matrix.
 - [x] Audio off by default; first school opt-in records authority, family notice
-  commitment and 7/30/90/365-day retention; upload fails closed.
+  commitment and 30/90/365-day retention; upload fails closed. Legacy stored
+  7-day choices remain deletion-only commitments.
 - [x] Optional Analytics/Crashlytics off by default with adult controls and
   physical iPhone network evidence.
 - [x] Account/student deletion workflow and automated cascade tests.
