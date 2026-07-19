@@ -311,3 +311,68 @@ Ask counsel to deliver a written decision that:
   https://www.twilio.com/en-us/legal/data-protection-addendum
 - Twilio subprocessors:
   https://www.twilio.com/en-us/legal/sub-processors
+
+---
+
+## Addendum — 20 July 2026: proposed AI pipeline no longer involves a US disclosure
+
+> **DRAFT — pending counsel + Nic approval; not in force.** This addendum
+> records a design change for counsel's review; it does not itself approve any
+> processing. The AI feature remains disabled in production.
+
+**Change.** On 2026-07-19 the proposed AI comprehension-evaluation design was
+revised (`docs/AI_EVALUATION_GEMINI_PLAN.md`): the planned Anthropic Claude
+evaluation stage (direct US API) was replaced by **Gemini on Vertex AI served
+from Google Cloud's `australia-southeast1` (Sydney) regional endpoint**. The
+speech-to-text stage was already Sydney-regional. As a result, the AI pipeline
+as now designed proposes **no disclosure of personal information to an
+overseas recipient**:
+
+- Audio, transcript, prompt and evaluation are stored and processed on Google
+  Cloud services pinned to `australia-southeast1`; server code rejects any
+  other region at startup, and the model must be on a code-reviewed allowlist.
+- No new vendor is introduced. Vertex AI is a Google Cloud service under the
+  same Google Cloud Data Processing Addendum already relied on for Firestore
+  and Storage; when a third-party model runs on Vertex, Google is the
+  processor. The former Anthropic gates (DPA, ZDR, US processing analysis,
+  API secret) are deleted from the design.
+- No API key or secret exists for the AI stage; authentication is the
+  Australian Functions runtime service account with a least-privilege custom
+  IAM role (`aiplatform.endpoints.predict` only).
+
+**Proposed finding (negative, for counsel confirmation):** APP 8.1 is not
+engaged by the AI evaluation pipeline because no overseas disclosure occurs in
+it. The §5 inventory row "Speech-to-Text/LLM" should, on adoption, be re-marked
+from a prospective US disclosure to an Australian-regional processing flow
+subject to the same effective-control analysis as the other Sydney-region
+Google services (support, telemetry, resilience and subprocessor access paths
+remain for counsel's effective-control assessment, exactly as for Firestore).
+
+**Contingency — this finding is NOT yet fully evidenced.** Live probe evidence
+(2026-07-19, `docs/AI_EVALUATION_GEMINI_PLAN.md` §12) confirms the Sydney
+regional endpoint serves the pinned model with the production request shape.
+Still outstanding before the finding can be relied on:
+
+1. dated capture of Google's **during-ML-processing** residency commitment
+   (not just at-rest) for `australia-southeast1` into
+   `docs/privacy/vendor-evidence/`; and
+2. dated pin of the Vertex generative-AI data-governance terms (no training on
+   customer content; abuse-monitoring/logging posture).
+
+Until both are captured, external claims use the tier-2 wording of plan §6
+("processed via Google Cloud's Sydney regional endpoint; Google's formal
+in-region processing commitment for generative AI in Australia is pending"),
+and this addendum should be read as a *proposed* negative finding contingent
+on that evidence.
+
+**Unchanged.** Every other row of the §5 inventory (US Firebase
+Authentication, global required logs, FCM/APNs, SendGrid, stores) is
+unaffected by this change and still requires the counsel review described in
+the body of this brief. The APP 6 secondary-use analysis, updated collection
+notice, opt-out decision, no-backfill guarantee, PIA approval and retention
+schedule are likewise untouched by the residency improvement — residency
+removes the APP 8 leg only. See `AI_EVAL_PIA_SECTION_DRAFT.md`.
+
+| Decision | Counsel conclusion | Evidence/reference | Approver | Date/expiry |
+| --- | --- | --- | --- | --- |
+| AI pipeline APP 8 treatment (proposed negative finding) | Pending | Plan §12 probes (2026-07-19); residency + data-governance captures pending | Pending | — |
