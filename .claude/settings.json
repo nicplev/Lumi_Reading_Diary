@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/audit-after-infra-change.sh\"",
+            "if": "Bash(firebase *)",
+            "async": true,
+            "asyncRewake": true,
+            "timeout": 420,
+            "statusMessage": "Auditing function estate after deploy",
+            "rewakeSummary": "Function-estate audit found issues",
+            "rewakeMessage": "The post-deploy function-estate audit found actionable issues. Investigate before reporting the deploy as healthy:"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/audit-after-infra-change.sh\"",
+            "if": "Bash(gcloud *)",
+            "async": true,
+            "asyncRewake": true,
+            "timeout": 420,
+            "statusMessage": "Auditing function estate after IAM change",
+            "rewakeSummary": "Function-estate audit found issues",
+            "rewakeMessage": "The post-IAM-change function-estate audit found actionable issues. Investigate before reporting the change as complete:"
+          }
+        ]
+      }
+    ]
+  }
+}
