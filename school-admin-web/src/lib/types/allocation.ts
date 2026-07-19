@@ -45,4 +45,8 @@ export interface Allocation {
   createdAt: Date;
   createdBy: string;
   metadata?: Record<string, unknown>;
+  /** Present only on disposable writes made during the current demo seed. */
+  demoEphemeral?: boolean;
+  demoGenerationId?: string;
+  demoOrigin?: 'portal_isbn' | 'portal_allocation' | 'flutter_camera' | 'flutter_manual';
 }

@@ -19,6 +19,16 @@ const impersonationWhitelist = new Set<string>([
   '/api/dev/impersonate/end',
 ]);
 
+function isDemoAllocationMutationPath(pathname: string, method: string): boolean {
+  const upperMethod = method.toUpperCase();
+  return (
+    (upperMethod === 'POST' && pathname === '/api/demo/isbn-assignment') ||
+    (upperMethod === 'POST' && pathname === '/api/demo/allocations') ||
+    (upperMethod === 'DELETE' &&
+      /^\/api\/demo\/allocations\/[A-Za-z0-9_-]+$/.test(pathname))
+  );
+}
+
 function getSecret() {
   const secret = process.env.SESSION_SECRET;
   if (!secret) throw new Error('SESSION_SECRET environment variable is required');
@@ -69,7 +79,11 @@ export async function middleware(request: NextRequest) {
   // used to create accounts, send email, delete records, or change settings.
   if (
     sessionData?.mfaExemptReason === 'isolatedDemoReadOnly' &&
-    !['GET', 'HEAD', 'OPTIONS'].includes(request.method.toUpperCase())
+    !['GET', 'HEAD', 'OPTIONS'].includes(request.method.toUpperCase()) &&
+    !(
+      sessionData.demoAllocationMutations === true &&
+      isDemoAllocationMutationPath(pathname, request.method)
+    )
   ) {
     return NextResponse.json(
       { error: 'The demo administrator is read-only.' },

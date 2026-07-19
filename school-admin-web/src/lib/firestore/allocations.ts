@@ -28,6 +28,9 @@ function toAllocation(doc: FirebaseFirestore.DocumentSnapshot): Allocation {
     createdAt: data.createdAt?.toDate() ?? new Date(),
     createdBy: data.createdBy ?? '',
     metadata: data.metadata,
+    demoEphemeral: data.demoEphemeral === true,
+    demoGenerationId: data.demoGenerationId,
+    demoOrigin: data.demoOrigin,
   };
 }
 

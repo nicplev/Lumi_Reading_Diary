@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lumi_reading_tracker/services/isbn_assignment_service.dart';
 
@@ -31,6 +35,44 @@ void main() {
         weekStart: DateTime(2026, 3, 9),
       );
       expect(id, 'isbn_student_1_20260309');
+    });
+  });
+
+  group('IsbnAssignmentService transient failure classification', () {
+    test('queues network and backend availability failures', () {
+      expect(
+        IsbnAssignmentService.isTransientAssignmentError(
+          FirebaseException(plugin: 'firestore', code: 'unavailable'),
+        ),
+        isTrue,
+      );
+      expect(
+        IsbnAssignmentService.isTransientAssignmentError(
+          const SocketException('unable to resolve host'),
+        ),
+        isTrue,
+      );
+      expect(
+        IsbnAssignmentService.isTransientAssignmentError(
+          TimeoutException('transaction timed out'),
+        ),
+        isTrue,
+      );
+    });
+
+    test('does not queue authorization or validation failures', () {
+      expect(
+        IsbnAssignmentService.isTransientAssignmentError(
+          FirebaseException(plugin: 'firestore', code: 'permission-denied'),
+        ),
+        isFalse,
+      );
+      expect(
+        IsbnAssignmentService.isTransientAssignmentError(
+          FirebaseException(plugin: 'firestore', code: 'invalid-argument'),
+        ),
+        isFalse,
+      );
     });
   });
 }

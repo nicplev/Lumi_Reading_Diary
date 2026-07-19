@@ -1,5 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
+import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
+
+import '../core/services/demo_session_service.dart';
 import '../core/services/service_status_controller.dart';
 import '../data/models/allocation_model.dart';
 import '../data/models/book_model.dart';
@@ -10,12 +15,75 @@ class IsbnAssignmentService {
   IsbnAssignmentService({
     FirebaseFirestore? firestore,
     BookLookupService? bookLookupService,
+    Future<DemoSessionContext?> Function({bool forceRefresh})?
+        demoContextProvider,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
         _bookLookupService =
-            bookLookupService ?? BookLookupService(firestore: firestore);
+            bookLookupService ?? BookLookupService(firestore: firestore),
+        _demoContextProvider =
+            demoContextProvider ?? DemoSessionService.currentContext;
 
   final FirebaseFirestore _firestore;
   final BookLookupService _bookLookupService;
+  final Future<DemoSessionContext?> Function({bool forceRefresh})
+      _demoContextProvider;
+
+  static const Set<String> _transientCodes = {
+    'unavailable',
+    'deadline-exceeded',
+    'aborted',
+    'cancelled',
+  };
+
+  /// Conservative classifier: authorization, validation and App Check errors
+  /// are never converted into apparently-successful offline work.
+  static bool isTransientAssignmentError(Object error) {
+    if (error is SocketException || error is TimeoutException) return true;
+    if (error is FirebaseException) {
+      if (_transientCodes.contains(error.code)) return true;
+      if (error.code != 'unknown' && error.code != 'internal') return false;
+      return _looksLikeNetworkFailure(error.message);
+    }
+    if (error is PlatformException) {
+      if (_transientCodes.contains(error.code)) return true;
+      return _looksLikeNetworkFailure(error.message);
+    }
+    return false;
+  }
+
+  static bool _looksLikeNetworkFailure(String? message) {
+    final value = (message ?? '').toLowerCase();
+    return value.contains('unable to resolve host') ||
+        value.contains('unknownhost') ||
+        value.contains('network is unreachable') ||
+        value.contains('connection reset') ||
+        value.contains('connection refused') ||
+        value.contains('failed to connect');
+  }
+
+  static String diagnosticCode(Object error) {
+    if (error is FirebaseException) return 'firebase:${error.code}';
+    if (error is PlatformException) return 'platform:${error.code}';
+    if (error is SocketException) return 'network:socket';
+    if (error is TimeoutException) return 'network:timeout';
+    return 'unexpected:${error.runtimeType}';
+  }
+
+  Future<DemoSessionContext?> _demoContextForSchool(
+    String schoolId, {
+    bool forceRefresh = false,
+  }) async {
+    final context = await _demoContextProvider(forceRefresh: forceRefresh);
+    if (context == null) return null;
+    if (context.schoolId != schoolId) {
+      throw FirebaseException(
+        plugin: 'lumi-demo',
+        code: 'permission-denied',
+        message: 'Demo school mismatch.',
+      );
+    }
+    return context;
+  }
 
   static DateTime startOfWeek(DateTime date) {
     final normalized = DateTime(date.year, date.month, date.day);
@@ -42,6 +110,13 @@ class IsbnAssignmentService {
     final dateStamp =
         '${weekStart.year.toString().padLeft(4, '0')}${weekStart.month.toString().padLeft(2, '0')}${weekStart.day.toString().padLeft(2, '0')}';
     return 'isbn_${studentId}_$dateStamp';
+  }
+
+  static String buildDemoWeeklyAllocationId({
+    required String studentId,
+    required DateTime weekStart,
+  }) {
+    return 'demo_${buildWeeklyAllocationId(studentId: studentId, weekStart: weekStart)}';
   }
 
   static String? normalizeIsbn(String? rawValue) {
@@ -115,8 +190,13 @@ class IsbnAssignmentService {
     final referenceDate = targetDate ?? DateTime.now();
     final weekStart = startOfWeek(referenceDate);
     final weekEnd = endOfWeek(referenceDate);
-    final allocationId =
-        buildWeeklyAllocationId(studentId: studentId, weekStart: weekStart);
+    final demoContext = await _demoContextForSchool(schoolId);
+    final allocationId = demoContext == null
+        ? buildWeeklyAllocationId(studentId: studentId, weekStart: weekStart)
+        : buildDemoWeeklyAllocationId(
+            studentId: studentId,
+            weekStart: weekStart,
+          );
 
     final summary = await _upsertWeeklyAllocation(
       schoolId: schoolId,
@@ -129,6 +209,7 @@ class IsbnAssignmentService {
       targetMinutes: targetMinutes,
       books: resolvedBooks,
       sessionId: sessionId,
+      demoContext: demoContext,
     );
 
     return IsbnAssignmentResult(
@@ -219,6 +300,7 @@ class IsbnAssignmentService {
     DateTime? targetDate,
     Set<String> renewedIsbns = const <String>{},
   }) async {
+    final demoContext = await _demoContextForSchool(schoolId);
     // Offline: the write runs a Firestore transaction, which throws with no
     // connection (transactions can't run from cache) — so a scan used to be
     // silently lost. Queue it and replay on reconnect (replayQueuedAssignment),
@@ -234,6 +316,7 @@ class IsbnAssignmentService {
         sessionId: sessionId,
         targetDate: targetDate,
         renewedIsbns: renewedIsbns,
+        demoContext: demoContext,
       );
     }
     try {
@@ -247,8 +330,9 @@ class IsbnAssignmentService {
         sessionId: sessionId,
         targetDate: targetDate,
         renewedIsbns: renewedIsbns,
+        demoContext: demoContext,
       );
-    } on FirebaseException catch (e) {
+    } catch (e) {
       // The health signal said we could write, but the transaction couldn't
       // reach the backend (connectivity dropped between the check and the
       // commit, or the health probe simply lagged reality). A transaction can't
@@ -257,7 +341,45 @@ class IsbnAssignmentService {
       // be lost unless the teacher re-scanned. Re-queue it instead. The replay
       // is idempotent: _upsertWeeklyAllocation dedupes by ACTIVE ISBN, so even a
       // write that secretly committed before its ack failed won't double-add.
-      if (e.code == 'unavailable' || e.code == 'deadline-exceeded') {
+      if (e is FirebaseException && e.code == 'permission-denied') {
+        // A just-reprovisioned demo or cold restored auth session may still
+        // carry the old token. Refresh once, then fail hard if Rules still deny.
+        final refreshedContext = await _demoContextForSchool(
+          schoolId,
+          forceRefresh: true,
+        );
+        try {
+          return await _writeResolvedBooks(
+            schoolId: schoolId,
+            classId: classId,
+            studentId: studentId,
+            teacherId: teacherId,
+            books: books,
+            targetMinutes: targetMinutes,
+            sessionId: sessionId,
+            targetDate: targetDate,
+            renewedIsbns: renewedIsbns,
+            demoContext: refreshedContext,
+          );
+        } catch (retryError) {
+          if (isTransientAssignmentError(retryError)) {
+            return _queueAssignmentOffline(
+              schoolId: schoolId,
+              classId: classId,
+              studentId: studentId,
+              teacherId: teacherId,
+              books: books,
+              targetMinutes: targetMinutes,
+              sessionId: sessionId,
+              targetDate: targetDate,
+              renewedIsbns: renewedIsbns,
+              demoContext: refreshedContext,
+            );
+          }
+          rethrow;
+        }
+      }
+      if (isTransientAssignmentError(e)) {
         return _queueAssignmentOffline(
           schoolId: schoolId,
           classId: classId,
@@ -268,6 +390,7 @@ class IsbnAssignmentService {
           sessionId: sessionId,
           targetDate: targetDate,
           renewedIsbns: renewedIsbns,
+          demoContext: demoContext,
         );
       }
       rethrow;
@@ -287,6 +410,7 @@ class IsbnAssignmentService {
     String? sessionId,
     DateTime? targetDate,
     Set<String> renewedIsbns = const <String>{},
+    DemoSessionContext? demoContext,
   }) async {
     await OfflineService.instance.enqueueAllocationAssignment(
       schoolId: schoolId,
@@ -298,12 +422,16 @@ class IsbnAssignmentService {
       sessionId: sessionId,
       targetDateMs: targetDate?.millisecondsSinceEpoch,
       renewedIsbns: renewedIsbns.toList(),
+      demoGenerationId: demoContext?.generationId,
     );
     final referenceDate = targetDate ?? DateTime.now();
-    final allocationId = buildWeeklyAllocationId(
-      studentId: studentId,
-      weekStart: startOfWeek(referenceDate),
-    );
+    final weekStart = startOfWeek(referenceDate);
+    final allocationId = demoContext == null
+        ? buildWeeklyAllocationId(studentId: studentId, weekStart: weekStart)
+        : buildDemoWeeklyAllocationId(
+            studentId: studentId,
+            weekStart: weekStart,
+          );
     return IsbnAssignmentResult(
       allocationId: allocationId,
       processedBooks: books,
@@ -328,12 +456,17 @@ class IsbnAssignmentService {
     String? sessionId,
     DateTime? targetDate,
     Set<String> renewedIsbns = const <String>{},
+    DemoSessionContext? demoContext,
   }) async {
     final referenceDate = targetDate ?? DateTime.now();
     final weekStart = startOfWeek(referenceDate);
     final weekEnd = endOfWeek(referenceDate);
-    final allocationId =
-        buildWeeklyAllocationId(studentId: studentId, weekStart: weekStart);
+    final allocationId = demoContext == null
+        ? buildWeeklyAllocationId(studentId: studentId, weekStart: weekStart)
+        : buildDemoWeeklyAllocationId(
+            studentId: studentId,
+            weekStart: weekStart,
+          );
 
     final summary = await _upsertWeeklyAllocation(
       schoolId: schoolId,
@@ -347,6 +480,7 @@ class IsbnAssignmentService {
       books: books,
       sessionId: sessionId,
       renewedIsbns: renewedIsbns,
+      demoContext: demoContext,
     );
 
     return IsbnAssignmentResult(
@@ -368,8 +502,33 @@ class IsbnAssignmentService {
         .map((b) => ScannedIsbnBook.fromMap(b as Map))
         .toList();
     final targetDateMs = data['targetDateMs'] as int?;
+    final schoolId = data['schoolId'] as String;
+    final queuedGenerationId = data['demoGenerationId'] as String?;
+    final currentDemo = await _demoContextForSchool(
+      schoolId,
+      forceRefresh: true,
+    );
+    if (queuedGenerationId != null && currentDemo == null) {
+      // A failed token refresh is not proof that the demo was reprovisioned.
+      // Keep the item retryable until we can compare two concrete generation
+      // values; otherwise a brief auth/network outage would park valid work.
+      throw FirebaseException(
+        plugin: 'lumi-demo',
+        code: 'unavailable',
+        message: 'Could not verify the current demo generation.',
+      );
+    }
+    if ((currentDemo != null && queuedGenerationId == null) ||
+        (queuedGenerationId != null &&
+            currentDemo!.generationId != queuedGenerationId)) {
+      throw FirebaseException(
+        plugin: 'lumi-demo',
+        code: 'failed-precondition',
+        message: 'This queued assignment expired when the demo was refreshed.',
+      );
+    }
     await _writeResolvedBooks(
-      schoolId: data['schoolId'] as String,
+      schoolId: schoolId,
       classId: data['classId'] as String,
       studentId: data['studentId'] as String,
       teacherId: data['teacherId'] as String,
@@ -379,8 +538,10 @@ class IsbnAssignmentService {
       targetDate: targetDateMs != null
           ? DateTime.fromMillisecondsSinceEpoch(targetDateMs)
           : null,
-      renewedIsbns:
-          ((data['renewedIsbns'] as List?) ?? const []).whereType<String>().toSet(),
+      renewedIsbns: ((data['renewedIsbns'] as List?) ?? const [])
+          .whereType<String>()
+          .toSet(),
+      demoContext: currentDemo,
     );
   }
 
@@ -452,6 +613,7 @@ class IsbnAssignmentService {
     required List<ScannedIsbnBook> books,
     String? sessionId,
     Set<String> renewedIsbns = const <String>{},
+    DemoSessionContext? demoContext,
   }) async {
     final ref = _firestore
         .collection('schools')
@@ -595,6 +757,11 @@ class IsbnAssignmentService {
           'isActive': true,
           'createdAt': createdAt ?? Timestamp.fromDate(now),
           'createdBy': createdBy ?? teacherId,
+          if (demoContext != null) ...{
+            'demoEphemeral': true,
+            'demoGenerationId': demoContext.generationId,
+            'demoOrigin': 'flutter_camera',
+          },
           'metadata': updatedMetadata,
         },
         SetOptions(merge: true),
@@ -748,7 +915,8 @@ class IsbnAssignmentService {
       );
     }
 
-    final effectiveTarget = targetDate ?? DateTime.now().add(const Duration(days: 7));
+    final effectiveTarget =
+        targetDate ?? DateTime.now().add(const Duration(days: 7));
     final weekStart = startOfWeek(effectiveTarget);
     final weekEnd = endOfWeek(effectiveTarget);
     final allocationId = buildWeeklyAllocationId(
@@ -778,8 +946,7 @@ class IsbnAssignmentService {
       books: books,
       // A carry-over to the next cycle is a renewal — tag the items so the
       // "Renewed" badge shows for teacher-initiated renewals too.
-      renewedIsbns:
-          books.map((b) => b.isbn).where((i) => i.isNotEmpty).toSet(),
+      renewedIsbns: books.map((b) => b.isbn).where((i) => i.isNotEmpty).toSet(),
     );
 
     return ReassignmentResult(
@@ -850,8 +1017,7 @@ class IsbnAssignmentService {
       for (final id in studentIds) id: <String>{},
     };
     for (var i = 0; i < studentIds.length; i += 30) {
-      final end =
-          i + 30 > studentIds.length ? studentIds.length : i + 30;
+      final end = i + 30 > studentIds.length ? studentIds.length : i + 30;
       final chunk = studentIds.sublist(i, end);
       if (chunk.isEmpty) continue;
       try {
@@ -933,8 +1099,8 @@ class IsbnAssignmentService {
 
     // 1. Renew — present on the immediately-prior week's list.
     try {
-      final prevId =
-          buildWeeklyAllocationId(studentId: studentId, weekStart: prevWeekStart);
+      final prevId = buildWeeklyAllocationId(
+          studentId: studentId, weekStart: prevWeekStart);
       final prevSnap = await allocations.doc(prevId).get();
       if (prevSnap.exists && _allocationHasActiveIsbn(prevSnap.data(), isbn)) {
         return ScanClassificationResult(

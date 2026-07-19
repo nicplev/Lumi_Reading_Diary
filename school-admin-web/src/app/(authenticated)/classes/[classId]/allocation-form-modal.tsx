@@ -12,6 +12,7 @@ import { useStudents } from '@/lib/hooks/use-students';
 import { BookSearchInput } from './book-search-input';
 import { Icon } from '@/components/lumi/icon';
 import type { ReadingLevelOption } from '@/lib/types';
+import { useAuth } from '@/lib/auth/auth-context';
 
 interface AllocationFormModalProps {
   open: boolean;
@@ -24,6 +25,8 @@ type BookItem = { title: string; bookId?: string; isbn?: string };
 
 export function AllocationFormModal({ open, onClose, classId, levelOptions }: AllocationFormModalProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isDemo = user?.demoAllocationMutations === true;
   const createAllocation = useCreateAllocation();
   const { data: students } = useStudents({ classId });
 
@@ -94,7 +97,7 @@ export function AllocationFormModal({ open, onClose, classId, levelOptions }: Al
       open={open}
       onClose={handleClose}
       title="Create Allocation"
-      description={`Step ${step} of 3`}
+      description={isDemo ? `Step ${step} of 3 · temporary demo allocation` : `Step ${step} of 3`}
       size="lg"
       footer={
         <>
@@ -125,22 +128,26 @@ export function AllocationFormModal({ open, onClose, classId, levelOptions }: Al
         <div className="space-y-4">
           <Select
             label="Allocation Type"
-            options={[
-              { value: 'byTitle', label: 'By Title — Assign specific books' },
-              { value: 'byLevel', label: 'By Level — Assign level range' },
-              { value: 'freeChoice', label: 'Free Choice — Student picks' },
-            ]}
+            options={isDemo
+              ? [{ value: 'byTitle', label: 'By Title — Assign specific books' }]
+              : [
+                  { value: 'byTitle', label: 'By Title — Assign specific books' },
+                  { value: 'byLevel', label: 'By Level — Assign level range' },
+                  { value: 'freeChoice', label: 'Free Choice — Student picks' },
+                ]}
             value={type}
             onChange={setType}
           />
           <Select
             label="Cadence"
-            options={[
-              { value: 'daily', label: 'Daily' },
-              { value: 'weekly', label: 'Weekly' },
-              { value: 'fortnightly', label: 'Fortnightly' },
-              { value: 'custom', label: 'Custom' },
-            ]}
+            options={isDemo
+              ? [{ value: 'weekly', label: 'Weekly' }]
+              : [
+                  { value: 'daily', label: 'Daily' },
+                  { value: 'weekly', label: 'Weekly' },
+                  { value: 'fortnightly', label: 'Fortnightly' },
+                  { value: 'custom', label: 'Custom' },
+                ]}
             value={cadence}
             onChange={setCadence}
           />

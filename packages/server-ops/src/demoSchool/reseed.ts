@@ -405,10 +405,14 @@ async function seedPlan(db: Firestore, plan: DemoSchoolPlan): Promise<number> {
   return count;
 }
 
-function exactClaims(user: DemoAuthUser): Record<string, unknown> {
+function exactClaims(
+  user: DemoAuthUser,
+  demoGenerationId: string
+): Record<string, unknown> {
   const claims: Record<string, unknown> = {
     demoAccount: true,
     demoSchoolId: demoSchoolConstants.schoolId,
+    demoGenerationId,
     schoolId: demoSchoolConstants.schoolId,
   };
   if (user.key === "sharedadmin") {
@@ -418,9 +422,16 @@ function exactClaims(user: DemoAuthUser): Record<string, unknown> {
   return claims;
 }
 
-async function finaliseClaims(auth: Auth, plan: DemoSchoolPlan): Promise<void> {
+async function finaliseClaims(
+  auth: Auth,
+  plan: DemoSchoolPlan,
+  demoGenerationId: string
+): Promise<void> {
   for (const user of plan.authUsers) {
-    await auth.setCustomUserClaims(user.uid, exactClaims(user));
+    await auth.setCustomUserClaims(
+      user.uid,
+      exactClaims(user, demoGenerationId)
+    );
     // Force stale broad/read-only token shapes out after the successful seed.
     await auth.revokeRefreshTokens(user.uid);
   }
@@ -477,7 +488,7 @@ export async function reseedDemoSchool(
       docsWritten,
       communityBooksDeleted,
     });
-    await finaliseClaims(auth, plan);
+    await finaliseClaims(auth, plan, leaseId);
 
     const finishedAt = new Date();
     await completeLease(

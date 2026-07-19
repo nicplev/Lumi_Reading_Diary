@@ -69,6 +69,7 @@ async function issuePortalSession(
   // Firestore tenant's immutable operational marker. A client-editable email
   // or profile field is never sufficient.
   let isReadOnlyDemoAdmin = false;
+  let demoGenerationId: string | undefined;
   if (
     userData.role === 'schoolAdmin' &&
     decodedToken.demoAccount === true &&
@@ -76,8 +77,21 @@ async function issuePortalSession(
     decodedToken.demoReadOnly === true &&
     decodedToken.demoSchoolId === userData.schoolId
   ) {
-    const school = await adminDb.collection('schools').doc(userData.schoolId).get();
-    isReadOnlyDemoAdmin = school.exists && school.data()?.isDemo === true;
+    const schoolRef = adminDb.collection('schools').doc(userData.schoolId);
+    const [school, reseedStatus] = await Promise.all([
+      schoolRef.get(),
+      adminDb.collection('demoAccess').doc('reseedStatus').get(),
+    ]);
+    const leaseId = reseedStatus.data()?.leaseId;
+    isReadOnlyDemoAdmin =
+      school.exists &&
+      school.data()?.isDemo === true &&
+      reseedStatus.data()?.state === 'succeeded' &&
+      reseedStatus.data()?.schoolId === userData.schoolId &&
+      typeof leaseId === 'string' &&
+      leaseId.length > 0 &&
+      decodedToken.demoGenerationId === leaseId;
+    if (isReadOnlyDemoAdmin) demoGenerationId = leaseId;
   }
 
   if (userData.role === 'schoolAdmin' && ADMIN_TOTP_ENFORCED && !isReadOnlyDemoAdmin) {
@@ -140,6 +154,8 @@ async function issuePortalSession(
     mfaExemptReason: isReadOnlyDemoAdmin
       ? 'isolatedDemoReadOnly'
       : undefined,
+    demoGenerationId,
+    demoAllocationMutations: isReadOnlyDemoAdmin ? true : undefined,
   };
   await createSessionCookie(verifiedSession);
   return NextResponse.json(verifiedSession);

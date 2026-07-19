@@ -20,6 +20,7 @@ import '../../../services/firebase_service.dart';
 import '../../../services/isbn_assignment_service.dart';
 import '../../../services/reading_level_service.dart';
 import '../../../services/staff_notification_service.dart';
+import '../../../core/services/demo_session_service.dart';
 import 'library_picker_sheet.dart';
 import 'allocation_preview_sheet.dart';
 import 'widgets/allocation_date_picker_sheet.dart';
@@ -363,7 +364,9 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
       );
     } catch (e) {
       // Notification failure should not block allocation success
-      debugPrint('Failed to send allocation notification: $e');
+      debugPrint(
+        'Failed to send allocation notification (${e.runtimeType})',
+      );
     }
   }
 
@@ -375,6 +378,11 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
           .map((t) => t.trim())
           .where((t) => t.isNotEmpty)
           .toList(growable: false);
+      final schoolId = widget.teacher.schoolId!;
+      final demoContext = await DemoSessionService.currentContext();
+      if (demoContext != null && demoContext.schoolId != schoolId) {
+        throw StateError('Demo school mismatch');
+      }
 
       final assignmentItems = _allocationType == AllocationType.byTitle
           ? _buildInitialAssignmentItems(
@@ -433,12 +441,21 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
           createdBy: widget.teacher.id,
         );
 
+        final allocationData = allocation.toFirestore();
+        if (demoContext != null) {
+          allocationData.addAll({
+            'demoEphemeral': true,
+            'demoGenerationId': demoContext.generationId,
+            'demoOrigin': 'flutter_manual',
+          });
+        }
+
         await _firebaseService.firestore
             .collection('schools')
-            .doc(widget.teacher.schoolId!)
+            .doc(schoolId)
             .collection('allocations')
             .doc(allocation.id)
-            .set(allocation.toFirestore());
+            .set(allocationData);
 
         // Fire-and-forget: notify parents of the new allocation
         _notifyParentsOfNewAllocation(allocation);
@@ -454,12 +471,11 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
         _resetForm();
         widget.onSaved();
       }
-    } catch (e, stackTrace) {
-      debugPrint('Error saving allocation: $e');
-      debugPrint('Stack trace: $stackTrace');
+    } catch (e) {
+      debugPrint('Error saving allocation (${e.runtimeType})');
       if (mounted) {
         showLumiToast(
-          message: 'Failed to save: ${e.toString()}',
+          message: 'Failed to save allocation. Please try again.',
           type: LumiToastType.error,
           duration: const Duration(seconds: 5),
         );
@@ -749,74 +765,76 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Edit mode banner
-            if (widget.editingAllocation != null) ...[
-              _buildEditBanner(),
-              const SizedBox(height: 12),
-            ],
+                if (widget.editingAllocation != null) ...[
+                  _buildEditBanner(),
+                  const SizedBox(height: 12),
+                ],
 
-            // Reading Type Section
-            AllocationReadingTypeCard(
-              allocationType: _allocationType,
-              levelsEnabled: _levelsEnabled,
-              readingLevelOptions: _readingLevelOptions,
-              levelRangeStart: _levelRangeStart,
-              levelRangeEnd: _levelRangeEnd,
-              bookTitles: _bookTitles,
-              libraryBookTitles: _selectedLibraryBooksByTitle.keys.toSet(),
-              bookTitleError: _bookTitleError,
-              levelError: _levelError,
-              bookTitlesController: _bookTitlesController,
-              onTypeChanged: _onTypeChanged,
-              onStartLevelChanged: _onStartLevelChanged,
-              onEndLevelChanged: (value) =>
-                  setState(() => _levelRangeEnd = value),
-              onBrowseLibrary: _browseLibrary,
-              onAddManualTitle: _addManualTitle,
-              onRemoveTitle: (title) => setState(() {
-                _bookTitles.remove(title);
-                _selectedLibraryBooksByTitle.remove(title);
-              }),
-              onManualTextChanged: () => setState(() {}),
-            ),
-            const SizedBox(height: 16),
+                // Reading Type Section
+                AllocationReadingTypeCard(
+                  allocationType: _allocationType,
+                  levelsEnabled: _levelsEnabled,
+                  readingLevelOptions: _readingLevelOptions,
+                  levelRangeStart: _levelRangeStart,
+                  levelRangeEnd: _levelRangeEnd,
+                  bookTitles: _bookTitles,
+                  libraryBookTitles: _selectedLibraryBooksByTitle.keys.toSet(),
+                  bookTitleError: _bookTitleError,
+                  levelError: _levelError,
+                  bookTitlesController: _bookTitlesController,
+                  onTypeChanged: _onTypeChanged,
+                  onStartLevelChanged: _onStartLevelChanged,
+                  onEndLevelChanged: (value) =>
+                      setState(() => _levelRangeEnd = value),
+                  onBrowseLibrary: _browseLibrary,
+                  onAddManualTitle: _addManualTitle,
+                  onRemoveTitle: (title) => setState(() {
+                    _bookTitles.remove(title);
+                    _selectedLibraryBooksByTitle.remove(title);
+                  }),
+                  onManualTextChanged: () => setState(() {}),
+                ),
+                const SizedBox(height: 16),
 
-            // Schedule Section
-            AllocationScheduleCard(
-              cadence: _cadence,
-              cadenceLabel: _getCadenceLabel(_cadence),
-              minutesController: _minutesController,
-              startDate: _startDate,
-              endDate: _endDate,
-              onCadenceTap: _pickFrequency,
-              onStartDateTap: _pickStartDate,
-              onEndDateTap: _pickEndDate,
-            ),
-            const SizedBox(height: 16),
+                // Schedule Section
+                AllocationScheduleCard(
+                  cadence: _cadence,
+                  cadenceLabel: _getCadenceLabel(_cadence),
+                  minutesController: _minutesController,
+                  startDate: _startDate,
+                  endDate: _endDate,
+                  onCadenceTap: _pickFrequency,
+                  onStartDateTap: _pickStartDate,
+                  onEndDateTap: _pickEndDate,
+                ),
+                const SizedBox(height: 16),
 
-            // Students Section
-            AllocationStudentScopeCard(
-              students: _students,
-              readingGroups: _readingGroups,
-              selectAllStudents: _selectAllStudents,
-              selectByGroup: _selectByGroup,
-              selectedStudentIds: _selectedStudentIds,
-              selectedGroupIds: _selectedGroupIds,
-              studentSearchQuery: _studentSearchQuery,
-              studentError: _studentError,
-              levelsEnabled: _levelsEnabled,
-              formatLevelLabel: _formatLevelLabel,
-              onScopeChanged: (allStudents, byGroup) =>
-                  _setScopeMode(allStudents: allStudents, byGroup: byGroup),
-              onGroupToggled: _onGroupSelectionChanged,
-              onStudentToggled: _onStudentToggled,
-              onSelectAll: () => setState(() {
-                _selectedStudentIds = _students.map((s) => s.id).toList();
-                _studentError = null;
-              }),
-              onDeselectAll: () => setState(() => _selectedStudentIds.clear()),
-              onSearchChanged: (v) => setState(() => _studentSearchQuery = v),
-            ),
-            const SizedBox(height: 16),
+                // Students Section
+                AllocationStudentScopeCard(
+                  students: _students,
+                  readingGroups: _readingGroups,
+                  selectAllStudents: _selectAllStudents,
+                  selectByGroup: _selectByGroup,
+                  selectedStudentIds: _selectedStudentIds,
+                  selectedGroupIds: _selectedGroupIds,
+                  studentSearchQuery: _studentSearchQuery,
+                  studentError: _studentError,
+                  levelsEnabled: _levelsEnabled,
+                  formatLevelLabel: _formatLevelLabel,
+                  onScopeChanged: (allStudents, byGroup) =>
+                      _setScopeMode(allStudents: allStudents, byGroup: byGroup),
+                  onGroupToggled: _onGroupSelectionChanged,
+                  onStudentToggled: _onStudentToggled,
+                  onSelectAll: () => setState(() {
+                    _selectedStudentIds = _students.map((s) => s.id).toList();
+                    _studentError = null;
+                  }),
+                  onDeselectAll: () =>
+                      setState(() => _selectedStudentIds.clear()),
+                  onSearchChanged: (v) =>
+                      setState(() => _studentSearchQuery = v),
+                ),
+                const SizedBox(height: 16),
 
                 // Assignment summary
                 _buildSummaryCard(),
@@ -1055,7 +1073,8 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
     // Fetch every target student's read-history in a few batched queries, then
     // match books in memory — replaces the old N-students × M-books sequential
     // reads (500+ round-trips for a "select-all" big class before the save).
-    final readByStudent = await service.readBookIdsForStudents(targetStudentIds);
+    final readByStudent =
+        await service.readBookIdsForStudents(targetStudentIds);
 
     for (final studentId in targetStudentIds) {
       final read = readByStudent[studentId] ?? const <String>{};
@@ -1161,7 +1180,8 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
                   backgroundColor: LumiTokens.green,
                   foregroundColor: LumiTokens.paper,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+                    borderRadius:
+                        BorderRadius.circular(LumiTokens.radiusMedium),
                   ),
                 ),
                 child: const Text('Assign Anyway'),
