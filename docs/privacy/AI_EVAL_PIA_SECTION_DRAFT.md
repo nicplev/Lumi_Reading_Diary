@@ -122,10 +122,13 @@ made once leg 3 and the STT terms are pinned. See plan §6 for the ladder.
   (a) the updated APP 5 notice in force before any eligible recording is made,
   (b) the server-enforced **no-backfill guarantee** (recordings pre-dating the
   notice's effective date are never processed, with no administrative
-  override), and (c) the opt-out/consent model selected in
-  `AI_EVAL_OPT_OUT_DECISION_MEMO.md` and implemented before enablement.
-  Whether notice-plus-opt-out is sufficient or express consent (opt-in) is
-  required for some school contexts is a counsel decision.
+  override), and (c) the consent model decided on 20 July 2026: **explicit
+  per-family opt-IN (Model C)** captured via a parent consent checkbox at
+  first recording use — no consent means no AI processing ever, while the
+  ordinary teacher-listening feature continues unchanged
+  (`AI_EVAL_OPT_OUT_DECISION_MEMO.md` §6; enforcement slice to be built
+  before enablement). Express consent is the strongest available APP 6
+  basis; counsel ratifies the wording and the consent-scope sub-questions.
 - **APP 8 (cross-border):** **negative finding proposed — no overseas
   disclosure occurs in the AI pipeline.** All three processing stages (STT,
   evaluation, narrative) run at Sydney regional endpoints under the existing
@@ -226,7 +229,9 @@ notice and the selected opt-out/consent route).
 ## 9. Pre-enablement gate summary (all must hold before ANY school is enabled)
 
 1. Counsel + Nic approve: this PIA section, the collection notice (with
-   effective date), the opt-out model, and the APP 8 addendum position.
+   effective date), the decided opt-in consent model (Model C, chosen
+   20 July 2026 — counsel ratifies wording/scope), and the APP 8 addendum
+   position.
 2. Residency evidence completed: during-ML-processing capture DONE
    (2026-07-20, vendor-evidence); data-governance terms pin still required;
    claims wording tier confirmed by Nic/counsel.

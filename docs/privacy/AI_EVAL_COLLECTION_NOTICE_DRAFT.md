@@ -47,10 +47,12 @@ school (APP 5 notice for an APP 6 secondary use). Companion documents:
 3. **Placeholders that MUST be resolved before publication:**
    - `[EFFECTIVE DATE]` — set by Nic when the notice ships; this timestamp is
      also the server-enforced eligibility floor for processing.
-   - `[OPT-OUT / CONSENT WORDING]` — pending the opt-out model decision
-     (`AI_EVAL_OPT_OUT_DECISION_MEMO.md`). The placeholder paragraph below is
-     written for the per-family opt-out model and must be replaced or confirmed
-     once Nic decides.
+   - ~~Opt-out / consent wording~~ **RESOLVED 20 July 2026:** Nic chose
+     per-family **opt-IN** (Model C) captured via a parent consent checkbox at
+     first recording use — the "Your choices" section below is drafted
+     accordingly. Counsel must still approve the wording, the withdrawal
+     route, and the consent-scope sub-questions in
+     `AI_EVAL_OPT_OUT_DECISION_MEMO.md` §6.
    - `[SCHOOL NAME]` / `[SCHOOL CONTACT]` — per school at publication.
 4. **Delivery.** The school delivers this notice to families (the existing
    audio-recording first-enable gate already records the school's commitment to
@@ -141,17 +143,27 @@ feature.** This is enforced by Lumi's servers, not just promised: recordings
 made before the effective date are not eligible for processing under any
 circumstances, including at a school's or administrator's request.
 
-#### Your choices
+#### Your choices — the AI feature only applies if you say yes
 
-[OPT-OUT / CONSENT WORDING — placeholder pending the opt-out model decision
-(`AI_EVAL_OPT_OUT_DECISION_MEMO.md`). Draft wording for the per-family opt-out
-model, to be confirmed or replaced:]
+The AI evaluation feature is **opt-in**. The first time you choose to use a
+comprehension recording in the Lumi app after the effective date, you will be
+asked whether you agree to your child's recordings also being processed by
+the AI feature described above.
 
-> If you do not want your child's recordings processed by the AI feature, tell
-> [SCHOOL CONTACT] and it will be turned off for your child. Your child can
-> keep using Lumi exactly as before — including making recordings for their
-> teacher to listen to — and opting out has no effect on your child's access
-> to any part of the reading diary.
+- **If you agree**, new recordings for your child may be transcribed and
+  evaluated as described in this notice. You can change your mind later
+  [WITHDRAWAL ROUTE — in-app control and/or via [SCHOOL CONTACT]; to be
+  finalised with counsel], and from then on no new recordings are processed.
+- **If you do not agree — or simply never answer — nothing changes.**
+  Recordings work exactly as they do today: your child's teacher can listen
+  to them, and **no AI transcription or evaluation ever occurs** for your
+  child. Not agreeing has no effect on your child's access to any part of
+  the reading diary.
+
+[Drafting note: consent-checkbox wording shown in-app must match this
+section and be approved by counsel — see
+`AI_EVAL_OPT_OUT_DECISION_MEMO.md` §6 (decision recorded 20 July 2026:
+Model C, per-family opt-in at first recording use).]
 
 #### Questions or concerns
 
@@ -168,5 +180,5 @@ Information Commissioner (oaic.gov.au).
 |---|---|---|---|
 | Lumi owner | Nicholas Plevritis | Pending | — |
 | Australian privacy counsel | Pending | Pending | — |
-| Effective date set | — | Pending | — |
-| Opt-out model resolved (B3 memo) | — | Pending | — |
+| Effective date set | — | Pending (deferred to full-production launch, after counsel + any state-department approvals) | — |
+| Consent model resolved (B3 memo) | Nicholas Plevritis | **Decided: Model C opt-in, first-use parent checkbox** (counsel ratification pending) | 20 July 2026 |

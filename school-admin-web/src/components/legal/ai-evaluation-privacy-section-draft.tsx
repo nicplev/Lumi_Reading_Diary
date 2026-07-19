@@ -76,11 +76,14 @@ export function AiEvaluationPrivacySectionDraft() {
         ever processed by it.</strong>
       </p>
       <p>
-        {/* Placeholder — replace per the decided opt-out model before activation. */}
-        Families who do not want a child&rsquo;s recordings processed by this feature can have it
-        turned off for that child by contacting the school or{' '}
-        <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>, with no effect on the rest of
-        the Lumi service.
+        {/* Decided 20 July 2026: per-family opt-IN (Model C) via a first-use parent
+            consent checkbox — wording pending counsel ratification. */}
+        This feature is <strong>opt-in</strong>: a parent/carer is asked to agree the first time
+        they use a comprehension recording, and without that agreement no AI transcription or
+        evaluation ever occurs for that child — recordings simply work as before, with the
+        teacher able to listen. A parent/carer can withdraw their agreement at any time via the
+        school or <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>, with no effect on the
+        rest of the Lumi service.
       </p>
     </section>
   );

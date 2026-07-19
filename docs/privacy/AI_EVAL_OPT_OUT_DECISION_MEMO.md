@@ -167,8 +167,47 @@ shared and only the default flips.
    enqueue gate + worker claim re-check + portal recording surface + tests.
    It must merge before any school entitlement is enabled.
 
-## 6. Approval record
+## 6. Decision recorded — 20 July 2026
+
+**Nic chose Model C (explicit per-family opt-IN)**, with a specific capture
+UX: a consent checkbox is shown to the parent in the app the **first time
+they tap "use this recording"**. If the parent does not accept, the recording
+is handled exactly as today — the teacher can listen to it — but **no AI
+transcription or evaluation ever occurs** for that child. Absent consent =
+not processed (fail-closed at the family level, matching the pipeline's gate
+philosophy). This supersedes §4's advisory recommendation of Model A, and it
+automatically satisfies the Victorian government-school opt-in mandate.
+
+Implementation implications (recorded for the build slice — **not built by
+this track**):
+
+- Consent is captured in the **parent app** at first recording use and must
+  be stored **server-side** on the student record (server-written; client
+  writes denied), because enforcement happens in privileged server code:
+  the `enqueueAiEvalJobCore()` gate and the worker claim-time re-check (§1).
+- The enqueue outcome for a non-consenting family should be its own enum
+  member (e.g. `"skipped:no_family_consent"`) so ops metrics distinguish
+  choice from error.
+- The teacher surface should show a "family has not opted in" state so
+  missing evaluations read as choice, not failure.
+
+Open sub-questions for counsel / the design slice:
+
+1. Consent scope: per student (any linked parent can grant?) or per parent
+   account — and what happens when two linked parents answer differently.
+2. Withdrawal path: how a parent changes their mind in-app, and whether
+   withdrawal also removes already-produced evaluations or only stops new
+   processing (current retention design: stops new processing; deletion on
+   request via the school).
+3. Checkbox wording — must be approved by counsel with the notice; the
+   notice draft (`AI_EVAL_COLLECTION_NOTICE_DRAFT.md`) carries the draft
+   consent language.
+4. Whether the first-use prompt is also re-shown after material changes
+   (model change, retention change) — recommended: yes, treated like a
+   notice re-issue.
+
+## 7. Approval record
 
 | Decision | Chosen model | Basis | Approver | Date |
 |---|---|---|---|---|
-| Opt-out / consent model | Pending | Pending counsel input | Nic | — |
+| Opt-out / consent model | **Model C — per-family opt-in via first-use parent consent checkbox** | Owner decision; counsel ratification pending | Nic | 20 July 2026 |
