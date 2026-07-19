@@ -59,10 +59,10 @@ Full design rationale, hostile-review resolutions, and pricing: `~/.claude/plans
 - [x] Verify regional recognize **quota** covers evening-peak jobs/min at target `maxInstances`. Live quota is 211 synchronous requests/minute/region versus planned `maxInstances=5`; load-test and revisit before fleet scale.
 
 ### Vertex AI (Gemini) — replaces the former Anthropic gates (provider pivot 2026-07-19)
-- [ ] **GO/NO-GO model probe:** confirm an AU-regional GA Flash-Lite-class model with ≥ 6 months to retirement (candidate ladder `AI_EVALUATION_GEMINI_PLAN.md` §3.1 — primary `gemini-3.1-flash-lite`; `gemini-2.5-flash-lite` retires 2026-10-16, spike-only; hard rule: never the `global` endpoint). Live `generateContent` probe against `australia-southeast1-aiplatform.googleapis.com`, evidence recorded like the STT spike
+- [x] **GO/NO-GO model probe (2026-07-19):** live probe of 10 model ids against `australia-southeast1-aiplatform.googleapis.com` — **only `gemini-2.5-flash` is served from Sydney** (flash-lite and all 3.x: 404). Pilot pins `gemini-2.5-flash` (Nic accepts the Oct-2026 retirement for the few-school pilot; model revisited before wider rollout). Structured-output + injection probes passed; `thinkingBudget:0` verified (no thought tokens). Evidence: `AI_EVALUATION_GEMINI_PLAN.md` §12
 - [ ] **Residency evidence:** current Google data-residency doc shows the **during-ML-processing** commitment (not just at-rest) for `australia-southeast1`; dated capture into `docs/privacy/vendor-evidence/`; pick the claims-ladder tier (§6)
 - [ ] Pin Vertex gen-AI data-governance terms (no training on customer data; abuse-monitoring/logging posture) into vendor-evidence, dated
-- [ ] IAM: custom role `lumiAiEvalPredictor` (`aiplatform.endpoints.predict` only) granted to the runtime SA (fallback `roles/aiplatform.user`, recorded); **no API key / secret exists in this design**
+- [x] IAM (2026-07-19): custom role `lumiAiEvalPredictor` (`aiplatform.endpoints.predict` only) created + granted to `lumi-ninc-au@appspot.gserviceaccount.com`, binding verified; `aiplatform.googleapis.com` enabled; rollback commands in §12.5. **No API key / secret exists in this design**
 - [ ] GCP billing budget + alert thresholds on Vertex AI + Speech SKUs (alert-only — app-level caps remain the hard stop)
 - [ ] Also probe: Claude models in Model Garden `australia-southeast1` (quality-fallback candidate #4; still no Anthropic DPA needed — Google is the processor)
 
