@@ -19,6 +19,23 @@ export const AI_EVAL_SPEECH_ENDPOINT = `${AI_EVAL_REGION}-speech.googleapis.com`
 export const AI_EVAL_MODEL_ALLOWLIST: readonly string[] = ["gemini-2.5-flash"];
 export const AI_EVAL_DEFAULT_MODEL = "gemini-2.5-flash";
 
+// RESIDENCY-CRITICAL CONTEXT CEILING.
+// Google's ML-processing residency matrix lists `gemini-2.5-flash` TWICE:
+// the 128k-context row carries the Australian commitment, the 1M-context
+// row does NOT (evidence: docs/privacy/vendor-evidence/2026-07-20/
+// vertex-au-ml-processing-residency.md). A request that crossed into the
+// 1M tier would still be served from Sydney but would fall outside the
+// commitment the school notice relies on — a silent compliance break.
+//
+// Real requests run ~3-4k tokens (~1.5% of the ceiling). These bounds exist
+// so a future config edit or a batching change cannot cross it unnoticed:
+// the transcript budget is clamped at config load, and the assembled prompt
+// is asserted before every provider call. Chars are converted at a
+// deliberately pessimistic ~2 chars/token.
+export const RESIDENCY_CONTEXT_TIER_TOKENS = 128_000;
+export const RESIDENCY_PROMPT_CHAR_BUDGET = 200_000;
+export const MAX_TRANSCRIPT_CHARS_CEILING = 100_000;
+
 // USD per 1M tokens, keyed by model. Used for estCostUsd metering and the
 // sweep cost alarm; drift here shows up in metering, not in billing.
 export const AI_EVAL_PRICE_TABLE: Record<
@@ -94,8 +111,12 @@ export function mergeOpsConfig(data: unknown): AiEvalOpsConfig {
       positiveNumber(record.defaultDailyCapPerSchool, d.defaultDailyCapPerSchool),
     globalDailyCap: positiveNumber(record.globalDailyCap, d.globalDailyCap),
     minDurationSec: positiveNumber(record.minDurationSec, d.minDurationSec),
-    maxTranscriptChars:
-      positiveNumber(record.maxTranscriptChars, d.maxTranscriptChars),
+    // Clamped so ops config can never widen the prompt past the residency
+    // context tier (see RESIDENCY_CONTEXT_TIER_TOKENS).
+    maxTranscriptChars: Math.min(
+      MAX_TRANSCRIPT_CHARS_CEILING,
+      positiveNumber(record.maxTranscriptChars, d.maxTranscriptChars)
+    ),
     evalTimeoutSec: positiveNumber(record.evalTimeoutSec, d.evalTimeoutSec),
     maxAttempts: positiveNumber(record.maxAttempts, d.maxAttempts),
     transcriptRetentionDays:
