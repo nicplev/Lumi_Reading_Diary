@@ -6,8 +6,40 @@ Full design rationale, hostile-review resolutions, and pricing: `~/.claude/plans
 
 ## Live implementation handoff
 
-**Last updated:** 2026-07-19
-**Current slice:** secure audio-ingestion substrate complete; provider pivoted to Gemini Flash-Lite on Vertex AU (all-Australian pipeline); Phase 0 representative audio, privacy and Vertex AU model/residency gates remain
+**Last updated:** 2026-07-19 (evening — autonomous implementation run)
+**Current slice:** ALL CODE PHASES IMPLEMENTED AND MERGED, everything dark/dev-gated; nothing deployed. Remaining: manual deploys, privacy/notice gates, representative recordings, pilot enablement.
+
+## Implementation status (2026-07-19) — the authoritative shipped-state table
+
+The per-phase checkboxes below are retained as the detailed spec; THIS table is the source of truth for what is merged. Every slice is its own squash-merged PR = the rollback unit (`git revert` the squash commit). Full ops detail: `docs/AI_EVALUATION_RUNBOOK.md` (§10 = deploy/rollback map).
+
+| Slice | PR | State | Notes |
+|---|---|---|---|
+| Phase 0 probes: Vertex AU model availability, structured-output + injection probes, IAM (`lumiAiEvalPredictor`), `aiplatform.googleapis.com`, A$150/mo billing budget (Vertex+Speech SKUs, 50/90/100% alerts) | #455 | **DONE (live in GCP)** | **Only `gemini-2.5-flash` serves from Sydney** — flash-lite/3.x 404; pilot pins `gemini-2.5-flash` (retires Oct 2026, accepted for pilot). Rollback cmds in plan §12 |
+| Phase 2: question denorm + enqueue (in `confirmComprehensionAudioUpload`) | #456 | **MERGED, dark** | + fixed pre-existing audio HTTP test (#420 seed gap) |
+| Phase 3: worker + sweep (STT + Gemini REST on pinned AU endpoints, caps, metrics, poison, race guard) | #457 | **MERGED, dark** | Live adversarial prompt regression **10/10** (2 prompt weaknesses found+fixed live); positive control secure 3/3/3; script `functions/scripts/ai-eval-prompt-regression.mjs` |
+| Phase 4: retention crons + runbook | #458 | **MERGED, dark** | `aiEvalRetention` 03:30 Syd; audio cleanup moved to fixed 04:00 Syd |
+| Phase 5: teacher app UX (student-detail section, review screen, eval sheet, entries) | #459 | **MERGED, dev-gated + fail-closed entitlement** | No numeric scores anywhere; classroom test harness updated |
+| Phase 6: super-admin entitlement card + platform kill-switch card (+audit-logged server-ops, derived global cap recompute); school-portal class Comprehension tab + CSV (levels/flags only) + Settings status card | #460 | **MERGED** | Portals not auto-deployed; all surfaces render disabled states while the switch is off |
+| Phase 7 core: report aggregation + `generateStudentReportNarrative` callable | #461 | **MERGED, dark** | App/portal PDF report surfaces = next slice (needs pilot data to be meaningful) |
+| Docs: Gemini replan + probe evidence + runbook | #454/#455/#458 | **MERGED** | |
+
+**Test evidence:** functions units 215/215 · audio emulator suites 8/8 + 4/4 · Flutter comprehension/classroom/student-detail 26/26 + 9 new · admin & school portals `tsc` + `next build` clean · live prompt regression 10/10. Pre-existing unrelated failures NOT fixed: `awards_screen_test.dart` (1, reproduces on clean main), the ~38 emulator-dependent Flutter tests.
+
+**Prod state right now:** `platformConfig/aiEvaluation = {enabled:false}` (kill switch OFF), no school entitled, NOTHING deployed from these PRs — functions/portals/app all pending manual deploy/release. The pipeline cannot run anywhere.
+
+### Deploy order when ready (all manual — see runbook §10)
+1. `cd functions && npm ci && firebase deploy --only functions:confirmComprehensionAudioUpload,functions:processAiEvalJob,functions:sweepAiEvalJobs,functions:aiEvalRetention,functions:cleanupComprehensionAudio,functions:generateStudentReportNarrative` (dark — switch off)
+2. Admin portal deploy (CI or manual) → gives you the entitlement + kill-switch cards
+3. School portal manual deploy (`FIREBASE_CLI_EXPERIMENTS=webframeworks firebase deploy --only hosting:school`; `pnpm install --ignore-workspace` first)
+4. App release train (all UI dev-gated — safe to ride any release)
+5. No rules/index deploys needed — Phase 1 (#390) already live covers everything
+
+### Nic-only gates before ANY school is enabled (unchanged)
+- Privacy: collection notice update, per-family opt-out decision, PIA approval, no-backfill guarantee, state DoE screening (`AI_EVALUATION_GEMINI_PLAN.md` §6 claims ladder; residency during-ML-processing doc capture still open)
+- 5–10 authorised representative child recordings + teacher transcript review; rubric/prompt freeze (run the prompt-regression script on any change)
+- Deletion-cascade extension to evals/jobs (runbook §5.5) — small functions slice, not yet written
+- Enable pilot school via the new admin card (terms version required) + flip the platform switch
 **Deployment state:** Phase 1 indexes and rules are deployed. Speech-to-Text is enabled and IAM-scoped for a dark Phase 0 spike. The recording pipeline now produces fully decoded, server-canonicalised audio with a generation/version/hash receipt, but no AI worker, LLM dependency, entitlement, provider credential or provider-connected product path is deployed.
 
 ### Session notes
@@ -35,7 +67,7 @@ Full design rationale, hostile-review resolutions, and pricing: `~/.claude/plans
 
 ### Resume point
 
-1. Run the Vertex AU gates (`docs/AI_EVALUATION_GEMINI_PLAN.md` §3.1/§6: regional model probe, ML-processing-commitment evidence, IAM grant, budget alerts), then complete the representative child-style M4A/teacher review and the external privacy/notice work before beginning any provider-connected pipeline or enabling a school.
+1. ~~Vertex AU gates~~ DONE (#455) except the during-ML-processing residency doc capture. Next actions: (a) Nic's privacy/notice/recordings gates (status table above), (b) deletion-cascade extension to evals/jobs, (c) manual deploys per the deploy-order table, (d) post-pilot slices: app/portal PDF report surfaces consuming the Phase 7 aggregation contract, school-portal student-page eval section, feedback thumbs, single-call multimodal bake-off.
 2. After Phase 0 passes, begin Phase 2 question denormalisation/enqueue on a new branch; keep both platform and school gates fail-closed and bind jobs to the current validated canonical generation/version.
 3. Keep each later phase isolated to its own PR and update this handoff with test/deployment evidence before merging.
 
