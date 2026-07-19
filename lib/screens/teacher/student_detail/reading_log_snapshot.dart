@@ -25,6 +25,7 @@ class ReadingLogSnapshot {
   final String? comprehensionAudioPath;
   final int? comprehensionAudioDurationSec;
   final bool comprehensionAudioUploaded;
+  final DateTime? comprehensionAudioUploadedAt;
   // One-tap log: books inferred from assignments, not parent-confirmed.
   final bool isQuickLog;
   // Denormalized comment-thread state, so a row can open the thread and show an
@@ -51,6 +52,7 @@ class ReadingLogSnapshot {
     this.comprehensionAudioPath,
     this.comprehensionAudioDurationSec,
     this.comprehensionAudioUploaded = false,
+    this.comprehensionAudioUploadedAt,
     this.isQuickLog = false,
     this.lastCommentAt,
     this.lastCommentByRole,
@@ -122,6 +124,8 @@ List<ReadingLogSnapshot> toReadingLogSnapshots(QuerySnapshot snapshot) {
           (data['comprehensionAudioDurationSec'] as num?)?.toInt(),
       comprehensionAudioUploaded:
           data['comprehensionAudioUploaded'] as bool? ?? false,
+      comprehensionAudioUploadedAt:
+          (data['comprehensionAudioUploadedAt'] as Timestamp?)?.toDate(),
       isQuickLog:
           (data['metadata'] as Map<String, dynamic>?)?['quickLog'] == true,
       lastCommentAt: (data['lastCommentAt'] as Timestamp?)?.toDate(),

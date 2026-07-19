@@ -499,6 +499,16 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen>
                       label: 'Class Reports',
                       onTap: () => _navigateWithClass('/teacher/class-report'),
                     ),
+                  // AI comprehension review — pilot feature, dev-gated until
+                  // the pilot un-gates it (entitlement check remains).
+                  if (hasDevAccess())
+                    TeacherSettingsItem(
+                      icon: Icons.graphic_eq,
+                      iconBgColor: LumiTokens.muted,
+                      label: 'Comprehension Review',
+                      onTap: () =>
+                          _navigateWithClass('/teacher/comprehension-review'),
+                    ),
                 ],
               )
                   .animate()

@@ -33,6 +33,7 @@ import '../../services/student_reading_level_service.dart';
 import '../../data/providers/student_detail_providers.dart';
 import 'student_detail/achievements_section.dart';
 import 'student_detail/assigned_books_section.dart';
+import 'student_detail/comprehension_section.dart';
 import 'student_detail/parent_comment_section.dart';
 import 'student_detail/reading_history_section.dart';
 import 'student_detail/reading_level_card.dart';
@@ -1257,6 +1258,22 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               onOpenLogComments: _openLogComments,
             ),
             const SizedBox(height: 20),
+
+            // AI Comprehension (pilot: entitlement + dev-access gated; the
+            // section renders nothing when either gate is off)
+            ComprehensionSection(
+              lookup: _lookup,
+              studentName: _currentStudent.fullName,
+              onViewAll: widget.classModel == null
+                  ? null
+                  : () => context.push(
+                        '/teacher/comprehension-review',
+                        extra: {
+                          'teacher': widget.teacher,
+                          'classModel': widget.classModel,
+                        },
+                      ),
+            ),
 
             // Latest Parent Comment
             ParentCommentSection(
