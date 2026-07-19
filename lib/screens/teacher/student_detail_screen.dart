@@ -36,6 +36,8 @@ import '../../data/providers/student_detail_providers.dart';
 import 'student_detail/achievements_section.dart';
 import 'student_detail/parent_comment_section.dart';
 import 'student_detail/reading_history_section.dart';
+import 'student_detail/reading_level_card.dart';
+import 'student_detail/reading_level_labels.dart';
 import 'student_detail/reading_log_snapshot.dart';
 import 'student_detail/feelings_section.dart';
 import 'student_detail/group_badges_section.dart';
@@ -89,7 +91,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   List<ReadingLevelOption> _readingLevelOptions = const [];
   bool _levelsEnabled = false;
   StudentModel? _studentOverride;
-  bool _readingLevelExpanded = false;
 
   StudentModel get _currentStudent => _studentOverride ?? widget.student;
 
@@ -1618,43 +1619,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     );
   }
 
-  String _readingLevelDisplayLabel(StudentModel student) {
-    if (_readingLevelOptions.isEmpty) {
-      final raw = student.currentReadingLevel?.trim();
-      return raw == null || raw.isEmpty ? 'Needs level' : raw;
-    }
-
-    return _readingLevelService.formatLevelLabel(
-      student.currentReadingLevel,
-      options: _readingLevelOptions,
-    );
-  }
-
-  String _readingLevelCompactLabel(StudentModel student) {
-    if (_readingLevelOptions.isEmpty) {
-      final raw = student.currentReadingLevel?.trim();
-      return raw == null || raw.isEmpty ? 'Needs level' : raw;
-    }
-
-    return _readingLevelService.formatCompactLabel(
-      student.currentReadingLevel,
-      options: _readingLevelOptions,
-    );
-  }
-
-  bool _isReadingLevelUnset(StudentModel student) {
-    final raw = student.currentReadingLevel?.trim();
-    return raw == null || raw.isEmpty;
-  }
-
-  bool _isReadingLevelUnresolved(StudentModel student) {
-    if (_readingLevelOptions.isEmpty) return false;
-    return _readingLevelService.hasUnresolvedLevel(
-      student.currentReadingLevel,
-      options: _readingLevelOptions,
-    );
-  }
-
   Future<void> _showReadingLevelPicker() async {
     try {
       final options = await _ensureReadingLevelOptionsLoaded();
@@ -1848,9 +1812,17 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             Padding(
               padding: const EdgeInsets.only(right: 12),
               child: TeacherReadingLevelPill(
-                label: _readingLevelCompactLabel(_currentStudent),
-                isUnset: _isReadingLevelUnset(_currentStudent),
-                isUnresolved: _isReadingLevelUnresolved(_currentStudent),
+                label: readingLevelCompactLabel(
+                  _currentStudent,
+                  options: _readingLevelOptions,
+                  service: _readingLevelService,
+                ),
+                isUnset: isReadingLevelUnset(_currentStudent),
+                isUnresolved: isReadingLevelUnresolved(
+                  _currentStudent,
+                  options: _readingLevelOptions,
+                  service: _readingLevelService,
+                ),
                 onTap: _showReadingLevelPicker,
               ),
             ),
@@ -1879,7 +1851,14 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             const SizedBox(height: 20),
 
             if (_levelsEnabled) ...[
-              _buildReadingLevelCard(),
+              ReadingLevelCard(
+                student: _currentStudent,
+                options: _readingLevelOptions,
+                readingLevelService: _readingLevelService,
+                onMoveLevel: _moveReadingLevel,
+                onShowHistory: _showReadingLevelHistory,
+                onShowPicker: _showReadingLevelPicker,
+              ),
               const SizedBox(height: 20),
             ],
 
@@ -1973,227 +1952,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     );
   }
 
-  Widget _buildReadingLevelCard() {
-    final hasResolvedLevel = !_isReadingLevelUnset(_currentStudent) &&
-        !_isReadingLevelUnresolved(_currentStudent);
-    final canMoveDown = hasResolvedLevel &&
-        _readingLevelService.previousLevel(
-              _currentStudent.currentReadingLevel,
-              options: _readingLevelOptions,
-            ) !=
-            null;
-    final canMoveUp = hasResolvedLevel &&
-        _readingLevelService.nextLevel(
-              _currentStudent.currentReadingLevel,
-              options: _readingLevelOptions,
-            ) !=
-            null;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: LumiTokens.paper,
-        borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
-        border: Border.all(color: LumiTokens.rule),
-        boxShadow: LumiTokens.shadowCard,
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Tappable header ──────────────────────────────────────────
-            InkWell(
-              onTap: () => setState(
-                () => _readingLevelExpanded = !_readingLevelExpanded,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 13,
-                ),
-                child: Row(
-                  children: [
-                    Text('Reading Level', style: LumiType.subhead),
-                    const SizedBox(width: 8),
-                    TeacherReadingLevelPill(
-                      label: _readingLevelCompactLabel(_currentStudent),
-                      isUnset: _isReadingLevelUnset(_currentStudent),
-                      isUnresolved: _isReadingLevelUnresolved(_currentStudent),
-                    ),
-                    const Spacer(),
-                    AnimatedRotation(
-                      turns: _readingLevelExpanded ? 0.5 : 0,
-                      duration: const Duration(milliseconds: 200),
-                      child: Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        size: 20,
-                        color: LumiTokens.muted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // ── Expanded content ─────────────────────────────────────────
-            if (_readingLevelExpanded) ...[
-              Divider(height: 1, color: LumiTokens.rule),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Level label + date
-                    Row(
-                      children: [
-                        Text(
-                          _readingLevelDisplayLabel(_currentStudent),
-                          style: LumiType.body.copyWith(
-                            color: LumiTokens.muted,
-                          ),
-                        ),
-                        if (_currentStudent.readingLevelUpdatedAt != null) ...[
-                          Text(
-                            '  ·  Updated ${formatCommentDate(_currentStudent.readingLevelUpdatedAt!)}',
-                            style: LumiType.caption,
-                          ),
-                        ],
-                      ],
-                    ),
-
-                    // Unresolved level warning
-                    if (_isReadingLevelUnresolved(_currentStudent)) ...[
-                      const SizedBox(height: 10),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.error.withValues(alpha: 0.07),
-                          borderRadius:
-                              BorderRadius.circular(LumiTokens.radiusMedium),
-                          border: Border.all(
-                            color: AppColors.error.withValues(alpha: 0.18),
-                          ),
-                        ),
-                        child: Text(
-                          'Legacy level — pick a new level to fix.',
-                          style: LumiType.caption.copyWith(
-                            color: LumiTokens.ink,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-
-                    const SizedBox(height: 12),
-
-                    // ── Action row ───────────────────────────────────────
-                    Row(
-                      children: [
-                        _buildCompactLevelButton(
-                          icon: Icons.keyboard_arrow_down_rounded,
-                          label: 'Down',
-                          onPressed: canMoveDown
-                              ? () => _moveReadingLevel(increase: false)
-                              : null,
-                        ),
-                        const SizedBox(width: 6),
-                        _buildCompactLevelButton(
-                          icon: Icons.keyboard_arrow_up_rounded,
-                          label: 'Up',
-                          onPressed: canMoveUp
-                              ? () => _moveReadingLevel(increase: true)
-                              : null,
-                        ),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: _showReadingLevelHistory,
-                          style: TextButton.styleFrom(
-                            foregroundColor: LumiTokens.muted,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            visualDensity: const VisualDensity(
-                              horizontal: -2,
-                              vertical: -2,
-                            ),
-                            textStyle: LumiType.caption,
-                          ),
-                          child: const Text('History'),
-                        ),
-                        const SizedBox(width: 4),
-                        ElevatedButton(
-                          onPressed: _showReadingLevelPicker,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: LumiTokens.green,
-                            foregroundColor: LumiTokens.paper,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            elevation: 0,
-                            visualDensity: const VisualDensity(
-                              horizontal: -2,
-                              vertical: -2,
-                            ),
-                            textStyle: LumiType.caption.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                  LumiTokens.radiusMedium),
-                            ),
-                          ),
-                          child: const Text('Change Level'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCompactLevelButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback? onPressed,
-  }) {
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 14),
-      label: Text(label),
-      style: OutlinedButton.styleFrom(
-        foregroundColor:
-            onPressed != null ? LumiTokens.green : LumiTokens.muted,
-        side: BorderSide(
-          color: onPressed != null
-              ? LumiTokens.green.withValues(alpha: 0.35)
-              : LumiTokens.rule,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
-        textStyle: LumiType.caption.copyWith(
-          fontWeight: FontWeight.w600,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
-        ),
-      ),
-    );
-  }
-
-  /// Returns the current streak only if the student read today or yesterday.
   Widget _buildAssignedBooksSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
