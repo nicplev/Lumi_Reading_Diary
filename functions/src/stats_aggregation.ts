@@ -36,6 +36,14 @@ import {
   parseTermDates,
 } from "./dateUtils";
 import {DEFAULT_TIMEZONE} from "./access";
+import {
+  applyFeelingsDelta,
+  buildLatestParentComment,
+  extractParentCommentContent,
+  recomputeStudentViewAggregates,
+  resolveParentName,
+  viewAggregatesRelevantChange,
+} from "./student_view_aggregates";
 
 const COUNTED_STATUSES = ["completed", "partial"];
 
@@ -152,6 +160,13 @@ export function isStatsNoopUpdate(
   const b = change.before.data() ?? {};
   const a = change.after.data() ?? {};
 
+  // View aggregates (feelingsByDay / latestParentComment) also hang off this
+  // trigger: a feeling or parent-comment edit must recompute even when no
+  // stat field moved. The two hot wasted firings this guard exists for
+  // (validation stamps, comment-thread mirrors) touch neither, so they are
+  // still skipped.
+  if (viewAggregatesRelevantChange(b, a)) return false;
+
   const bCounted =
     COUNTED_STATUSES.includes(String(b.status ?? "")) && !isInvalidatedLog(b);
   const aCounted =
@@ -249,7 +264,14 @@ export async function reconcileStudentStats(
   const averageMinutesPerDay =
     totalReadingDays > 0 ? totalMinutesRead / totalReadingDays : 0;
 
+  // View aggregates ride the same recompute so the weekly reconciler,
+  // self-heal path and backfill all repair them alongside the stats.
+  const aggregates =
+    await recomputeStudentViewAggregates(db, schoolId, studentId, tz);
+
   await studentRef.update({
+    "feelingsByDay": aggregates.feelingsByDay,
+    "latestParentComment": aggregates.latestParentComment,
     "stats.totalMinutesRead": totalMinutesRead,
     "stats.totalBooksRead": totalBooksRead,
     "stats.currentStreak": currentStreak,
@@ -299,18 +321,68 @@ export async function applyStudentStatsDelta(
 
   const beforeCounted = extractCountedFields(before, tz);
   const afterCounted = extractCountedFields(after, tz);
+  const aggregatesRelevant = viewAggregatesRelevantChange(before, after);
 
-  // No transition affects stats — bail.
-  if (!beforeCounted && !afterCounted) return;
+  // Neither the stats nor the view aggregates can change — bail.
+  if (!beforeCounted && !afterCounted && !aggregatesRelevant) return;
 
   const studentSnap = await studentRef.get();
-  const stats = studentSnap.data()?.stats ?? {};
+  const studentData = studentSnap.data() ?? {};
+  const stats = studentData.stats ?? {};
 
   // Self-heal: first-ever trigger for this student in incremental mode.
-  // Run the full recompute once to seed the readingDates array. Pass the
-  // school data we already read so the fallback doesn't re-read it.
+  // Run the full recompute once to seed the readingDates array (and the view
+  // aggregates, which the reconcile now writes too). Pass the school data we
+  // already read so the fallback doesn't re-read it.
   if (!Array.isArray(stats.readingDates)) {
     await reconcileStudentStats(schoolId, studentId, schoolData);
+    return;
+  }
+
+  const today = localDateString(new Date(), tz);
+
+  // ── View aggregates (feelingsByDay / latestParentComment) ─────────────
+  const aggregateUpdates: Record<string, unknown> = {};
+  if (aggregatesRelevant) {
+    const storedFeelings =
+      (studentData.feelingsByDay as
+        Record<string, Record<string, number>> | undefined) ?? {};
+    aggregateUpdates["feelingsByDay"] =
+      applyFeelingsDelta(storedFeelings, before, after, tz, today);
+
+    const stored = studentData.latestParentComment as
+      {logId?: string; date?: admin.firestore.Timestamp} | null | undefined;
+    const changedLogId = change.after.exists ? change.after.id : change.before.id;
+    const afterContent = extractParentCommentContent(after);
+    const afterDate = after?.date as admin.firestore.Timestamp | undefined;
+
+    if (
+      after && afterContent && afterDate &&
+      (!stored?.date || afterDate.toMillis() >= stored.date.toMillis() ||
+        stored.logId === changedLogId)
+    ) {
+      // Newest comment (or an edit to the currently-stored one) — set it.
+      const parentName = await resolveParentName(
+        db, schoolId,
+        typeof after.parentId === "string" ? after.parentId : null,
+      );
+      aggregateUpdates["latestParentComment"] =
+        buildLatestParentComment(changedLogId, after, parentName);
+    } else if (stored?.logId === changedLogId && (!after || !afterContent)) {
+      // The stored latest lost its content (or was deleted) — bounded
+      // recompute finds the next-newest commented log.
+      const recomputed =
+        await recomputeStudentViewAggregates(db, schoolId, studentId, tz);
+      aggregateUpdates["latestParentComment"] = recomputed.latestParentComment;
+    }
+  }
+
+  // Aggregate-only writes (e.g. a feeling edit on an uncounted log) skip the
+  // stats math entirely.
+  if (!beforeCounted && !afterCounted) {
+    if (Object.keys(aggregateUpdates).length > 0) {
+      await studentRef.update(aggregateUpdates);
+    }
     return;
   }
 
@@ -349,7 +421,6 @@ export async function applyStudentStatsDelta(
   const deltaBooks =
     (afterCounted?.books ?? 0) - (beforeCounted?.books ?? 0);
 
-  const today = localDateString(new Date(), tz);
   const {currentStreak, restDaysRemaining} =
     computeGentleStreak(readingDates, today, MAX_REST_DAYS, isCountingDay);
   const longestStreak = Math.max(
@@ -378,6 +449,7 @@ export async function applyStudentStatsDelta(
   }
 
   await studentRef.update({
+    ...aggregateUpdates,
     "stats.totalMinutesRead": newTotalMinutes,
     "stats.totalBooksRead": newTotalBooks,
     "stats.currentStreak": currentStreak,

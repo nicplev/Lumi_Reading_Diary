@@ -54,6 +54,22 @@ class StudentModel {
   // linked (name only) without read access to other parent docs.
   final Map<String, GuardianProfile> guardianProfiles;
 
+  /// Server-maintained rolling per-day feeling counts (day key → feeling →
+  /// count), written by the stats trigger + weekly reconcile. NULL means the
+  /// field hasn't been backfilled yet — readers fall back to the live log
+  /// query. An empty map is authoritative ("no feelings in window").
+  final Map<String, Map<String, int>>? feelingsByDay;
+
+  /// Server-denormalised newest parent comment (see
+  /// functions/src/student_view_aggregates.ts). Only meaningful when
+  /// [hasLatestParentCommentField] is true; null then means "no comments".
+  final LatestParentCommentData? latestParentComment;
+
+  /// Whether the `latestParentComment` field exists on the doc at all —
+  /// distinguishes "not backfilled yet" (fall back to the log query) from an
+  /// authoritative "student has no parent comments".
+  final bool hasLatestParentCommentField;
+
   StudentModel({
     required this.id,
     required this.firstName,
@@ -83,6 +99,9 @@ class StudentModel {
     this.stats,
     this.earnedAchievementIds = const [],
     this.guardianProfiles = const {},
+    this.feelingsByDay,
+    this.latestParentComment,
+    this.hasLatestParentCommentField = false,
   });
 
   bool get isEnrolled =>
@@ -181,6 +200,18 @@ class StudentModel {
                   GuardianProfile.fromMap(
                       Map<String, dynamic>.from(value as Map)))) ??
           const {},
+      feelingsByDay: data['feelingsByDay'] is Map
+          ? (data['feelingsByDay'] as Map).map((day, bucket) => MapEntry(
+              day as String,
+              bucket is Map
+                  ? bucket.map((feeling, n) => MapEntry(                      feeling as String, (n as num?)?.toInt() ?? 0))
+                  : <String, int>{}))
+          : null,
+      latestParentComment: data['latestParentComment'] is Map
+          ? LatestParentCommentData.fromMap(
+              Map<String, dynamic>.from(data['latestParentComment'] as Map))
+          : null,
+      hasLatestParentCommentField: data.containsKey('latestParentComment'),
     );
   }
 
@@ -598,5 +629,73 @@ class StudentStats {
           ? Timestamp.fromDate(streakFreezeLastEarnedDate!)
           : null,
     };
+  }
+}
+
+/// Parsed `latestParentComment` student-doc field (server-denormalised newest
+/// parent comment — see functions/src/student_view_aggregates.ts). Field
+/// names mirror the server payload exactly.
+class LatestParentCommentData {
+  final String logId;
+  final DateTime date;
+  final String? feeling;
+  final List<String> presetChips;
+  final String freeText;
+  final String? parentId;
+  final String parentName;
+  final DateTime? lastCommentAt;
+  final String? lastCommentByRole;
+  final Map<String, DateTime> commentsViewedAt;
+
+  const LatestParentCommentData({
+    required this.logId,
+    required this.date,
+    this.feeling,
+    this.presetChips = const [],
+    this.freeText = '',
+    this.parentId,
+    this.parentName = 'Parent',
+    this.lastCommentAt,
+    this.lastCommentByRole,
+    this.commentsViewedAt = const {},
+  });
+
+  static LatestParentCommentData? fromMap(Map<String, dynamic> map) {
+    final date = map['date'];
+    final logId = map['logId'];
+    if (date is! Timestamp || logId is! String) return null;
+    final viewedRaw = map['commentsViewedAt'];
+    return LatestParentCommentData(
+      logId: logId,
+      date: date.toDate(),
+      feeling: (map['feeling'] as String?)?.trim().isEmpty ?? true
+          ? null
+          : (map['feeling'] as String).trim(),
+      presetChips: (map['presetChips'] as List<dynamic>?)
+              ?.whereType<String>()
+              .toList() ??
+          const [],
+      freeText: (map['freeText'] as String?) ?? '',
+      parentId: map['parentId'] as String?,
+      parentName: (map['parentName'] as String?)?.trim().isNotEmpty == true
+          ? (map['parentName'] as String).trim()
+          : 'Parent',
+      lastCommentAt: (map['lastCommentAt'] as Timestamp?)?.toDate(),
+      lastCommentByRole: map['lastCommentByRole'] as String?,
+      commentsViewedAt: viewedRaw is Map
+          ? {
+              for (final entry in viewedRaw.entries)
+                if (entry.value is Timestamp)
+                  entry.key as String: (entry.value as Timestamp).toDate(),
+            }
+          : const {},
+    );
+  }
+
+  /// Same unread rule as ReadingLogSnapshot.hasUnreadForTeacher.
+  bool hasUnreadForTeacher(String uid) {
+    if (lastCommentAt == null || lastCommentByRole == 'teacher') return false;
+    final viewed = commentsViewedAt[uid];
+    return viewed == null || viewed.isBefore(lastCommentAt!);
   }
 }

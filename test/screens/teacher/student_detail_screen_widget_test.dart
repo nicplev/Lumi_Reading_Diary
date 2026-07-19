@@ -209,6 +209,68 @@ void main() {
       expect(find.textContaining('Sarah Nguyen'), findsOneWidget);
     });
 
+    testWidgets(
+        'renders latest parent comment from the server aggregate without '
+        'any logs', (tester) async {
+      await firestore
+          .collection('schools')
+          .doc('school_1')
+          .collection('students')
+          .doc('student_1')
+          .update({
+        'latestParentComment': {
+          'logId': 'log_agg',
+          'date': Timestamp.fromDate(DateTime.now()),
+          'feeling': 'good',
+          'presetChips': ['Loved hearing you read!'],
+          'freeText': 'Retold the story',
+          'parentId': 'parent_1',
+          'parentName': 'Sarah Nguyen',
+          'lastCommentAt': null,
+          'lastCommentByRole': null,
+          'commentsViewedAt': <String, dynamic>{},
+        },
+        'feelingsByDay': {
+          _dayKey(DateTime.now()): {'good': 2, 'great': 1},
+        },
+      });
+      await pumpScreen(tester);
+
+      expect(find.text('Latest Parent Comment'), findsOneWidget);
+      expect(find.text('Loved hearing you read!'), findsOneWidget);
+      expect(find.text('Retold the story'), findsOneWidget);
+      expect(find.textContaining('Sarah Nguyen'), findsOneWidget);
+      expect(find.byType(FeelingsTrackerCard), findsOneWidget);
+    });
+
+    testWidgets(
+        'aggregate null latestParentComment renders the empty state '
+        '(authoritative, no log scan)', (tester) async {
+      await firestore
+          .collection('schools')
+          .doc('school_1')
+          .collection('students')
+          .doc('student_1')
+          .update({
+        'latestParentComment': null,
+        'feelingsByDay': <String, dynamic>{},
+      });
+      // A commented log exists, but the aggregate says "no comments" — the
+      // aggregate wins (it is server-authoritative once the field exists).
+      await _seedLog(
+        firestore,
+        id: 'log_ignored',
+        date: DateTime.now(),
+        minutesRead: 10,
+        bookTitles: const ['Ignored'],
+        parentCommentFreeText: 'Should not appear',
+      );
+      await pumpScreen(tester);
+
+      expect(find.text('No parent comments yet'), findsOneWidget);
+      expect(find.text('Should not appear'), findsNothing);
+    });
+
     testWidgets('shows achievements empty state when none earned',
         (tester) async {
       await pumpScreen(tester);
@@ -227,6 +289,11 @@ void main() {
     });
   });
 }
+
+String _dayKey(DateTime d) =>
+    '${d.year.toString().padLeft(4, '0')}-'
+    '${d.month.toString().padLeft(2, '0')}-'
+    '${d.day.toString().padLeft(2, '0')}';
 
 Future<void> _seedSchool(
   FakeFirebaseFirestore firestore, {
