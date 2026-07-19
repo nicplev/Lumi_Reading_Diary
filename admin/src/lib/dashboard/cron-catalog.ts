@@ -50,8 +50,14 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
   {
     name: "cleanupComprehensionAudio",
     label: "Audio retention cleanup",
-    scheduleLabel: "daily",
+    scheduleLabel: "daily 04:00 Syd",
     staleAfterMs: 26 * HOUR,
+  },
+  {
+    name: "sweepAiEvalJobs",
+    label: "AI eval job sweep",
+    scheduleLabel: "6-hourly",
+    staleAfterMs: 8 * HOUR,
   },
   {
     name: "cleanupExpiredLinkCodes",
