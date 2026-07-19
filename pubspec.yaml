@@ -131,6 +131,9 @@ dev_dependencies:
   mockito: ^5.4.4
   fake_cloud_firestore: ^4.0.0
   firebase_auth_mocks: ^0.15.1
+  # Direct dep for setupFirebaseCoreMocks() in widget tests (already in the
+  # transitive graph via firebase_core).
+  firebase_core_platform_interface: ^6.0.2
   google_sign_in_mocks: ^0.4.1
   connectivity_plus_platform_interface: ^2.0.1
 

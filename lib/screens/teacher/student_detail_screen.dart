@@ -57,11 +57,16 @@ class StudentDetailScreen extends StatefulWidget {
   final StudentModel student;
   final ClassModel? classModel;
 
+  /// Test seam (same pattern as TeacherClassroomScreen): defaults to the
+  /// app-wide instance in production.
+  final FirebaseFirestore? firestore;
+
   const StudentDetailScreen({
     super.key,
     required this.teacher,
     required this.student,
     this.classModel,
+    this.firestore,
   });
 
   @override
@@ -69,12 +74,11 @@ class StudentDetailScreen extends StatefulWidget {
 }
 
 class _StudentDetailScreenState extends State<StudentDetailScreen> {
-  final FirebaseService _firebaseService = FirebaseService.instance;
-  final AllocationCrudService _allocationCrudService = AllocationCrudService();
-  final BookLookupService _bookLookupService = BookLookupService();
-  final ReadingLevelService _readingLevelService = ReadingLevelService();
-  final StudentReadingLevelService _studentReadingLevelService =
-      StudentReadingLevelService();
+  late final FirebaseFirestore _firestore;
+  late final AllocationCrudService _allocationCrudService;
+  late final BookLookupService _bookLookupService;
+  late final ReadingLevelService _readingLevelService;
+  late final StudentReadingLevelService _studentReadingLevelService;
   final Map<String, Future<String>> _parentNameFutures = {};
   BookMetadataResolver? _metadataResolverInstance;
   // Screen-local ISBN API results (separate from Firestore-doc-based data
@@ -96,7 +100,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     if (existing != null) return existing;
 
     final resolver = BookMetadataResolver(
-      lookupService: BookLookupService(),
+      lookupService: _bookLookupService,
       schoolId: widget.student.schoolId,
       actorId: widget.teacher.id,
     );
@@ -108,6 +112,14 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _firestore = widget.firestore ?? FirebaseService.instance.firestore;
+    _allocationCrudService = AllocationCrudService(firestore: _firestore);
+    _bookLookupService = BookLookupService(firestore: _firestore);
+    _readingLevelService = ReadingLevelService(firestore: _firestore);
+    _studentReadingLevelService = StudentReadingLevelService(
+      firestore: _firestore,
+      readingLevelService: _readingLevelService,
+    );
     BookCoverCacheService.instance.addListener(_onCoversUpdated);
     _ensureMetadataResolver();
     _loadReadingLevelOptions();
@@ -117,7 +129,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
   Future<List<ReadingGroupModel>> _loadStudentGroups() async {
     try {
-      final snapshot = await _firebaseService.firestore
+      final snapshot = await _firestore
           .collection('schools')
           .doc(widget.student.schoolId)
           .collection('readingGroups')
@@ -137,7 +149,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   Future<List<EarnedAchievementDisplay>>
       _loadStudentAchievementDisplays() async {
     try {
-      final doc = await _firebaseService.firestore
+      final doc = await _firestore
           .collection('schools')
           .doc(widget.student.schoolId)
           .collection('students')
@@ -246,7 +258,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     try {
       var classModel = widget.classModel;
       if (classModel == null) {
-        final classDoc = await _firebaseService.firestore
+        final classDoc = await _firestore
             .collection('schools')
             .doc(widget.student.schoolId)
             .collection('classes')
@@ -285,7 +297,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     try {
       var classModel = widget.classModel;
       if (classModel == null) {
-        final classDoc = await _firebaseService.firestore
+        final classDoc = await _firestore
             .collection('schools')
             .doc(widget.student.schoolId)
             .collection('classes')
@@ -755,7 +767,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     required String title,
   }) async {
     // Look up the allocation doc to find the full AllocationBookItem
-    final doc = await _firebaseService.firestore
+    final doc = await _firestore
         .collection('schools')
         .doc(widget.student.schoolId)
         .collection('allocations')
@@ -1078,7 +1090,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
   Future<void> _showRenewSheet() async {
     // Fetch current allocations for this student's class
-    final snapshot = await _firebaseService.firestore
+    final snapshot = await _firestore
         .collection('schools')
         .doc(widget.student.schoolId)
         .collection('allocations')
@@ -1237,7 +1249,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       return Future.value('Parent');
     }
     return _parentNameFutures.putIfAbsent(parentId, () async {
-      final schoolRef = _firebaseService.firestore
+      final schoolRef = _firestore
           .collection('schools')
           .doc(widget.student.schoolId);
 
@@ -2161,7 +2173,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     // 5, and it maps to the full ReadingLogModel so we can read childFeeling.
     final floor = DateTime.now().subtract(const Duration(days: 366));
     return StreamBuilder<QuerySnapshot>(
-      stream: _firebaseService.firestore
+      stream: _firestore
           .collection('schools')
           .doc(widget.student.schoolId)
           .collection('readingLogs')
@@ -2208,7 +2220,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         ),
         const SizedBox(height: 10),
         StreamBuilder<QuerySnapshot>(
-          stream: _firebaseService.firestore
+          stream: _firestore
               .collection('schools')
               .doc(widget.student.schoolId)
               .collection('readingLogs')
@@ -2748,7 +2760,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         Text('Assigned Books', style: LumiType.subhead),
         const SizedBox(height: 12),
         StreamBuilder<QuerySnapshot>(
-          stream: _firebaseService.firestore
+          stream: _firestore
               .collection('schools')
               .doc(widget.student.schoolId)
               .collection('allocations')
@@ -2775,12 +2787,12 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                 .toList();
             BookCoverCacheService.instance.primeFromAllocations(
               allocations,
-              _firebaseService.firestore,
+              _firestore,
             );
             _primeIsbnCovers(allocations);
 
             return StreamBuilder<QuerySnapshot>(
-              stream: _firebaseService.firestore
+              stream: _firestore
                   .collection('schools')
                   .doc(widget.student.schoolId)
                   .collection('readingLogs')
@@ -2976,7 +2988,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         Text('Latest Parent Comment', style: LumiType.subhead),
         const SizedBox(height: 8),
         StreamBuilder<QuerySnapshot>(
-          stream: _firebaseService.firestore
+          stream: _firestore
               .collection('schools')
               .doc(widget.student.schoolId)
               .collection('readingLogs')
