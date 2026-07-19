@@ -43,10 +43,12 @@ class _AwardsScreenState extends State<AwardsScreen> {
       .collection('classes')
       .doc(widget.classModel.id);
 
-  Stream<ClassModel> get _classStream =>
-      _classRef.snapshots().map(ClassModel.fromFirestore);
+  // Created once (late final) so rebuilds reuse the live Firestore
+  // subscriptions — the former getters built a brand-new stream per build.
+  late final Stream<ClassModel> _classStream =
+      _classRef.snapshots().map(ClassModel.fromFirestore).asBroadcastStream();
 
-  Stream<List<StudentModel>> get _rosterStream => _fs
+  late final Stream<List<StudentModel>> _rosterStream = _fs
       .collection('schools')
       .doc(widget.classModel.schoolId)
       .collection('students')
@@ -54,7 +56,9 @@ class _AwardsScreenState extends State<AwardsScreen> {
       .where('isActive', isEqualTo: true)
       .snapshots()
       .map((s) => s.docs.map(StudentModel.fromFirestore).toList()
-        ..sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase())));
+        ..sort((a, b) =>
+            a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase())))
+      .asBroadcastStream();
 
   void _snack(String msg) {
     showLumiToast(

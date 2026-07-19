@@ -37,6 +37,9 @@ class _TeacherLevelManagementScreenState
   final StudentReadingLevelService _studentReadingLevelService =
       StudentReadingLevelService();
   final TextEditingController _searchController = TextEditingController();
+  // Cached so rebuilds (search typing, etc.) reuse the live roster
+  // subscription instead of re-subscribing every keystroke.
+  Stream<QuerySnapshot>? _studentsStream;
 
   List<ReadingLevelOption> _readingLevelOptions = const [];
   bool _levelsEnabled = true;
@@ -366,13 +369,15 @@ class _TeacherLevelManagementScreenState
                 _buildHeader(),
                 Expanded(
                   child: StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseService.instance.firestore
-                        .collection('schools')
-                        .doc(widget.teacher.schoolId)
-                        .collection('students')
-                        .where('classId', isEqualTo: widget.classModel.id)
-                        .where('isActive', isEqualTo: true)
-                        .snapshots(),
+                    stream: _studentsStream ??=
+                        FirebaseService.instance.firestore
+                            .collection('schools')
+                            .doc(widget.teacher.schoolId)
+                            .collection('students')
+                            .where('classId', isEqualTo: widget.classModel.id)
+                            .where('isActive', isEqualTo: true)
+                            .snapshots()
+                            .asBroadcastStream(),
                     builder: (context, snapshot) {
                       if (snapshot.hasError) {
                         return Center(

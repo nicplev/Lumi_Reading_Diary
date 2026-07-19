@@ -26,6 +26,8 @@ class TeacherProfileScreen extends StatefulWidget {
 
 class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
   final FirebaseService _firebaseService = FirebaseService.instance;
+  // Cached so rebuilds reuse the live school-doc subscription.
+  Stream<DocumentSnapshot>? _schoolStream;
   late UserModel _user;
   List<ClassModel> _classes = [];
   bool _isLoading = true;
@@ -132,10 +134,11 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
 
             // School Info
             StreamBuilder<DocumentSnapshot>(
-              stream: _firebaseService.firestore
+              stream: _schoolStream ??= _firebaseService.firestore
                   .collection('schools')
                   .doc(widget.user.schoolId)
-                  .snapshots(),
+                  .snapshots()
+                  .asBroadcastStream(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData || !snapshot.data!.exists) {
                   return const SizedBox();

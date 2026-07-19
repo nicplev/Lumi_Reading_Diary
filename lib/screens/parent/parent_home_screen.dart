@@ -1444,30 +1444,74 @@ class _ChildTodayCardState extends State<_ChildTodayCard> {
 /// a gentle streak chip (only when positive — cheer, don't shame), the week at
 /// a glance, and forward progress to the next badge. Taps through to the full
 /// Progress screen. Replaces the old ring + stats + rhythm + near-miss stack.
-class _MomentumCard extends StatelessWidget {
+class _MomentumCard extends StatefulWidget {
   final StudentModel student;
 
   const _MomentumCard({required this.student});
 
   @override
-  Widget build(BuildContext context) {
+  State<_MomentumCard> createState() => _MomentumCardState();
+}
+
+class _MomentumCardState extends State<_MomentumCard> {
+  // Streams are created once (and only re-created when the student changes) so
+  // parent rebuilds don't tear down and re-subscribe the Firestore listeners —
+  // same pattern as _ChildTodayCardState above. Broadcast so a StreamBuilder
+  // re-subscription (rebuild/reinsertion) doesn't trip "Stream has already
+  // been listened to".
+  late Stream<DocumentSnapshot> _studentStream;
+  late Stream<QuerySnapshot> _weekLogsStream;
+
+  StudentModel get student => widget.student;
+
+  @override
+  void initState() {
+    super.initState();
+    _initStreams();
+  }
+
+  @override
+  void didUpdateWidget(covariant _MomentumCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.student.id != widget.student.id ||
+        oldWidget.student.schoolId != widget.student.schoolId) {
+      _initStreams();
+    }
+  }
+
+  void _initStreams() {
     final firestore = FirebaseService.instance.firestore;
-    final accent = context.sectionTheme.accent;
     final now = DateTime.now();
     final startOfWeek = DateTime(now.year, now.month, now.day)
         .subtract(Duration(days: now.weekday - 1));
+    _studentStream = firestore
+        .collection('schools')
+        .doc(student.schoolId)
+        .collection('students')
+        .doc(student.id)
+        .snapshots()
+        .asBroadcastStream();
+    _weekLogsStream = firestore
+        .collection('schools')
+        .doc(student.schoolId)
+        .collection('readingLogs')
+        .where('studentId', isEqualTo: student.id)
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek))
+        .snapshots()
+        .asBroadcastStream();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = context.sectionTheme.accent;
+    final now = DateTime.now();
 
     return GestureDetector(
       onTap: () =>
           context.push('/parent/progress', extra: {'student': student}),
       child: LumiCard(
         child: StreamBuilder<DocumentSnapshot>(
-          stream: firestore
-              .collection('schools')
-              .doc(student.schoolId)
-              .collection('students')
-              .doc(student.id)
-              .snapshots(),
+          stream: _studentStream,
           builder: (context, studentSnap) {
             int totalNights = 0;
             int currentStreak = 0;
@@ -1521,15 +1565,7 @@ class _MomentumCard extends StatelessWidget {
                 LumiGap.m,
                 // This week, at a glance.
                 StreamBuilder<QuerySnapshot>(
-                  stream: firestore
-                      .collection('schools')
-                      .doc(student.schoolId)
-                      .collection('readingLogs')
-                      .where('studentId', isEqualTo: student.id)
-                      .where('date',
-                          isGreaterThanOrEqualTo:
-                              Timestamp.fromDate(startOfWeek))
-                      .snapshots(),
+                  stream: _weekLogsStream,
                   builder: (context, weekSnap) {
                     final completedDays = <int>{};
                     if (weekSnap.hasData) {
