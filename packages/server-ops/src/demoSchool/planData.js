@@ -217,6 +217,47 @@ const PARENT_COMMENTS = [
   "Read to little brother as well.",
 ];
 
+// Canonical demo-school feature defaults. The super-admin demo control panel
+// may change these during a provisioned day; the next fenced reseed restores
+// this colourful, fully populated baseline.
+export const DEMO_CONTROL_DEFAULTS = {
+  audioRecordingEnabled: false,
+  parentCommentsEnabled: true,
+  freeTextCommentsEnabled: true,
+  messagingEnabled: true,
+  quickLoggingEnabled: true,
+  commentPresets: [
+    { id: "default-1", name: "Encouragement", chips: ["Great job!", "Keep it up!", "Loved hearing you read!", "So proud of you!"] },
+    { id: "default-2", name: "Reading Skills", chips: ["Sounded out words well", "Good finger tracking", "Read with expression", "Used picture clues"] },
+    { id: "default-3", name: "Comprehension", chips: ["Understood the story well", "Asked great questions", "Made predictions", "Retold the story"] },
+  ],
+};
+
+// One selectable Lumi per seeded child. Keep this explicit and deterministic
+// so every class/family surface has visual variety after every reseed.
+export const DEMO_STUDENT_CHARACTER_IDS = [
+  "pink_lumi",
+  "blue_lumi",
+  "green_lumi",
+  "yellow_lumi",
+  "orange_lumi",
+  "purple_lumi",
+  "light_blue_lumi",
+  "lumi_chef",
+  "lumi_cool_kid",
+  "lumi_crown",
+  "lumi_headphones",
+  "lumi_ninja",
+  "lumi_pirate",
+  "lumi_space",
+  "lumi_wizard",
+  "lumi_shark",
+];
+
+if (DEMO_STUDENT_CHARACTER_IDS.length !== STUDENTS.length) {
+  throw new Error("Every seeded demo student must have one distinct Lumi character.");
+}
+
 // Achievement tier metadata — mirrors BOOKS_TIERS / MINUTES_TIERS / DAYS_TIERS
 // and DEFAULT_ACHIEVEMENT_THRESHOLDS in functions/src/index.ts. Streak tiers
 // are intentionally not awarded there, so none are seeded here either.
@@ -501,20 +542,23 @@ function buildPlan(now) {
       createdBy: adminUid,
       settings: {
         readingGoalMinutes: 20,
-        messaging: { enabled: true },
+        messaging: { enabled: DEMO_CONTROL_DEFAULTS.messagingEnabled },
         parentComments: {
-          enabled: true,
-          freeTextEnabled: true,
-          customPresets: [
-            { id: "default-1", name: "Encouragement", chips: ["Great job!", "Keep it up!", "Loved hearing you read!", "So proud of you!"] },
-            { id: "default-2", name: "Reading Skills", chips: ["Sounded out words well", "Good finger tracking", "Read with expression", "Used picture clues"] },
-            { id: "default-3", name: "Comprehension", chips: ["Understood the story well", "Asked great questions", "Made predictions", "Retold the story"] },
-          ],
+          enabled: DEMO_CONTROL_DEFAULTS.parentCommentsEnabled,
+          freeTextEnabled: DEMO_CONTROL_DEFAULTS.freeTextCommentsEnabled,
+          customPresets: DEMO_CONTROL_DEFAULTS.commentPresets.map((category) => ({
+            ...category,
+            chips: [...category.chips],
+          })),
         },
-        // Shared demo accounts cannot upload new audio. The demo controls may
-        // expose a separately governed, seeded-fixture preview later.
-        comprehensionRecording: { enabled: false },
-        quickLogging: { enabled: true },
+        // Shared demo accounts cannot upload new audio. Super-admin demo
+        // controls can expose this local record/playback preview without
+        // fabricating a real school's authority evidence.
+        comprehensionRecording: {
+          enabled: DEMO_CONTROL_DEFAULTS.audioRecordingEnabled,
+          demoPreviewOnly: true,
+        },
+        quickLogging: { enabled: DEMO_CONTROL_DEFAULTS.quickLoggingEnabled },
       },
       studentCount: STUDENTS.length,
       teacherCount: STAFF.filter((s) => s.role === "teacher").length,
@@ -587,7 +631,7 @@ function buildPlan(now) {
   const studentIdsByClass = { "3g": [], "5b": [] };
   const levelIndex = { J: 9, K: 10, L: 11, M: 12, N: 13, P: 15 }; // A=0 … Z=25
 
-  for (const s of Object.values(studentsByKey)) {
+  for (const [studentIndex, s] of Object.values(studentsByKey).entries()) {
     const cls = classByKey[s.classKey];
     studentIdsByClass[s.classKey].push(s.id);
 
@@ -615,6 +659,7 @@ function buildPlan(now) {
       data: {
         firstName: s.firstName,
         lastName: s.lastName,
+        characterId: DEMO_STUDENT_CHARACTER_IDS[studentIndex],
         schoolId: SCHOOL_ID,
         classId: cls.id,
         currentReadingLevel: s.level,

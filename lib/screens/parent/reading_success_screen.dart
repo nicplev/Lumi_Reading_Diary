@@ -120,6 +120,7 @@ class _ReadingSuccessScreenState extends ConsumerState<ReadingSuccessScreen>
   ComprehensionRecordingResult? _comprehensionRecording;
   bool _comprehensionExpanded = false;
   bool _comprehensionSaved = false;
+  bool _demoAudioPreviewOnly = false;
 
   bool get _comprehensionEnabled => _comprehensionSettings.enabled;
 
@@ -238,11 +239,13 @@ class _ReadingSuccessScreenState extends ConsumerState<ReadingSuccessScreen>
       setState(() {
         if (schoolDoc.exists) {
           final school = SchoolModel.fromFirestore(schoolDoc);
+          final schoolAudio = school.comprehensionRecordingSettings;
           _commentSettings = school.parentCommentSettings;
           _comprehensionSettings = ComprehensionRecordingSettings(
-            enabled: platformEnabled &&
-                school.comprehensionRecordingSettings.enabled,
+            enabled: platformEnabled && schoolAudio.enabled,
+            previewOnly: schoolAudio.previewOnly,
           );
+          _demoAudioPreviewOnly = schoolAudio.previewOnly;
         }
         if (classDoc != null && classDoc.exists) {
           _comprehensionQuestion =
@@ -286,15 +289,20 @@ class _ReadingSuccessScreenState extends ConsumerState<ReadingSuccessScreen>
 
     final recording = _comprehensionRecording;
     if (recording != null && !_comprehensionSaved) {
-      try {
-        await ReadingLogService.instance.attachComprehension(
-          widget.readingLog,
-          localFilePath: recording.localPath,
-          durationSec: recording.durationSec,
-        );
+      if (_demoAudioPreviewOnly) {
+        await discardComprehensionRecordingPreview(recording);
         _comprehensionSaved = true;
-      } catch (_) {
-        // Non-critical — the recording is queued for retry on failure.
+      } else {
+        try {
+          await ReadingLogService.instance.attachComprehension(
+            widget.readingLog,
+            localFilePath: recording.localPath,
+            durationSec: recording.durationSec,
+          );
+          _comprehensionSaved = true;
+        } catch (_) {
+          // Non-critical — the recording is queued for retry on failure.
+        }
       }
     }
     _goHome();
@@ -716,6 +724,7 @@ class _ReadingSuccessScreenState extends ConsumerState<ReadingSuccessScreen>
                     logId: widget.readingLog.id,
                     initialLocalPath: _comprehensionRecording?.localPath,
                     initialDurationSec: _comprehensionRecording?.durationSec,
+                    previewOnly: _demoAudioPreviewOnly,
                     onRecordingChanged: (r) =>
                         setState(() => _comprehensionRecording = r),
                     onSkip: () => setState(() {

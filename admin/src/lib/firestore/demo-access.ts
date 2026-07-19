@@ -4,6 +4,10 @@ import type {
   PlatformDemoAccessConfig,
   DemoAccessEmailStatus,
 } from "@lumi/types";
+import {
+  readDemoControlValues,
+  type DemoControlValues,
+} from "@/lib/demo/control-model";
 
 // The permanent demo tenant. Config is the source of truth; this is the
 // fail-safe default the seed script also writes.
@@ -124,8 +128,14 @@ export interface DemoAccessView {
   portalLoginUrl: string;
   marketingUrl: string;
   readiness: DemoReadinessView | null;
+  controls: DemoControlsView;
   /** Send history for THIS onboarding request, newest first. */
   history: DemoEmailHistoryItem[];
+}
+
+export interface DemoControlsView extends DemoControlValues {
+  updatedAtISO: string | null;
+  updatedByEmail: string | null;
 }
 
 export interface DemoReadinessView {
@@ -187,7 +197,15 @@ export async function getDemoAccessView(
   onboardingId: string
 ): Promise<DemoAccessView> {
   const db = getAdminDb();
-  const [config, stateSnap, readinessSnap, emailsSnap] = await Promise.all([
+  const [
+    config,
+    stateSnap,
+    readinessSnap,
+    emailsSnap,
+    schoolSnap,
+    platformAudioSnap,
+    controlStatusSnap,
+  ] = await Promise.all([
     readDemoAccessConfig(),
     db.doc("demoAccess/state").get(),
     db.doc("demoAccess/readinessStatus").get(),
@@ -195,16 +213,33 @@ export async function getDemoAccessView(
       .collection("demoAccessEmails")
       .where("onboardingId", "==", onboardingId)
       .get(),
+    db.doc(`schools/${DEMO_SCHOOL_ID_DEFAULT}`).get(),
+    db.doc("platformConfig/comprehensionRecording").get(),
+    db.doc("demoAccess/controlStatus").get(),
   ]);
 
   const today = sydneyDayKey();
   const state = stateSnap.data();
   const scrambled = !!state && state.scrambledAt != null;
-  const active = !!state && state.dayKey === today && !scrambled;
+  const active =
+    !!state &&
+    state.dayKey === today &&
+    !scrambled &&
+    typeof state.password === "string" &&
+    state.password.length > 0;
 
   const history = emailsSnap.docs
     .map(mapEmailDoc)
     .sort((a, b) => b.createdAtISO.localeCompare(a.createdAtISO));
+  const controlValues = readDemoControlValues(
+    schoolSnap.data(),
+    platformAudioSnap.data(),
+  );
+  const controlStatus = controlStatusSnap.data();
+  const controlUpdatedBy =
+    controlStatus?.updatedBy && typeof controlStatus.updatedBy === "object"
+      ? (controlStatus.updatedBy as Record<string, unknown>)
+      : {};
 
   return {
     today,
@@ -219,6 +254,14 @@ export async function getDemoAccessView(
     portalLoginUrl: config.portalLoginUrl,
     marketingUrl: config.marketingUrl,
     readiness: mapReadiness(readinessSnap.data()),
+    controls: {
+      ...controlValues,
+      updatedAtISO: toISO(controlStatus?.updatedAt) || null,
+      updatedByEmail:
+        typeof controlUpdatedBy.email === "string"
+          ? controlUpdatedBy.email
+          : null,
+    },
     history,
   };
 }
