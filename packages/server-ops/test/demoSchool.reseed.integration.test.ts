@@ -6,6 +6,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { buildDemoSchoolPlan } from "../src/demoSchool/plan";
 import { reseedDemoSchool } from "../src/demoSchool/reseed";
+import { provisionDemoAccess } from "../src/provisionDemoAccess";
 
 const PROJECT = "demo-lumi-reseed";
 const app = initializeApp({ projectId: PROJECT, storageBucket: `${PROJECT}.appspot.com` });
@@ -38,6 +39,15 @@ test("fenced reseed preserves password state and finalises exact demo claims", a
   assert.ok(result.docsWritten > 450);
   assert.equal((await db.doc("demoAccess/state").get()).data()?.sentinel, "password-state-survives");
   assert.equal((await db.doc("demoAccess/reseedStatus").get()).data()?.state, "succeeded");
+  const controlStatus = (await db.doc("demoAccess/controlStatus").get()).data();
+  assert.equal(controlStatus?.controls?.audioRecordingEnabled, false);
+  assert.equal(controlStatus?.controls?.parentCommentsEnabled, true);
+  assert.equal(controlStatus?.controls?.freeTextCommentsEnabled, true);
+  assert.equal(controlStatus?.controls?.messagingEnabled, true);
+  assert.equal(controlStatus?.controls?.quickLoggingEnabled, true);
+  assert.equal(controlStatus?.controls?.commentCategoryCount, 3);
+  assert.equal(controlStatus?.controls?.commentChipCount, 12);
+  assert.equal(controlStatus?.resetByReseed?.trigger, "manual");
   assert.equal((await db.doc("schools/lumi_demo_primary_school").get()).data()?.isDemo, true);
   assert.equal((await db.doc("schools/lumi_demo_primary_school/allocations/demo_alloc_3g_bytitle").get()).exists, true);
   assert.equal((await db.doc("schools/lumi_demo_primary_school/allocations/demo_alloc_3g_bylevel").get()).exists, false);
@@ -59,6 +69,41 @@ test("fenced reseed preserves password state and finalises exact demo claims", a
     demoSchoolId: "lumi_demo_primary_school",
     schoolId: "lumi_demo_primary_school",
   });
+});
+
+test("explicit same-day reprovision rotates instead of reusing the password", async () => {
+  const plan = buildDemoSchoolPlan(new Date("2026-07-17T09:00:00+10:00"));
+  const account = (key: string) =>
+    plan.authUsers.find((user) => user.key === key)?.email ?? "";
+  const params = {
+    config: {
+      schoolId: "lumi_demo_primary_school",
+      adminEmail: account("sharedadmin"),
+      teacherEmail: account("teacher"),
+      parentEmail: account("parent1"),
+    },
+    dayKey: "2026-07-17",
+  };
+  const actor = {
+    uid: "test-super-admin",
+    email: "security-test@lumi-reading.com",
+  };
+
+  const first = await provisionDemoAccess(auth, db, actor, params);
+  const idempotent = await provisionDemoAccess(auth, db, actor, params);
+  assert.equal(idempotent.reused, true);
+  assert.equal(idempotent.password, first.password);
+
+  const reprovisioned = await provisionDemoAccess(auth, db, actor, {
+    ...params,
+    forceRotate: true,
+  });
+  assert.equal(reprovisioned.reused, false);
+  assert.notEqual(reprovisioned.password, first.password);
+  assert.equal(
+    (await db.doc("demoAccess/state").get()).data()?.password,
+    reprovisioned.password,
+  );
 });
 
 test("fresh running lease refuses overlap", async () => {

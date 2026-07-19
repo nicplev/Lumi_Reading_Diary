@@ -10,6 +10,7 @@ import type { Storage } from "firebase-admin/storage";
 import type { Actor } from "../audit";
 import {
   buildDemoSchoolPlan,
+  demoControlDefaults,
   demoSchoolConstants,
   type DemoAuthUser,
   type DemoPlanDocument,
@@ -132,6 +133,7 @@ async function completeLease(
   communityBooksDeleted: number
 ): Promise<void> {
   const statusRef = db.doc(STATUS_PATH);
+  const controlStatusRef = db.doc("demoAccess/controlStatus");
   const auditRef = db.collection("adminAuditLog").doc();
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(statusRef);
@@ -147,6 +149,28 @@ async function completeLease(
       finishedAt,
       docsWritten,
       communityBooksDeleted,
+    });
+    // The school document has just been rebuilt from the canonical defaults.
+    // Advance this separate status timestamp in the same completion
+    // transaction so already-open super-admin panels remount instead of
+    // continuing to display their pre-reseed local switch state.
+    tx.set(controlStatusRef, {
+      schoolId,
+      controls: {
+        audioRecordingEnabled: demoControlDefaults.audioRecordingEnabled,
+        parentCommentsEnabled: demoControlDefaults.parentCommentsEnabled,
+        freeTextCommentsEnabled: demoControlDefaults.freeTextCommentsEnabled,
+        messagingEnabled: demoControlDefaults.messagingEnabled,
+        quickLoggingEnabled: demoControlDefaults.quickLoggingEnabled,
+        commentCategoryCount: demoControlDefaults.commentPresets.length,
+        commentChipCount: demoControlDefaults.commentPresets.reduce(
+          (total, preset) => total + preset.chips.length,
+          0,
+        ),
+      },
+      updatedAt: finishedAt,
+      updatedBy: { uid: actor.uid, email: actor.email ?? null },
+      resetByReseed: { trigger, leaseId },
     });
     tx.set(auditRef, {
       action: "demo.reseed",

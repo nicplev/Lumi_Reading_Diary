@@ -113,6 +113,7 @@ export function DemoAccessPanel({
   };
 
   const prepareAndVerify = async () => {
+    const preparationAction = view.active ? "reprovision" : "provision";
     setReseedPhase(null);
     setPreparePhase("provisioning");
     setLoading("prepare");
@@ -122,7 +123,7 @@ export function DemoAccessPanel({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "provision" }),
+          body: JSON.stringify({ action: preparationAction }),
         },
       );
       const provisionData = await provisionResponse.json();
@@ -150,7 +151,11 @@ export function DemoAccessPanel({
           readinessData.error || "The demo is not ready. Review the failed check.",
         );
       }
-      toast.success("Today’s demo is prepared and verified");
+      toast.success(
+        preparationAction === "reprovision"
+          ? "Today’s demo was reset, given a new password and verified"
+          : "Today’s demo is prepared and verified",
+      );
       router.refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Demo preparation failed");
