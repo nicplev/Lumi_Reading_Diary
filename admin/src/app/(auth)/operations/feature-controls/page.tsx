@@ -1,10 +1,12 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { getAdminDb } from "@/lib/firebase-admin";
 import {
+  getAiEvaluationPlatformFlag,
   getComprehensionRecordingFlag,
   getComprehensionRetentionConfig,
   getStorageAlertsConfig,
 } from "@lumi/server-ops";
+import { AiEvaluationSwitchCard } from "./ai-evaluation-switch-card";
 import { FeatureControlsPanel } from "./feature-controls-panel";
 import { RetentionControlsCard } from "./retention-controls-card";
 import {
@@ -47,11 +49,13 @@ export default async function FeatureControlsPage() {
     comprehensionRetention,
     storageAlerts,
     storageUsage,
+    aiEvaluationFlag,
   ] = await Promise.all([
     getComprehensionRecordingFlag(db),
     getComprehensionRetentionConfig(db),
     getStorageAlertsConfig(db),
     getStorageUsageSummary(db),
+    getAiEvaluationPlatformFlag(db),
   ]);
 
   return (
@@ -62,6 +66,7 @@ export default async function FeatureControlsPage() {
       />
       <div className="space-y-6">
         <FeatureControlsPanel initialFlag={comprehensionRecording} />
+        <AiEvaluationSwitchCard initialFlag={aiEvaluationFlag} />
         <RetentionControlsCard initialConfig={comprehensionRetention} />
         <StorageAlertsCard initialConfig={storageAlerts} usage={storageUsage} />
       </div>

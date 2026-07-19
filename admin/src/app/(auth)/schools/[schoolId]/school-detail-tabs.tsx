@@ -18,6 +18,7 @@ import type { SchoolSubscriptionRow } from "@/lib/firestore/school-subscriptions
 import { SchoolDemoAccessTab } from "./school-demo-access-tab";
 import { SchoolDemoControlsTab } from "./school-demo-controls-tab";
 import type { DemoEmailHistoryItem } from "@/lib/firestore/demo-access";
+import type { AiEvaluationSchoolConfig } from "@lumi/server-ops";
 
 interface SchoolDetailTabsProps {
   school: SchoolDetail;
@@ -27,6 +28,7 @@ interface SchoolDetailTabsProps {
   classes: ClassListItem[];
   parents: ParentListItem[];
   defaultTab?: string;
+  aiEvaluation: AiEvaluationSchoolConfig;
   bookCount?: number;
   activeAllocationCount?: number;
   recentLogCount?: number;
@@ -50,6 +52,7 @@ export function SchoolDetailTabs({
   subscriptions,
   currentAcademicYear,
   demoAccessEmails,
+  aiEvaluation,
 }: SchoolDetailTabsProps) {
   const showDemoTab = demoAccessEmails != null;
   return (
@@ -86,6 +89,7 @@ export function SchoolDetailTabs({
           currentAcademicYear={currentAcademicYear}
           initialSubscriptions={subscriptions}
           initialAccessMode={school.accessMode}
+          initialAiEvaluation={aiEvaluation}
         />
       </TabsContent>
       <TabsContent value="settings">

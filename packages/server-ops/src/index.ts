@@ -17,3 +17,4 @@ export * from "./audioAuthority";
 export * from "./provisionDemoAccess";
 export * from "./demoSchool/plan";
 export * from "./demoSchool/reseed";
+export * from "./aiEvaluation";
