@@ -2,6 +2,8 @@
 
 **Status:** Conditional GO for the Australian Google Speech-to-Text technical path; **NO-GO for school or production AI processing**
 
+> **Provider revision 2026-07-19:** the proposed Anthropic (Claude Haiku) evaluation stage has been replaced by **Gemini Flash-Lite on Vertex AI at `australia-southeast1`** so the entire pipeline is processed inside Australia — see `docs/AI_EVALUATION_GEMINI_PLAN.md`. Anthropic-specific gates and data-flow lines below are retained as the historical Phase 0 record and are no longer applicable; the STT evidence in this document remains current and banked.
+
 **Evidence date:** 2026-07-15
 
 **Project / region:** `lumi-ninc-au` / `australia-southeast1`
