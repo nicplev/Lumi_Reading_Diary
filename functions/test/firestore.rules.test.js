@@ -873,6 +873,43 @@ test('allocations: teacher can query allocations for an assigned class', async (
   );
 });
 
+test('allocations: teacher may get a missing allocation doc, parent may not', async () => {
+  // The camera-scan upsert transaction reads the weekly allocation doc before
+  // creating it. A rules deref of resource.data on the missing doc used to
+  // deny that read and abort the whole transaction ("Could not assign").
+  await seedData(async (db) => {
+    await db.collection('schools').doc('school_1').set({
+      name: 'Lumi School One',
+      createdBy: 'admin_1',
+    });
+    await db.collection('schools').doc('school_1').collection('users').doc('teacher_1').set({
+      role: 'teacher',
+      schoolId: 'school_1',
+    });
+    await db.collection('schools').doc('school_1').collection('parents').doc('parent_1').set({
+      role: 'parent',
+      schoolId: 'school_1',
+      linkedChildren: ['student_1'],
+    });
+    await db.collection('schools').doc('school_1').collection('classes').doc('class_1').set({
+      schoolId: 'school_1',
+      teacherId: 'teacher_1',
+      teacherIds: ['teacher_1'],
+      studentIds: ['student_1'],
+    });
+  });
+
+  const missingDoc = (db) => db
+    .collection('schools')
+    .doc('school_1')
+    .collection('allocations')
+    .doc('isbn_student_1_20260713');
+
+  await assertSucceeds(missingDoc(authDb('teacher_1')).get());
+  await assertFails(missingDoc(authDb('parent_1')).get());
+  await assertFails(missingDoc(authDb('outsider_1')).get());
+});
+
 test('allocations: parent can read linked child allocations only', async () => {
   await seedData(async (db) => {
     await db.collection('schools').doc('school_1').set({
@@ -1816,6 +1853,36 @@ test('ordinary demo teacher: can create and delete only current ephemeral alloca
     type: 'byTitle',
     cadence: 'weekly',
     targetMinutes: 20,
+  }));
+});
+
+test('ordinary demo teacher: may get the missing weekly allocation doc before creating it', async () => {
+  // Mirrors the mobile scan flow, whose transaction reads the deterministic
+  // demo_isbn_* doc before the fenced create.
+  await seedDemoAdmin();
+  await seedData(async (db) => {
+    await db.collection('schools').doc(DEMO_SCHOOL_ID)
+      .collection('classes').doc('demo_class').set({
+        schoolId: DEMO_SCHOOL_ID,
+        teacherIds: ['demo_teacher_1'],
+        name: 'Demo Class',
+      });
+  });
+  const db = authDb('demo_teacher_1', ordinaryDemoClaims());
+  const ref = db.collection('schools').doc(DEMO_SCHOOL_ID)
+    .collection('allocations').doc('demo_isbn_demo_student_1_20260713');
+  await assertSucceeds(ref.get());
+  await assertSucceeds(ref.set({
+    schoolId: DEMO_SCHOOL_ID,
+    classId: 'demo_class',
+    studentIds: ['demo_student_1'],
+    assignmentItems: [],
+    type: 'byTitle',
+    cadence: 'weekly',
+    targetMinutes: 20,
+    demoEphemeral: true,
+    demoGenerationId: DEMO_GENERATION_ID,
+    demoOrigin: 'flutter_camera',
   }));
 });
 

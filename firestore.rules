@@ -920,9 +920,13 @@ service cloud.firestore {
       }
 
       match /allocations/{allocationId} {
+        // The scan/create upsert transaction reads the weekly allocation doc
+        // before it exists; a missing doc has no classId to check, so any
+        // teacher of the school may observe non-existence.
         allow get, list: if isSchoolAdmin(schoolId) ||
             (isTeacher(schoolId) &&
-              teacherTeachesClass(schoolId, resource.data.classId)) ||
+              (resource == null ||
+                teacherTeachesClass(schoolId, resource.data.classId))) ||
             parentCanReadAllocation(schoolId, resource.data) ||
             isDevImpersonatingSchool(schoolId);
 
