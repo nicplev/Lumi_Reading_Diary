@@ -15,6 +15,9 @@ pnpm test:demo-plan
 step "Redacted live preflight core"
 pnpm test:demo-preflight
 
+step "Live demo feature controls"
+pnpm test:demo-controls
+
 step "Fenced Auth/Firestore/Storage reseed"
 JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home}" \
   PATH="${JAVA_HOME:-/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home}/bin:$PATH" \
@@ -39,6 +42,8 @@ flutter test \
   test/screens/auth/login_screen_policy_test.dart \
   test/data/providers/user_provider_auth_resolution_test.dart \
   test/screens/auth/terms_account_load_error_test.dart \
+  test/screens/parent/comprehension_recording_demo_preview_test.dart \
+  test/models/comprehension_recording_settings_test.dart \
   test/models/user_model_test.dart \
   test/assets_bundled_test.dart
 
@@ -47,7 +52,11 @@ flutter analyze \
   lib/core/routing/app_router.dart \
   lib/screens/auth/login_screen.dart \
   lib/data/providers/user_provider.dart \
-  lib/screens/auth/terms_acceptance_screen.dart
+  lib/screens/auth/terms_acceptance_screen.dart \
+  lib/data/models/comprehension_recording_settings.dart \
+  lib/screens/parent/widgets/comprehension_recording_step.dart \
+  lib/screens/parent/log_reading_screen.dart \
+  lib/screens/parent/reading_success_screen.dart
 
 step "School portal session/read-only security"
 pnpm --filter lumi-school-admin test:security

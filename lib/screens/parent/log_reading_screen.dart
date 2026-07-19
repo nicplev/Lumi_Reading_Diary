@@ -61,6 +61,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
       ComprehensionRecordingSettings.defaults();
   String _comprehensionQuestion = ClassModel.defaultComprehensionQuestion;
   ComprehensionRecordingResult? _comprehensionRecording;
+  bool _demoAudioPreviewOnly = false;
 
   bool get _commentsEnabled => _commentSettings.enabled;
   bool get _comprehensionEnabled => _comprehensionSettings.enabled;
@@ -328,11 +329,13 @@ class _LogReadingScreenState extends State<LogReadingScreen>
       setState(() {
         if (schoolDoc.exists) {
           final school = SchoolModel.fromFirestore(schoolDoc);
+          final schoolAudio = school.comprehensionRecordingSettings;
           _commentSettings = school.parentCommentSettings;
           _comprehensionSettings = ComprehensionRecordingSettings(
-            enabled: platformEnabled &&
-                school.comprehensionRecordingSettings.enabled,
+            enabled: platformEnabled && schoolAudio.enabled,
+            previewOnly: schoolAudio.previewOnly,
           );
+          _demoAudioPreviewOnly = schoolAudio.previewOnly;
         }
         if (classDoc != null && classDoc.exists) {
           _comprehensionQuestion =
@@ -406,7 +409,8 @@ class _LogReadingScreenState extends State<LogReadingScreen>
 
     try {
       final recording = _comprehensionRecording;
-      final storagePath = recording == null
+      final previewOnly = recording != null && _demoAudioPreviewOnly;
+      final storagePath = recording == null || previewOnly
           ? null
           : ReadingLogService.comprehensionAudioUploadStoragePath(
               schoolId: widget.student.schoolId,
@@ -425,13 +429,16 @@ class _LogReadingScreenState extends State<LogReadingScreen>
         freeText: _notesController.text,
         id: _logId,
         comprehensionAudioPath: storagePath,
-        comprehensionAudioDurationSec: recording?.durationSec,
+        comprehensionAudioDurationSec:
+            previewOnly ? null : recording?.durationSec,
       );
 
       // Hand the audio file off: directly online, or via the offline queue.
       // Failures here are swallowed to the queue — the log itself succeeded
       // and showing a "save failed" screen would mislead the parent.
-      if (recording != null && storagePath != null) {
+      if (previewOnly) {
+        await discardComprehensionRecordingPreview(recording);
+      } else if (recording != null && storagePath != null) {
         if (result.savedOffline) {
           await OfflineService.instance.enqueueComprehensionAudioUpload(
             logId: result.log.id,
@@ -1019,6 +1026,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
                     logId: _logId,
                     initialLocalPath: _comprehensionRecording?.localPath,
                     initialDurationSec: _comprehensionRecording?.durationSec,
+                    previewOnly: _demoAudioPreviewOnly,
                     onRecordingChanged: (result) {
                       setState(() => _comprehensionRecording = result);
                     },

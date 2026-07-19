@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildDemoSchoolPlan } from "../src/demoSchool/plan";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import {
+  buildDemoSchoolPlan,
+  demoControlDefaults,
+  demoStudentCharacterIds,
+} from "../src/demoSchool/plan";
 
 test("demo plan is deterministic and internally coherent", () => {
   const now = new Date("2026-07-17T09:00:00+10:00");
@@ -13,6 +19,19 @@ test("demo plan is deterministic and internally coherent", () => {
   assert.equal(first.books.length, 3);
   assert.ok(first.students.every((student) => student.data.access?.status === "active"));
   assert.ok(first.students.every((student) => student.data.access?.academicYear === 2026));
+  assert.equal(demoStudentCharacterIds.length, first.students.length);
+  assert.equal(new Set(demoStudentCharacterIds).size, first.students.length);
+  assert.deepEqual(
+    first.students.map((student) => student.data.characterId),
+    demoStudentCharacterIds,
+  );
+  for (const characterId of demoStudentCharacterIds) {
+    assert.equal(
+      existsSync(resolve(`assets/characters/${characterId}.png`)),
+      true,
+      `missing selectable Lumi asset for ${characterId}`,
+    );
+  }
 });
 test("demo plan contains no fake by-level card or global catalogue write", () => {
   const plan = buildDemoSchoolPlan(new Date("2026-07-17T09:00:00+10:00"));
@@ -31,4 +50,24 @@ test("demo plan contains no fake by-level card or global catalogue write", () =>
     )
   );
   assert.equal(plan.school.data.settings.comprehensionRecording.enabled, false);
+  assert.equal(
+    plan.school.data.settings.comprehensionRecording.demoPreviewOnly,
+    true,
+  );
+  assert.equal(
+    plan.school.data.settings.parentComments.enabled,
+    demoControlDefaults.parentCommentsEnabled,
+  );
+  assert.equal(
+    plan.school.data.settings.parentComments.freeTextEnabled,
+    demoControlDefaults.freeTextCommentsEnabled,
+  );
+  assert.deepEqual(
+    plan.school.data.settings.parentComments.customPresets,
+    demoControlDefaults.commentPresets,
+  );
+  assert.equal(
+    plan.school.data.settings.messaging.enabled,
+    demoControlDefaults.messagingEnabled,
+  );
 });

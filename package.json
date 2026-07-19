@@ -11,6 +11,7 @@
     "demo:reseed:dry-run": "tsx scripts/reseed_demo_school.ts --dry-run",
     "demo:preflight": "tsx admin/scripts/demo-preflight.ts",
     "test:demo-preflight": "tsx --test admin/test/demo-preflight-core.test.ts",
+    "test:demo-controls": "tsx --test admin/test/demo-control-model.test.ts",
     "test:demo-plan": "tsx --test packages/server-ops/test/demoSchool.plan.test.ts",
     "test:demo-readiness": "bash scripts/demo-readiness-local.sh"
   },

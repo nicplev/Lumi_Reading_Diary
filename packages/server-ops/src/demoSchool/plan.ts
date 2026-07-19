@@ -1,6 +1,8 @@
 import {
   buildDemoSchoolPlanData,
+  DEMO_CONTROL_DEFAULTS,
   DEMO_SCHOOL_CONSTANTS,
+  DEMO_STUDENT_CHARACTER_IDS,
 } from "./planData.js";
 
 export interface DemoPlanDocument {
@@ -38,6 +40,21 @@ export interface DemoSchoolConstants {
   retiredIndexEmails: string[];
 }
 
+export interface DemoCommentPreset {
+  id: string;
+  name: string;
+  chips: string[];
+}
+
+export interface DemoControlDefaults {
+  audioRecordingEnabled: boolean;
+  parentCommentsEnabled: boolean;
+  freeTextCommentsEnabled: boolean;
+  messagingEnabled: boolean;
+  quickLoggingEnabled: boolean;
+  commentPresets: DemoCommentPreset[];
+}
+
 /**
  * Builds the entire demo tenant without accessing Firebase, Storage, secrets,
  * the network or process-global state. The same instant produces the same ids
@@ -49,3 +66,9 @@ export function buildDemoSchoolPlan(now = new Date()): DemoSchoolPlan {
 
 export const demoSchoolConstants =
   DEMO_SCHOOL_CONSTANTS as DemoSchoolConstants;
+
+export const demoControlDefaults =
+  DEMO_CONTROL_DEFAULTS as DemoControlDefaults;
+
+export const demoStudentCharacterIds =
+  [...DEMO_STUDENT_CHARACTER_IDS] as string[];

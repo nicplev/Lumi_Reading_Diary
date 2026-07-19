@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { DemoFeatureControls } from "@/components/demo/demo-feature-controls";
 import type {
   DemoAccessView,
   DemoReadinessView,
@@ -134,8 +135,8 @@ export function DemoAccessPanel({
       const readinessResponse = await fetch(
         `/api/onboarding/${onboardingId}/demo-readiness`,
         {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ confirm: "RUN DEMO PREFLIGHT" }),
         },
       );
@@ -356,6 +357,13 @@ export function DemoAccessPanel({
             )}
           </div>
 
+          <DemoFeatureControls
+            key={`${view.today}:${view.active}:${view.controls.updatedAtISO ?? "seed"}`}
+            initialControls={view.controls}
+            active={view.active}
+            patchEndpoint={`/api/onboarding/${onboardingId}/demo-controls`}
+          />
+
           {/* Actions */}
           <div className="flex flex-wrap gap-2">
             <Button onClick={prepareAndVerify} disabled={loading !== null}>
@@ -367,8 +375,12 @@ export function DemoAccessPanel({
               {loading === "prepare"
                 ? preparePhase === "verifying"
                   ? "Verifying live demo…"
-                  : "Preparing demo…"
-                : "Prepare and verify today’s demo"}
+                  : view.active
+                    ? "Reprovisioning demo…"
+                    : "Preparing demo…"
+                : view.active
+                  ? "Reprovision and check today’s demo"
+                  : "Prepare and verify today’s demo"}
             </Button>
             <Button
               variant="outline"
@@ -396,9 +408,9 @@ export function DemoAccessPanel({
           {loading === "prepare" &&
             preparePhase === "provisioning" &&
             reseedPhase && (
-            <p className="text-xs text-muted-foreground" role="status">
-              Refreshing demo data: {reseedPhase.replaceAll("_", " ")}…
-            </p>
+              <p className="text-xs text-muted-foreground" role="status">
+                Refreshing demo data: {reseedPhase.replaceAll("_", " ")}…
+              </p>
             )}
 
           {/* Send history for this request */}

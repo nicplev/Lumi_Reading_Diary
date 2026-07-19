@@ -26,6 +26,23 @@ class ComprehensionRecordingResult {
   });
 }
 
+/// Removes a local demo-preview recording without ever sending it to Lumi.
+/// Production recordings are removed by [ReadingLogService] after the server
+/// validates them; the shared demo deliberately has no upload capability.
+Future<void> discardComprehensionRecordingPreview(
+  ComprehensionRecordingResult? recording,
+) async {
+  final path = recording?.localPath;
+  if (path == null) return;
+  try {
+    final file = File(path);
+    if (file.existsSync()) await file.delete();
+  } catch (_) {
+    // Best effort. The app-private file remains inaccessible to other apps and
+    // can be removed by the next re-record or app-data cleanup.
+  }
+}
+
 enum _RecordingState {
   idle,
   countdown,
@@ -72,6 +89,10 @@ class ComprehensionRecordingStep extends StatefulWidget {
   /// chrome, no "Skip this step" — not recording is itself the skip).
   final bool embedded;
 
+  /// Shared sales demos let a prospect try capture and playback, but never
+  /// upload or retain the voice recording.
+  final bool previewOnly;
+
   const ComprehensionRecordingStep({
     super.key,
     required this.question,
@@ -81,6 +102,7 @@ class ComprehensionRecordingStep extends StatefulWidget {
     this.initialLocalPath,
     this.initialDurationSec,
     this.embedded = false,
+    this.previewOnly = false,
   });
 
   @override
@@ -353,7 +375,15 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
     // Embedded: the host reflection screen owns the header + scrolling, so
     // render just the recorder controls inline.
     if (widget.embedded) {
-      return _buildStateBody();
+      return Column(
+        children: [
+          if (widget.previewOnly) ...[
+            _buildPreviewOnlyNotice(),
+            const SizedBox(height: 12),
+          ],
+          _buildStateBody(),
+        ],
+      );
     }
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -373,8 +403,35 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
             textAlign: TextAlign.center,
             style: LumiTextStyles.h2(color: LumiTokens.ink),
           ),
+          if (widget.previewOnly) ...[
+            const SizedBox(height: 12),
+            _buildPreviewOnlyNotice(),
+          ],
           const SizedBox(height: 24),
           _buildStateBody(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreviewOnlyNotice() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: LumiTokens.blue.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.visibility_outlined, color: LumiTokens.ink),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Demo preview — try recording and playback. This audio is not uploaded or kept.',
+              style: LumiTextStyles.bodySmall(color: LumiTokens.ink),
+            ),
+          ),
         ],
       ),
     );
@@ -524,7 +581,9 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Recording saved (${_formatDuration(_elapsedSec)})',
+                  widget.previewOnly
+                      ? 'Recording ready to preview (${_formatDuration(_elapsedSec)})'
+                      : 'Recording saved (${_formatDuration(_elapsedSec)})',
                   style: LumiTextStyles.bodyMedium(color: LumiTokens.ink),
                 ),
               ),

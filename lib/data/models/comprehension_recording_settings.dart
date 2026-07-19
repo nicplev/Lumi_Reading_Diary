@@ -6,16 +6,24 @@
 /// prompt is on `classes/{classId}.settings.comprehensionQuestion`.
 class ComprehensionRecordingSettings {
   final bool enabled;
+  final bool previewOnly;
 
-  const ComprehensionRecordingSettings({required this.enabled});
+  const ComprehensionRecordingSettings({
+    required this.enabled,
+    this.previewOnly = false,
+  });
 
   factory ComprehensionRecordingSettings.defaults() =>
-      const ComprehensionRecordingSettings(enabled: false);
+      const ComprehensionRecordingSettings(enabled: false, previewOnly: false);
 
   factory ComprehensionRecordingSettings.fromMap(Map<String, dynamic>? map) =>
       ComprehensionRecordingSettings(
         enabled: map?['enabled'] as bool? ?? false,
+        previewOnly: map?['demoPreviewOnly'] as bool? ?? false,
       );
 
-  Map<String, dynamic> toMap() => {'enabled': enabled};
+  Map<String, dynamic> toMap() => {
+        'enabled': enabled,
+        if (previewOnly) 'demoPreviewOnly': true,
+      };
 }

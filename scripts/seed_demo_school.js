@@ -307,6 +307,20 @@ const STUDENTS = [
   { key: "harper", id: "demo_student_harper_lee", firstName: "Harper", lastName: "Lee", classKey: "5b", level: "N", pattern: "none", parentKeys: [], enrollmentStatus: "not_enrolled" },
 ];
 
+// Keep parity with packages/server-ops/src/demoSchool/planData.js, the
+// production fenced-reseed source. Every demo child receives a different
+// selectable character so legacy/manual seed runs retain the same variety.
+const DEMO_STUDENT_CHARACTER_IDS = [
+  "pink_lumi", "blue_lumi", "green_lumi", "yellow_lumi",
+  "orange_lumi", "purple_lumi", "light_blue_lumi", "lumi_chef",
+  "lumi_cool_kid", "lumi_crown", "lumi_headphones", "lumi_ninja",
+  "lumi_pirate", "lumi_space", "lumi_wizard", "lumi_shark",
+];
+
+if (DEMO_STUDENT_CHARACTER_IDS.length !== STUDENTS.length) {
+  throw new Error("Every seeded demo student must have one distinct Lumi character.");
+}
+
 const FEELINGS = ["okay", "good", "good", "great", "great", "tricky"];
 
 const PARENT_COMMENTS = [
@@ -670,7 +684,7 @@ function buildPlan(now) {
   const studentIdsByClass = { "3g": [], "5b": [] };
   const levelIndex = { J: 9, K: 10, L: 11, M: 12, N: 13, P: 15 }; // A=0 … Z=25
 
-  for (const s of Object.values(studentsByKey)) {
+  for (const [studentIndex, s] of Object.values(studentsByKey).entries()) {
     const cls = classByKey[s.classKey];
     studentIdsByClass[s.classKey].push(s.id);
 
@@ -698,6 +712,7 @@ function buildPlan(now) {
       data: {
         firstName: s.firstName,
         lastName: s.lastName,
+        characterId: DEMO_STUDENT_CHARACTER_IDS[studentIndex],
         schoolId: SCHOOL_ID,
         classId: cls.id,
         currentReadingLevel: s.level,

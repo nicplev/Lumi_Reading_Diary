@@ -71,9 +71,11 @@ Book-a-Demo requests from the marketing site land in the super-admin
 **Onboarding** pipeline's *demo* column. On the request's detail page, the
 **Demo access** panel drives the whole flow:
 
-1. **Provision today's demo password** — issues one shared password (idempotent
-   within the Sydney day; a second demo reuses the same one) and sets it on the
-   three shared accounts. Read it out on the call, or:
+1. **Prepare and verify today's demo** — issues one shared password on the first
+   run of the Sydney day and verifies the live paths. Once it is active, the
+   button changes to **Reprovision and check today's demo** so the operator can
+   tell that the existing daily credential will be safely reused and checked.
+   Read it out on the call, or:
 2. **Email demo details** — SendGrids the requester the day's credentials, the
    portal + marketing links, app-store instructions, and the teacher/parent app
    logins (BCC'd to `support@lumi-reading.com` as a paper trail).
@@ -84,6 +86,30 @@ in themselves during/after a Zoom demo without lingering access. The canonical
 "who's been given demo access" history lives on the demo school's detail page
 (**Demo access** tab). Config (emails, store URLs) is in
 `platformConfig/demoAccess`; see `docs/DEMO_DAY_ACCESS_PLAN.md`.
+
+### Live feature controls
+
+Once today's credential is active, the same **Demo access** card exposes an
+audited control panel for the isolated shared demo school. A Lumi super-admin
+can switch comprehension recording, parent comment chips, typed custom comments,
+parent–teacher communication and quick logging on or off while presenting. The
+default comment categories remain populated and can be edited to demonstrate a
+school's customisation options. Changes affect the real demo parent/teacher UI;
+an already-open screen may need a refresh.
+
+The shared demo's audio option is intentionally a **local record/playback
+preview**. It shows the real guided capture experience, but the recording is
+deleted locally when the flow completes and is never uploaded or retained. This
+keeps the sales demo from fabricating a real school's child-audio authority and
+preserves the existing Storage/callable denial for every shared demo account.
+The platform-wide audio safety switch remains authoritative.
+
+The control API accepts no school ID or arbitrary field path from the browser.
+It re-verifies the super-admin session and same origin, validates bounded input,
+rate-limits writes, pins the immutable `isDemo: true` tenant and active Sydney
+credential, and records a redacted audit summary without storing custom chip
+text in the audit log. The shared school administrator remains read-only; these
+controls are operated only from the Lumi super-admin portal.
 
 ### MFA exception for the shared demo administrator
 
@@ -106,7 +132,9 @@ the admin-only TOTP policy.
 | Ruby Jones / Harper Lee | 3G / 5B | `not_enrolled` — populate the parent-links onboarding funnel ("no subscription" state). |
 
 Everyone else fills out the charts with believable variety (~460 reading logs over
-60 days and allocations).
+60 days and allocations). All 16 seeded students use a different selectable Lumi
+character, so class, family and dashboard surfaces retain visual variety after
+every fenced reseed.
 
 ---
 
@@ -149,11 +177,12 @@ Everything above, plus:
 ## 4. The pre-demo ritual (10 minutes, every time)
 
 1. **Prepare and verify:** in the super-admin portal, open the prospect's demo
-   request and select **Prepare and verify today's demo**. One click provisions
-   (or safely reuses) today's password, runs the fenced reseed when a new Sydney
-   day requires it, and then checks the real administrator, teacher, parent,
-   Rules and portal paths. Wait for the green **Ready for a customer demo**
-   receipt. Do not separately run the legacy seed/reset command.
+   request and select **Prepare and verify today's demo** (or **Reprovision and
+   check today's demo** when today's credential is already active). One click
+   provisions or safely reuses today's password, runs the fenced reseed when a
+   new Sydney day requires it, and then checks the real administrator, teacher,
+   parent, Rules and portal paths. Wait for the green **Ready for a customer
+   demo** receipt. Do not separately run the legacy seed/reset command.
 2. **Terminal fallback only:** if the portal readiness control itself is
    unavailable, run the same redacted automated preflight from the repo root:
 
