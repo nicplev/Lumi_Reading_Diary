@@ -8,6 +8,27 @@
 import {Rubric} from "./rubrics";
 import {EVAL_RESPONSE_SCHEMA} from "./schemas";
 import {ProviderHttpError, vertexGenerateContent} from "./vertex_rest";
+import {RESIDENCY_PROMPT_CHAR_BUDGET} from "./config";
+
+// Thrown when an assembled prompt would exceed the context tier that
+// carries the Australian ML-processing commitment. Never expected in
+// production (real prompts are ~1.5% of the ceiling) — this is the
+// tripwire that keeps a future config/batching change from silently
+// voiding the residency claim the school notice relies on.
+export class ResidencyBudgetError extends Error {}
+
+export function assertResidencyPromptBudget(
+  systemInstruction: string,
+  userBlock: string
+): void {
+  const total = systemInstruction.length + userBlock.length;
+  if (total > RESIDENCY_PROMPT_CHAR_BUDGET) {
+    throw new ResidencyBudgetError(
+      `assembled prompt ${total} chars exceeds the residency budget ` +
+      `${RESIDENCY_PROMPT_CHAR_BUDGET}; refusing to call the provider`
+    );
+  }
+}
 
 export interface ProviderUsage {
   inputTokens: number;
@@ -202,18 +223,13 @@ export interface EvaluationRequest {
 export function buildEvaluationRequestBody(
   request: EvaluationRequest
 ): Record<string, unknown> {
+  const systemInstruction =
+    buildSystemInstruction(request.rubric, request.promptVersion);
+  const userBlock = buildUserBlock(request.questionText, request.transcript);
+  assertResidencyPromptBudget(systemInstruction, userBlock);
   return {
-    systemInstruction: {
-      parts: [{
-        text: buildSystemInstruction(request.rubric, request.promptVersion),
-      }],
-    },
-    contents: [{
-      role: "user",
-      parts: [{
-        text: buildUserBlock(request.questionText, request.transcript),
-      }],
-    }],
+    systemInstruction: {parts: [{text: systemInstruction}]},
+    contents: [{role: "user", parts: [{text: userBlock}]}],
     generationConfig: {
       temperature: 0.1,
       maxOutputTokens: 1200,

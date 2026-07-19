@@ -17,6 +17,14 @@ const {
 } = require('../lib/ai_evaluation/evaluation.js');
 const {ProviderHttpError} = require('../lib/ai_evaluation/vertex_rest.js');
 const {
+  assertResidencyPromptBudget,
+  ResidencyBudgetError,
+} = require('../lib/ai_evaluation/evaluation.js');
+const {
+  RESIDENCY_PROMPT_CHAR_BUDGET,
+  MAX_TRANSCRIPT_CHARS_CEILING,
+} = require('../lib/ai_evaluation/config.js');
+const {
   validateEvalResponse,
   computeSortKey,
   validateClassificationResponse,
@@ -322,4 +330,53 @@ test('model flag vocabulary excludes worker-only flags', () => {
   for (const workerOnly of ['concerning_content', 'system_error', 'inaudible']) {
     assert.ok(!MODEL_FLAGS.includes(workerOnly), workerOnly);
   }
+});
+
+
+// ---------------------------------------------------------------------------
+// Residency context-tier guard. Google's ML-processing matrix grants the
+// Australian commitment to gemini-2.5-flash at 128k context only; the 1M row
+// is US/EU/Canada/Singapore. These bounds keep a config or batching change
+// from silently crossing that line.
+// ---------------------------------------------------------------------------
+
+test('residency guard: normal prompts pass with vast headroom', () => {
+  const body = buildEvaluationRequestBody({
+    model: 'gemini-2.5-flash',
+    rubric: RUBRIC,
+    promptVersion: 1,
+    questionText: 'What happened at the start of the story?',
+    transcript: 'um the dog found a bone and then he buried it near the tree',
+    timeoutSec: 60,
+  });
+  const assembled =
+    body.systemInstruction.parts[0].text.length +
+    body.contents[0].parts[0].text.length;
+  assert.ok(assembled < RESIDENCY_PROMPT_CHAR_BUDGET / 10,
+    `assembled ${assembled} should be far under the budget`);
+});
+
+test('residency guard: oversized prompt refuses to call the provider', () => {
+  assert.throws(
+    () => buildEvaluationRequestBody({
+      model: 'gemini-2.5-flash',
+      rubric: RUBRIC,
+      promptVersion: 1,
+      questionText: 'Q?',
+      transcript: 'x'.repeat(RESIDENCY_PROMPT_CHAR_BUDGET + 1),
+      timeoutSec: 60,
+    }),
+    ResidencyBudgetError
+  );
+  assert.throws(
+    () => assertResidencyPromptBudget('a'.repeat(RESIDENCY_PROMPT_CHAR_BUDGET), 'bb'),
+    /residency budget/
+  );
+});
+
+test('residency guard: ops config cannot widen the transcript past the ceiling', () => {
+  const cfg = mergeOpsConfig({maxTranscriptChars: 5_000_000});
+  assert.equal(cfg.maxTranscriptChars, MAX_TRANSCRIPT_CHARS_CEILING);
+  // A transcript at the clamped ceiling still fits the prompt budget.
+  assert.ok(cfg.maxTranscriptChars < RESIDENCY_PROMPT_CHAR_BUDGET);
 });
