@@ -18,6 +18,7 @@ import 'library/book_detail_sheet.dart';
 import 'library/book_history_item.dart';
 import 'library/reading_feeling_visuals.dart';
 import 'library/session_detail_sheet.dart';
+import '../../core/utils/image_decode.dart';
 
 /// Vertical space the parent's floating glass nav occupies; scroll content
 /// reserves this so the last item clears the bar (mirrors the Home shell).
@@ -1135,6 +1136,7 @@ class _SessionRow extends ConsumerWidget {
                   Image.asset(
                     feelingAsset(feeling),
                     width: 40,
+                    cacheWidth: decodeCacheSize(context, 40),
                     height: 40,
                     fit: BoxFit.contain,
                   )

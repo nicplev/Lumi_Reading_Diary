@@ -10,6 +10,7 @@ import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_step_indicator.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import 'demo_request_screen.dart';
+import '../../core/utils/image_decode.dart';
 
 class SchoolDemoScreen extends StatefulWidget {
   const SchoolDemoScreen({super.key});
@@ -180,6 +181,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
                       _bookAssets[_currentPage % _bookAssets.length],
                       key: ValueKey<int>(_currentPage % _bookAssets.length),
                       width: 22,
+                      cacheWidth: decodeCacheSize(context, 22),
                       height: 22,
                       fit: BoxFit.contain,
                     ),

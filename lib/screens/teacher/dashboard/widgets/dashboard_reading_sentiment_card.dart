@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../theme/lumi_tokens.dart';
 import '../../../../theme/lumi_typography.dart';
 import '../../../../data/models/reading_log_model.dart';
+import '../../../../core/utils/image_decode.dart';
 
 /// Shows the distribution of child reading feelings (hard → great) this week.
 class DashboardReadingSentimentCard extends StatelessWidget {
@@ -97,6 +98,7 @@ class DashboardReadingSentimentCard extends StatelessWidget {
             _buildEmptyState()
           else ...[
             ..._feelingOrder.map((f) => _buildBar(
+                  context,
                   feeling: f,
                   count: counts[f] ?? 0,
                   total: totalWithFeeling,
@@ -109,6 +111,7 @@ class DashboardReadingSentimentCard extends StatelessWidget {
                   Image.asset(
                     'assets/blobs/blob-${mostCommon.name}.png',
                     width: 18,
+                    cacheWidth: decodeCacheSize(context, 18),
                     height: 18,
                     fit: BoxFit.contain,
                     errorBuilder: (_, __, ___) => const SizedBox.shrink(),
@@ -130,7 +133,8 @@ class DashboardReadingSentimentCard extends StatelessWidget {
     );
   }
 
-  Widget _buildBar({
+  Widget _buildBar(
+    BuildContext context, {
     required ReadingFeeling feeling,
     required int count,
     required int total,
@@ -154,6 +158,7 @@ class DashboardReadingSentimentCard extends StatelessWidget {
               child: Image.asset(
                 'assets/blobs/blob-${feeling.name}.png',
                 fit: BoxFit.contain,
+                cacheWidth: decodeCacheSize(context, 24),
                 errorBuilder: (_, __, ___) => Icon(
                   Icons.sentiment_neutral_rounded,
                   size: 20,

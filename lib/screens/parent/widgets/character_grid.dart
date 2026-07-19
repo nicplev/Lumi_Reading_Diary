@@ -5,6 +5,7 @@ import '../../../core/characters/lumi_character.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/lumi_text_styles.dart';
 import '../../../theme/lumi_tokens.dart';
+import '../../../core/utils/image_decode.dart';
 
 /// Reusable grid of selectable Lumi characters.
 ///
@@ -100,6 +101,8 @@ class _CharacterTile extends StatelessWidget {
                     child: Image.asset(
                       character.assetPath,
                       fit: BoxFit.contain,
+                      // Grid cells render ~100dp; cap decode accordingly.
+                      cacheWidth: decodeCacheSize(context, 120),
                       alignment: Alignment.center,
                     ),
                   ),

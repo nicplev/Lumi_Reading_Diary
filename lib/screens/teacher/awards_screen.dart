@@ -9,6 +9,7 @@ import '../../data/models/student_model.dart';
 import '../../services/firebase_service.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
+import '../../core/utils/image_decode.dart';
 
 /// Teacher management for the two per-class reading awards:
 ///  • Top Reader — the weekly auto award (gold Lumi, most minutes). Teacher
@@ -348,7 +349,11 @@ class _AwardsScreenState extends State<AwardsScreen> {
       padding: const EdgeInsets.all(4),
       child: c == null
           ? const SizedBox.shrink()
-          : Image.asset(c.assetPath, fit: BoxFit.contain),
+          : Image.asset(
+              c.assetPath,
+              fit: BoxFit.contain,
+              cacheWidth: decodeCacheSize(context, 48),
+            ),
     );
   }
 

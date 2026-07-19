@@ -9,6 +9,7 @@ import '../../../data/providers/school_settings_provider.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
 import 'reading_feeling_visuals.dart';
+import '../../../core/utils/image_decode.dart';
 
 /// Library section accent. Bottom sheets render in an overlay above the screen
 /// and so don't inherit the screen's `LumiSectionScope`; we use the library
@@ -115,6 +116,7 @@ class _SessionDetailSheet extends ConsumerWidget {
                         Image.asset(
                           feelingAsset(log.childFeeling!),
                           width: 36,
+                          cacheWidth: decodeCacheSize(context, 36),
                           height: 36,
                           fit: BoxFit.contain,
                         ),

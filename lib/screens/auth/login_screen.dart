@@ -29,6 +29,7 @@ import '../../core/services/user_school_index_service.dart';
 import 'widgets/dev_access_modal.dart';
 import 'widgets/parent_registration_modal.dart';
 import 'widgets/teacher_registration_modal.dart';
+import '../../core/utils/image_decode.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -718,6 +719,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           'assets/UI Lumi/Red_Lumi_Default_EyesUp.png',
                           width: mascotWidth,
                           height: mascotHeight,
+                          cacheWidth: decodeCacheSize(context, mascotWidth),
                           fit: BoxFit.fill,
                           filterQuality: FilterQuality.high,
                         ),
@@ -839,6 +841,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: Image.asset(
                               'assets/UI Lumi/Lumi signup.png',
                               height: artworkHeight,
+                              cacheHeight:
+                                  decodeCacheSize(context, artworkHeight),
                               fit: BoxFit.contain,
                               filterQuality: FilterQuality.high,
                               semanticLabel: 'Lumi ready to help you sign up',
@@ -1025,6 +1029,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                 child: Image.asset(
                                   'assets/UI Lumi/Lumi_Eyes.png',
                                   width: eyesWidth,
+                                  cacheWidth:
+                                      decodeCacheSize(context, eyesWidth),
                                   fit: BoxFit.contain,
                                   filterQuality: FilterQuality.high,
                                   semanticLabel: 'Lumi face',

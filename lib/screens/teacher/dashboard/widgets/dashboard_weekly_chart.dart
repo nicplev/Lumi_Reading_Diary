@@ -10,6 +10,7 @@ import '../../../../theme/lumi_tokens.dart';
 import '../../../../theme/lumi_typography.dart';
 import '../../../../data/models/class_model.dart';
 import '../../../../services/class_daily_reading_service.dart';
+import '../../../../core/utils/image_decode.dart';
 
 /// Dashboard Weekly Chart
 ///
@@ -573,6 +574,7 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
           'assets/UI Lumi/lumi welcome.png',
           height: 60,
           fit: BoxFit.contain,
+          cacheHeight: decodeCacheSize(context, 60),
         ),
         const SizedBox(height: 8),
         Text(

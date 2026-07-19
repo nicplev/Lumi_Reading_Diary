@@ -16,6 +16,7 @@ import '../../services/book_lookup_service.dart';
 import '../../services/isbn_assignment_service.dart';
 import '../../services/teacher_device_book_cache_service.dart';
 import 'cover_scanner_screen.dart';
+import '../../core/utils/image_decode.dart';
 
 class IsbnScannerScreen extends StatefulWidget {
   const IsbnScannerScreen({
@@ -1149,6 +1150,7 @@ class _StudentIdentityOverlay extends StatelessWidget {
       visual = Image.asset(
         character.assetPath,
         width: 52,
+        cacheWidth: decodeCacheSize(context, 52),
         height: 52,
         fit: BoxFit.contain,
       );

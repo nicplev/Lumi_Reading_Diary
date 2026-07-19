@@ -19,6 +19,7 @@ import 'dashboard/teacher_dashboard_view.dart';
 import 'teacher_classroom_screen.dart';
 import 'teacher_library_screen.dart';
 import 'teacher_settings_screen.dart';
+import '../../core/utils/image_decode.dart';
 
 class TeacherHomeScreen extends StatefulWidget {
   final UserModel user;
@@ -534,6 +535,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                         'assets/UI Lumi/lumi welcome.png',
                         height: 150,
                         fit: BoxFit.contain,
+                        cacheHeight: decodeCacheSize(context, 150),
                       ),
                       const SizedBox(height: 20),
                       Text(

@@ -27,6 +27,7 @@ import '../../services/offline_service.dart';
 import '../settings/mfa_settings_sheet.dart';
 import 'widgets/add_email_for_recovery_modal.dart';
 import 'settings/child_manage_sheet.dart';
+import '../../core/utils/image_decode.dart';
 
 /// Vertical space the floating glass nav occupies; scroll content reserves this
 /// so the last item clears the bar (mirrors Home/Library).
@@ -319,6 +320,7 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen>
               Image.asset(
                 'assets/characters/red lumi (default).png',
                 width: 64,
+                cacheWidth: decodeCacheSize(context, 64),
                 height: 64,
                 fit: BoxFit.contain,
               ),
