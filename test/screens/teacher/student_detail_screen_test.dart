@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lumi_reading_tracker/screens/teacher/student_detail_screen.dart';
+import 'package:lumi_reading_tracker/screens/teacher/student_detail/assigned_books_section.dart';
 
 void main() {
   group('shouldHydrateStudentDetailIsbnCover', () {
