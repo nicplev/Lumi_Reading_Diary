@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/lib/auth/auth-context';
 
 export interface AssignIsbnsResult {
   allocationId: string;
@@ -17,9 +18,13 @@ export interface AssignIsbnsInput {
 
 export function useAssignIsbns() {
   const qc = useQueryClient();
+  const { user } = useAuth();
   return useMutation<AssignIsbnsResult, Error, AssignIsbnsInput>({
     mutationFn: async (input) => {
-      const res = await fetch('/api/isbn-assignment', {
+      const endpoint = user?.demoAllocationMutations
+        ? '/api/demo/isbn-assignment'
+        : '/api/isbn-assignment';
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),

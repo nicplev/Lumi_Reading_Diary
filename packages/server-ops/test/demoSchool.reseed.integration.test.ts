@@ -57,9 +57,11 @@ test("fenced reseed preserves password state and finalises exact demo claims", a
   const plan = buildDemoSchoolPlan(new Date("2026-07-17T09:00:00+10:00"));
   const sharedAdmin = plan.authUsers.find((user) => user.key === "sharedadmin")!;
   const teacher = plan.authUsers.find((user) => user.key === "teacher")!;
+  const generationId = result.leaseId;
   assert.deepEqual((await auth.getUser(sharedAdmin.uid)).customClaims, {
     demoAccount: true,
     demoSchoolId: "lumi_demo_primary_school",
+    demoGenerationId: generationId,
     schoolId: "lumi_demo_primary_school",
     demoAdminMfaExempt: true,
     demoReadOnly: true,
@@ -67,6 +69,7 @@ test("fenced reseed preserves password state and finalises exact demo claims", a
   assert.deepEqual((await auth.getUser(teacher.uid)).customClaims, {
     demoAccount: true,
     demoSchoolId: "lumi_demo_primary_school",
+    demoGenerationId: generationId,
     schoolId: "lumi_demo_primary_school",
   });
 });
@@ -93,6 +96,12 @@ test("explicit same-day reprovision rotates instead of reusing the password", as
   const idempotent = await provisionDemoAccess(auth, db, actor, params);
   assert.equal(idempotent.reused, true);
   assert.equal(idempotent.password, first.password);
+  for (const account of idempotent.accounts) {
+    assert.equal(
+      (await auth.getUser(account.uid)).customClaims?.demoGenerationId,
+      (await db.doc("demoAccess/reseedStatus").get()).data()?.leaseId,
+    );
+  }
 
   const reprovisioned = await provisionDemoAccess(auth, db, actor, {
     ...params,

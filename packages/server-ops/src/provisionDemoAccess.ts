@@ -77,6 +77,19 @@ export async function provisionDemoAccess(
     throw new ServerOpsValidationError("dayKey is required");
   }
 
+  const reseed = (await db.doc("demoAccess/reseedStatus").get()).data();
+  const demoGenerationId = reseed?.leaseId;
+  if (
+    reseed?.state !== "succeeded" ||
+    reseed?.schoolId !== schoolId ||
+    typeof demoGenerationId !== "string" ||
+    demoGenerationId.length === 0
+  ) {
+    throw new ServerOpsValidationError(
+      "The demo school has no current completed generation — reseed it before provisioning demo access."
+    );
+  }
+
   const stateRef = db.doc("demoAccess/state");
 
   // Ordinary preparation is idempotent within a Sydney day so one operator
@@ -84,30 +97,15 @@ export async function provisionDemoAccess(
   // privileged reprovision action opts into an intentional rotation.
   const existingSnap = await stateRef.get();
   const existing = existingSnap.data();
-  if (
+  const reusing =
     params.forceRotate !== true &&
     existingSnap.exists &&
     existing &&
     existing.dayKey === dayKey &&
     existing.scrambledAt == null &&
-    typeof existing.password === "string"
-  ) {
-    const issuedAt = existing.issuedAt;
-    const issuedAtISO =
-      issuedAt && typeof issuedAt.toDate === "function"
-        ? issuedAt.toDate().toISOString()
-        : new Date().toISOString();
-    return {
-      password: existing.password,
-      dayKey,
-      accounts: Array.isArray(existing.accounts) ? existing.accounts : [],
-      issuedAtISO,
-      issuedByEmail: existing.issuedBy?.email,
-      reused: true,
-    };
-  }
+    typeof existing.password === "string";
 
-  const password = generateTempPassword(12);
+  const password = reusing ? existing.password : generateTempPassword(12);
 
   const specs: AccountSpec[] = [
     { role: "admin", email: adminEmail, collection: "users", ensure: true },
@@ -162,19 +160,22 @@ export async function provisionDemoAccess(
       });
     }
 
-    authUser = await auth.updateUser(uid, {
-      password,
-      emailVerified: true,
-      // Demo accounts must remain friction-free. The shared administrator's
-      // TOTP exception is safe only while it is coupled to read-only claims.
-      multiFactor: { enrolledFactors: [] },
-    });
+    if (!reusing) {
+      authUser = await auth.updateUser(uid, {
+        password,
+        emailVerified: true,
+        // Demo accounts must remain friction-free. The shared administrator's
+        // TOTP exception is safe only while it is coupled to read-only claims.
+        multiFactor: { enrolledFactors: [] },
+      });
+    }
     // Replace, rather than spread, custom claims. These are shared accounts;
     // preserving a stale developer/impersonation/admin capability would turn
     // a harmless demo credential into a privileged production credential.
     const claims: Record<string, unknown> = {
       demoAccount: true,
       demoSchoolId: schoolId,
+      demoGenerationId,
       schoolId,
     };
     if (spec.role === "admin") {
@@ -183,6 +184,22 @@ export async function provisionDemoAccess(
     }
     await auth.setCustomUserClaims(uid, claims);
     accounts.push({ role: spec.role, email: spec.email, uid });
+  }
+
+  if (reusing) {
+    const issuedAt = existing.issuedAt;
+    const issuedAtISO =
+      issuedAt && typeof issuedAt.toDate === "function"
+        ? issuedAt.toDate().toISOString()
+        : new Date().toISOString();
+    return {
+      password,
+      dayKey,
+      accounts,
+      issuedAtISO,
+      issuedByEmail: existing.issuedBy?.email,
+      reused: true,
+    };
   }
 
   const issuedAt = new Date();

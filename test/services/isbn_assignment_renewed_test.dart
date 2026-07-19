@@ -1,7 +1,9 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lumi_reading_tracker/core/models/service_status.dart';
 import 'package:lumi_reading_tracker/core/services/service_status_controller.dart';
+import 'package:lumi_reading_tracker/core/services/demo_session_service.dart';
 import 'package:lumi_reading_tracker/services/isbn_assignment_service.dart';
 
 /// Verifies that [IsbnAssignmentService.assignResolvedBooks] tags an item's
@@ -81,5 +83,95 @@ void main() {
     );
 
     expect((await itemMetadata())?.containsKey('renewed'), false);
+  });
+
+  test('demo writes carry the current generation fence and origin', () async {
+    service = IsbnAssignmentService(
+      firestore: firestore,
+      demoContextProvider: ({bool forceRefresh = false}) async =>
+          const DemoSessionContext(
+        schoolId: schoolId,
+        generationId: 'generation-123',
+      ),
+    );
+
+    final result = await service.assignResolvedBooks(
+      schoolId: schoolId,
+      classId: classId,
+      studentId: studentId,
+      teacherId: 'teacher1',
+      books: [book()],
+      targetDate: targetDate,
+    );
+    final snapshot = await firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('allocations')
+        .doc(result.allocationId)
+        .get();
+
+    expect(snapshot.data()?['demoEphemeral'], true);
+    expect(snapshot.data()?['demoGenerationId'], 'generation-123');
+    expect(snapshot.data()?['demoOrigin'], 'flutter_camera');
+  });
+
+  test('queued demo work stays retryable when generation cannot be verified',
+      () async {
+    service = IsbnAssignmentService(
+      firestore: firestore,
+      demoContextProvider: ({bool forceRefresh = false}) async => null,
+    );
+
+    await expectLater(
+      service.replayQueuedAssignment({
+        'schoolId': schoolId,
+        'classId': classId,
+        'studentId': studentId,
+        'teacherId': 'teacher1',
+        'books': [book().toMap()],
+        'targetMinutes': 20,
+        'renewedIsbns': <String>[],
+        'demoGenerationId': 'generation-123',
+      }),
+      throwsA(
+        isA<FirebaseException>().having(
+          (error) => error.code,
+          'code',
+          'unavailable',
+        ),
+      ),
+    );
+  });
+
+  test('queued demo work is parked only after a proven generation change',
+      () async {
+    service = IsbnAssignmentService(
+      firestore: firestore,
+      demoContextProvider: ({bool forceRefresh = false}) async =>
+          const DemoSessionContext(
+        schoolId: schoolId,
+        generationId: 'generation-456',
+      ),
+    );
+
+    await expectLater(
+      service.replayQueuedAssignment({
+        'schoolId': schoolId,
+        'classId': classId,
+        'studentId': studentId,
+        'teacherId': 'teacher1',
+        'books': [book().toMap()],
+        'targetMinutes': 20,
+        'renewedIsbns': <String>[],
+        'demoGenerationId': 'generation-123',
+      }),
+      throwsA(
+        isA<FirebaseException>().having(
+          (error) => error.code,
+          'code',
+          'failed-precondition',
+        ),
+      ),
+    );
   });
 }

@@ -11,6 +11,7 @@ import {
 } from "../src/lib/demo/preflight-core";
 
 const schoolId = "lumi_demo_primary_school";
+const demoGenerationId = "demo-generation-test";
 const password = "DO-NOT-RETURN-this-password";
 const accounts = {
   "support+demo@lumi-reading.com": { role: "admin", uid: "secret-admin-uid" },
@@ -45,7 +46,10 @@ function createHarness(failingRole?: string, portalMutationStatus = 403) {
       "demoAccess/state",
       { dayKey: "2026-07-19", scrambledAt: null, password },
     ],
-    ["demoAccess/reseedStatus", { state: "succeeded", schoolId }],
+    [
+      "demoAccess/reseedStatus",
+      { state: "succeeded", schoolId, leaseId: demoGenerationId },
+    ],
   ]);
 
   for (const [email, account] of Object.entries(accounts)) {
@@ -98,6 +102,7 @@ function createHarness(failingRole?: string, portalMutationStatus = 403) {
         customClaims: {
           demoAccount: true,
           demoSchoolId: schoolId,
+          demoGenerationId,
           schoolId,
           ...(account.role === "admin"
             ? { demoAdminMfaExempt: true, demoReadOnly: true }

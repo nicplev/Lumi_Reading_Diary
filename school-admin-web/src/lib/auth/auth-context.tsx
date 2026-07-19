@@ -11,6 +11,8 @@ export interface AuthUser {
   role: 'teacher' | 'schoolAdmin';
   fullName: string;
   characterId?: string;
+  /** UI hint only; demo mutation endpoints re-authorize server-side. */
+  demoAllocationMutations?: true;
 }
 
 interface AuthContextType {

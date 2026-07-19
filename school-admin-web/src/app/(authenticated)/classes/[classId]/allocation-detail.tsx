@@ -9,6 +9,7 @@ import { Avatar } from '@/components/lumi/avatar';
 import { useToast } from '@/components/lumi/toast';
 import { useAddBookToAllocation, useRemoveBookFromAllocation } from '@/lib/hooks/use-allocations';
 import { BookSearchInput } from './book-search-input';
+import { useAuth } from '@/lib/auth/auth-context';
 
 interface AllocationStudent {
   id: string;
@@ -35,6 +36,7 @@ interface AllocationDetailProps {
       removedItemIds: string[];
       addedItems: { id: string; title: string; isDeleted: boolean }[];
     }>;
+    demoEphemeral?: boolean;
   };
   students?: AllocationStudent[];
   onClose: () => void;
@@ -55,6 +57,8 @@ const cadenceLabels: Record<string, string> = {
 
 export function AllocationDetail({ allocation, students, onClose }: AllocationDetailProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isDemo = user?.demoAllocationMutations === true;
   const addBook = useAddBookToAllocation();
   const removeBook = useRemoveBookFromAllocation();
   const [showAddBook, setShowAddBook] = useState(false);
@@ -137,7 +141,7 @@ export function AllocationDetail({ allocation, students, onClose }: AllocationDe
       <div className="mb-4">
         <div className="flex items-center justify-between mb-2">
           <h4 className="text-sm font-semibold text-ink">Books ({activeItems.length})</h4>
-          {allocation.isActive && (
+          {allocation.isActive && !isDemo && (
             <Button variant="ghost" size="sm" onClick={() => setShowAddBook(!showAddBook)}>
               {showAddBook ? 'Cancel' : '+ Add Book'}
             </Button>
@@ -178,7 +182,7 @@ export function AllocationDetail({ allocation, students, onClose }: AllocationDe
                   <span className="text-sm text-ink truncate">{item.title}</span>
                   {item.isbn && <Badge variant="default"><span className="text-[10px]">{item.isbn}</span></Badge>}
                 </div>
-                {allocation.isActive && (
+                {allocation.isActive && !isDemo && (
                   <button
                     onClick={() => handleRemoveBook(item.id)}
                     className="text-muted hover:text-error transition-colors flex-shrink-0 ml-2"

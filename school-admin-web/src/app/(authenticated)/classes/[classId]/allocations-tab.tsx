@@ -14,6 +14,7 @@ import { ConfirmDialog } from '@/components/lumi/confirm-dialog';
 import { AllocationFormModal } from './allocation-form-modal';
 import { AllocationDetail } from './allocation-detail';
 import type { ReadingLevelOption } from '@/lib/types';
+import { useAuth } from '@/lib/auth/auth-context';
 
 interface AllocationsTabProps {
   classId: string;
@@ -37,6 +38,8 @@ const cadenceLabels: Record<string, string> = {
 
 export function AllocationsTab({ classId, levelOptions }: AllocationsTabProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isDemo = user?.demoAllocationMutations === true;
   const { data: allocations, isLoading } = useAllocations({ classId });
   const { data: students } = useStudents({ classId });
   const deleteAllocation = useDeleteAllocation();
@@ -87,9 +90,14 @@ export function AllocationsTab({ classId, levelOptions }: AllocationsTabProps) {
       id: 'type',
       header: 'Type',
       accessorFn: (row) => row.type,
-      cell: (value) => {
+      cell: (value, row) => {
         const t = typeLabels[value as string] ?? { label: value as string, variant: 'default' as const };
-        return <Badge variant={t.variant}>{t.label}</Badge>;
+        return (
+          <div className="flex flex-wrap gap-1">
+            <Badge variant={t.variant}>{t.label}</Badge>
+            {row.demoEphemeral && <Badge variant="warning">Temporary demo</Badge>}
+          </div>
+        );
       },
     },
     {
@@ -163,6 +171,8 @@ export function AllocationsTab({ classId, levelOptions }: AllocationsTabProps) {
             size="sm"
             onClick={() => setDeleteConfirm(row.id)}
             className="text-error hover:text-error"
+            disabled={isDemo && !row.demoEphemeral}
+            title={isDemo && !row.demoEphemeral ? 'Seeded demo allocations cannot be deleted' : undefined}
           >
             Delete
           </Button>
@@ -180,6 +190,12 @@ export function AllocationsTab({ classId, levelOptions }: AllocationsTabProps) {
           Create Allocation
         </Button>
       </div>
+
+      {isDemo && (
+        <div className="mb-4 rounded-[var(--radius-md)] border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-ink">
+          New allocations are temporary and reset when the demo is reprovisioned. Seeded allocations remain read-only.
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
         {([

@@ -294,6 +294,7 @@ export async function runDemoPreflight(
 
   let config: FirebaseFirestore.DocumentData = {};
   let state: FirebaseFirestore.DocumentData = {};
+  let demoGenerationId = "";
   let accounts: SharedAccount[] = [];
   let signedIn: SignedInAccount[] = [];
 
@@ -322,8 +323,14 @@ export async function runDemoPreflight(
         reseedSnap.data()?.schoolId === options.demoSchoolId,
         "The latest refresh points at the wrong school.",
       );
+      ensure(
+        typeof reseedSnap.data()?.leaseId === "string" &&
+          reseedSnap.data()!.leaseId.length > 0,
+        "The latest refresh has no generation fence.",
+      );
       config = configSnap.data() ?? {};
       state = stateSnap.data() ?? {};
+      demoGenerationId = reseedSnap.data()!.leaseId;
     },
   );
 
@@ -430,6 +437,7 @@ export async function runDemoPreflight(
         const expectedClaims: Record<string, unknown> = {
           demoAccount: true,
           demoSchoolId: options.demoSchoolId,
+          demoGenerationId,
           schoolId: options.demoSchoolId,
           ...(account.role === "admin"
             ? { demoAdminMfaExempt: true, demoReadOnly: true }

@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Allocation, AllocationBookItem } from '@/lib/types';
+import { useAuth } from '@/lib/auth/auth-context';
 
 type SerializedAllocation = Omit<Allocation, 'createdAt' | 'startDate' | 'endDate' | 'assignmentItems' | 'studentOverrides'> & {
   createdAt: string;
@@ -47,6 +48,7 @@ export function useAllocation(allocationId: string) {
 
 export function useCreateAllocation() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
     mutationFn: async (data: {
       classId: string;
@@ -60,7 +62,10 @@ export function useCreateAllocation() {
       studentIds?: string[];
       assignmentItems?: { title: string; bookId?: string; isbn?: string }[];
     }) => {
-      const res = await fetch('/api/allocations', {
+      const endpoint = user?.demoAllocationMutations
+        ? '/api/demo/allocations'
+        : '/api/allocations';
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -107,9 +112,13 @@ export function useUpdateAllocation() {
 
 export function useDeleteAllocation() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
     mutationFn: async (allocationId: string) => {
-      const res = await fetch(`/api/allocations/${allocationId}`, { method: 'DELETE' });
+      const endpoint = user?.demoAllocationMutations
+        ? `/api/demo/allocations/${allocationId}`
+        : `/api/allocations/${allocationId}`;
+      const res = await fetch(endpoint, { method: 'DELETE' });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || 'Failed to delete allocation');

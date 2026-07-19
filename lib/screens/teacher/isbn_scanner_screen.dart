@@ -321,6 +321,10 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
         }
       });
     } catch (e) {
+      debugPrint(
+        '[IsbnAssignment] failed code='
+        '${IsbnAssignmentService.diagnosticCode(e)}',
+      );
       if (!mounted) return;
       setState(() {
         _statusMessage = 'Could not assign "${book.title}". Please try again.';

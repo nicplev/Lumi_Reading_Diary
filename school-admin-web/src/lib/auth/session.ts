@@ -46,6 +46,14 @@ export interface SessionData {
   mfaVerified?: boolean;
   /** Server-verified exception for the isolated, synthetic, read-only demo. */
   mfaExemptReason?: 'isolatedDemoReadOnly';
+  /**
+   * Current reseed lease for the isolated demo tenant. Demo-only mutation
+   * routes compare this signed value with Firestore before every write so a
+   * session from before a reprovision can never modify the new demo dataset.
+   */
+  demoGenerationId?: string;
+  /** Server-issued UI capability; handlers still re-authorize independently. */
+  demoAllocationMutations?: true;
   /** Present iff a developer impersonation session is active. */
   impersonation?: ImpersonationSessionBlock;
 }
@@ -244,6 +252,12 @@ export async function getSession(
         payload.mfaExemptReason === 'isolatedDemoReadOnly'
           ? 'isolatedDemoReadOnly'
           : undefined,
+      demoGenerationId:
+        typeof payload.demoGenerationId === 'string'
+          ? payload.demoGenerationId
+          : undefined,
+      demoAllocationMutations:
+        payload.demoAllocationMutations === true ? true : undefined,
       impersonation: payload.impersonation as ImpersonationSessionBlock | undefined,
     };
   } catch {

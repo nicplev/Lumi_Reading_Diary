@@ -1612,12 +1612,14 @@ test('sanity: test environment initialized', async () => {
 // ── Shared-password demo administrator: readable but never writable ───────
 
 const DEMO_SCHOOL_ID = 'lumi_demo_primary_school';
+const DEMO_GENERATION_ID = 'demo_generation_1';
 const DEMO_ADMIN_UID = 'demo_admin_1';
 
 function demoAdminClaims(overrides = {}) {
   return {
     demoAccount: true,
     demoSchoolId: DEMO_SCHOOL_ID,
+    demoGenerationId: DEMO_GENERATION_ID,
     schoolId: DEMO_SCHOOL_ID,
     demoAdminMfaExempt: true,
     demoReadOnly: true,
@@ -1629,6 +1631,7 @@ function ordinaryDemoClaims(overrides = {}) {
   return {
     demoAccount: true,
     demoSchoolId: DEMO_SCHOOL_ID,
+    demoGenerationId: DEMO_GENERATION_ID,
     schoolId: DEMO_SCHOOL_ID,
     ...overrides,
   };
@@ -1665,6 +1668,7 @@ async function seedDemoAdmin() {
       schoolId: DEMO_SCHOOL_ID,
       state: 'succeeded',
       phase: 'complete',
+      leaseId: DEMO_GENERATION_ID,
     });
   });
 }
@@ -1762,6 +1766,84 @@ test('ordinary demo teacher: can write school-local content after a successful r
         schoolId: DEMO_SCHOOL_ID,
       }),
   );
+});
+
+test('ordinary demo teacher: can create and delete only current ephemeral allocations', async () => {
+  await seedDemoAdmin();
+  await seedData(async (db) => {
+    await db.collection('schools').doc(DEMO_SCHOOL_ID)
+      .collection('classes').doc('demo_class').set({
+        schoolId: DEMO_SCHOOL_ID,
+        teacherIds: ['demo_teacher_1'],
+        name: 'Demo Class',
+      });
+    await db.collection('schools').doc(DEMO_SCHOOL_ID)
+      .collection('allocations').doc('seeded').set({
+        schoolId: DEMO_SCHOOL_ID,
+        classId: 'demo_class',
+        studentIds: [],
+        assignmentItems: [],
+        type: 'byTitle',
+        cadence: 'weekly',
+        targetMinutes: 20,
+      });
+  });
+  const db = authDb('demo_teacher_1', ordinaryDemoClaims());
+  const allocations = db.collection('schools').doc(DEMO_SCHOOL_ID)
+    .collection('allocations');
+  const ephemeral = allocations.doc('ephemeral');
+  await assertSucceeds(ephemeral.set({
+    schoolId: DEMO_SCHOOL_ID,
+    classId: 'demo_class',
+    studentIds: [],
+    assignmentItems: [],
+    type: 'byTitle',
+    cadence: 'weekly',
+    targetMinutes: 20,
+    demoEphemeral: true,
+    demoGenerationId: DEMO_GENERATION_ID,
+    demoOrigin: 'flutter_camera',
+  }));
+  await assertSucceeds(ephemeral.update({targetMinutes: 25}));
+  await assertSucceeds(ephemeral.delete());
+  await assertFails(allocations.doc('seeded').update({targetMinutes: 25}));
+  await assertFails(allocations.doc('seeded').delete());
+  await assertFails(allocations.doc('unmarked').set({
+    schoolId: DEMO_SCHOOL_ID,
+    classId: 'demo_class',
+    studentIds: [],
+    assignmentItems: [],
+    type: 'byTitle',
+    cadence: 'weekly',
+    targetMinutes: 20,
+  }));
+});
+
+test('ordinary demo teacher: stale generation cannot create allocations', async () => {
+  await seedDemoAdmin();
+  await seedData(async (db) => {
+    await db.collection('schools').doc(DEMO_SCHOOL_ID)
+      .collection('classes').doc('demo_class').set({
+        schoolId: DEMO_SCHOOL_ID,
+        teacherIds: ['demo_teacher_1'],
+      });
+  });
+  const db = authDb('demo_teacher_1', ordinaryDemoClaims({
+    demoGenerationId: 'stale_generation',
+  }));
+  await assertFails(db.collection('schools').doc(DEMO_SCHOOL_ID)
+    .collection('allocations').doc('stale').set({
+      schoolId: DEMO_SCHOOL_ID,
+      classId: 'demo_class',
+      studentIds: [],
+      assignmentItems: [],
+      type: 'byTitle',
+      cadence: 'weekly',
+      targetMinutes: 20,
+      demoEphemeral: true,
+      demoGenerationId: 'stale_generation',
+      demoOrigin: 'flutter_manual',
+    }));
 });
 
 test('ordinary demo teacher and parent: mobile login self-updates work but sensitive fields remain denied', async () => {

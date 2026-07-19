@@ -177,7 +177,8 @@ export async function deleteBook(schoolId: string, bookId: string): Promise<void
 export async function lookupBookByIsbn(
   isbn: string,
   schoolId: string,
-  actorId: string
+  actorId: string,
+  options: { cache?: boolean } = {},
 ): Promise<Book | null> {
   const normalized = normalizeIsbn(isbn);
   if (!normalized) return null;
@@ -251,6 +252,11 @@ export async function lookupBookByIsbn(
         }
       }
     }
+    // Demo assignment routes deliberately use cache:false: a temporary
+    // allocation must not create a persistent library record as a side effect.
+    if (options.cache === false) {
+      return toBookFromLookup(googleResult, normalized);
+    }
     // Cache to Firestore
     const bookId = await createBook(schoolId, {
       title: googleResult.title,
@@ -271,6 +277,9 @@ export async function lookupBookByIsbn(
   // 3. Open Library API
   const olResult = await fetchFromOpenLibrary(normalized, true);
   if (olResult) {
+    if (options.cache === false) {
+      return toBookFromLookup(olResult, normalized);
+    }
     const bookId = await createBook(schoolId, {
       title: olResult.title,
       author: olResult.author,

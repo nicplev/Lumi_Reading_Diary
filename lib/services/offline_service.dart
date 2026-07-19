@@ -499,12 +499,16 @@ class OfflineService with WidgetsBindingObserver {
     String? sessionId,
     int? targetDateMs,
     List<String> renewedIsbns = const <String>[],
+    String? demoGenerationId,
   }) async {
     final sessionKey = (sessionId != null && sessionId.isNotEmpty)
         ? sessionId
         : (targetDateMs?.toString() ?? 'now');
+    final generationKey = demoGenerationId == null
+        ? ''
+        : '_${demoGenerationId.substring(0, min(demoGenerationId.length, 12))}';
     final sync = PendingSync(
-      id: 'alloc_${studentId}_$sessionKey',
+      id: 'alloc_${studentId}_$sessionKey$generationKey',
       type: SyncType.allocationAssignment,
       action: SyncAction.update,
       data: {
@@ -517,6 +521,7 @@ class OfflineService with WidgetsBindingObserver {
         'sessionId': sessionId,
         'targetDateMs': targetDateMs,
         'renewedIsbns': renewedIsbns,
+        'demoGenerationId': demoGenerationId,
       },
       createdAt: DateTime.now(),
     );

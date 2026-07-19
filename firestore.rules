@@ -217,7 +217,35 @@ service cloud.firestore {
           && ordinaryShape
           && school.data.get('isDemo', false) == true
           && reseed.data.get('schoolId', '') == schoolId
-          && reseed.data.get('state', '') == 'succeeded';
+          && reseed.data.get('state', '') == 'succeeded'
+          && request.auth.token.get('demoGenerationId', '') is string
+          && request.auth.token.get('demoGenerationId', '').size() > 0
+          && request.auth.token.get('demoGenerationId', '') ==
+              reseed.data.get('leaseId', '');
+    }
+
+    function validCurrentDemoAllocation(schoolId, data) {
+      return data.demoEphemeral == true
+          && data.demoGenerationId is string
+          && data.demoGenerationId.size() > 0
+          && data.demoGenerationId ==
+              request.auth.token.get('demoGenerationId', '')
+          && data.demoOrigin in [
+            'flutter_camera',
+            'flutter_manual'
+          ]
+          && data.schoolId == schoolId
+          && data.classId is string
+          && data.classId.size() > 0
+          && data.studentIds is list
+          && data.studentIds.size() <= 100
+          && (data.assignmentItems == null ||
+            (data.assignmentItems is list && data.assignmentItems.size() <= 50))
+          && data.type in ['byLevel', 'byTitle', 'freeChoice']
+          && data.cadence in ['daily', 'weekly', 'fortnightly', 'custom']
+          && data.targetMinutes is int
+          && data.targetMinutes >= 1
+          && data.targetMinutes <= 180;
     }
 
     function writeAllowedForDev() {
@@ -901,20 +929,36 @@ service cloud.firestore {
         allow create: if (isSchoolAdmin(schoolId) ||
               (isTeacher(schoolId) &&
                 teacherTeachesClass(schoolId, request.resource.data.classId))) &&
-            writeAllowedForSchoolContent(schoolId) &&
-            request.resource.data.schoolId == schoolId;
+            request.resource.data.schoolId == schoolId &&
+            (
+              writeAllowedForDev() ||
+              (demoAccountMayWriteSchoolContent(schoolId) &&
+                validCurrentDemoAllocation(schoolId, request.resource.data))
+            );
 
         allow update: if (isSchoolAdmin(schoolId) ||
               (isTeacher(schoolId) &&
                 teacherTeachesClass(schoolId, resource.data.classId) &&
                 teacherTeachesClass(schoolId, request.resource.data.classId))) &&
-            writeAllowedForSchoolContent(schoolId) &&
-            request.resource.data.schoolId == schoolId;
+            request.resource.data.schoolId == schoolId &&
+            (
+              writeAllowedForDev() ||
+              (demoAccountMayWriteSchoolContent(schoolId) &&
+                validCurrentDemoAllocation(schoolId, resource.data) &&
+                validCurrentDemoAllocation(schoolId, request.resource.data) &&
+                request.resource.data.demoGenerationId ==
+                  resource.data.demoGenerationId &&
+                request.resource.data.demoOrigin == resource.data.demoOrigin)
+            );
 
         allow delete: if (isSchoolAdmin(schoolId) ||
               (isTeacher(schoolId) &&
                 teacherTeachesClass(schoolId, resource.data.classId))) &&
-            writeAllowedForSchoolContent(schoolId);
+            (
+              writeAllowedForDev() ||
+              (demoAccountMayWriteSchoolContent(schoolId) &&
+                validCurrentDemoAllocation(schoolId, resource.data))
+            );
       }
 
       match /books/{bookId} {
