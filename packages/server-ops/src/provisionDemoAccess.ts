@@ -58,7 +58,12 @@ export async function provisionDemoAccess(
   auth: Auth,
   db: Firestore,
   actor: Actor,
-  params: { config: ProvisionDemoAccessConfig; dayKey: string }
+  params: {
+    config: ProvisionDemoAccessConfig;
+    dayKey: string;
+    /** Explicit operator action: rotate even when today's state is active. */
+    forceRotate?: boolean;
+  }
 ): Promise<ProvisionDemoAccessResult> {
   const parsed = configSchema.safeParse(params.config);
   if (!parsed.success) {
@@ -74,10 +79,13 @@ export async function provisionDemoAccess(
 
   const stateRef = db.doc("demoAccess/state");
 
-  // Idempotent same-day reuse.
+  // Ordinary preparation is idempotent within a Sydney day so one operator
+  // cannot unexpectedly invalidate an in-progress customer call. The separate
+  // privileged reprovision action opts into an intentional rotation.
   const existingSnap = await stateRef.get();
   const existing = existingSnap.data();
   if (
+    params.forceRotate !== true &&
     existingSnap.exists &&
     existing &&
     existing.dayKey === dayKey &&

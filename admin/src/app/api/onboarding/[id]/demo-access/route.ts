@@ -21,7 +21,8 @@ function noStoreJson(body: unknown, status = 200): NextResponse {
 }
 
 // POST /api/onboarding/[id]/demo-access
-//   { action: "provision" }  → issue/reuse today's shared demo password
+//   { action: "provision" }    → issue/reuse today's shared demo password
+//   { action: "reprovision" }  → fenced reseed + rotate today's password
 //   { action: "sendEmail" }  → queue the demo-details email to the requester
 export async function POST(
   request: Request,
@@ -39,12 +40,25 @@ export async function POST(
     const parsed = demoAccessActionSchema.parse(body);
     const actor = { uid: session.uid, email: session.email ?? undefined };
 
-    if (parsed.action === "provision") {
+    if (parsed.action === "provision" || parsed.action === "reprovision") {
+      const reprovision = parsed.action === "reprovision";
       await consumeDemoRouteLimits([
-        { key: `provision:actor:${session.uid}`, max: 5, windowMs: 60 * 60 * 1000 },
-        { key: "provision:global", max: 10, windowMs: 60 * 60 * 1000 },
+        {
+          key: `${parsed.action}:actor:${session.uid}`,
+          max: reprovision ? 3 : 5,
+          windowMs: 60 * 60 * 1000,
+        },
+        {
+          key: `${parsed.action}:global`,
+          max: reprovision ? 6 : 10,
+          windowMs: 60 * 60 * 1000,
+        },
       ]);
-      const result = await provisionDemoAccessForOnboarding(actor, id);
+      const result = await provisionDemoAccessForOnboarding(
+        actor,
+        id,
+        parsed.action,
+      );
       return noStoreJson({ success: true, ...result });
     }
     await consumeDemoRouteLimits([

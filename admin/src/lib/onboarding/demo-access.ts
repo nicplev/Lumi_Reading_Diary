@@ -24,17 +24,26 @@ export interface ProvisionDemoAccessResponse {
   issuedByEmail?: string;
 }
 
+export type DemoPreparationMode = "provision" | "reprovision";
+
 // "Provision today's demo password": issue (or reuse) the day password and set
 // it on the three shared accounts.
 export async function provisionDemoAccessForOnboarding(
   actor: { uid: string; email?: string },
-  onboardingId: string
+  onboardingId: string,
+  mode: DemoPreparationMode = "provision",
 ): Promise<ProvisionDemoAccessResponse> {
   const db = getAdminDb();
   const obRef = db.collection("schoolOnboarding").doc(onboardingId);
   const obSnap = await obRef.get();
   if (!obSnap.exists) {
     throw new DemoAccessError("Onboarding request not found", 404);
+  }
+  if (obSnap.data()?.status !== "demo") {
+    throw new DemoAccessError(
+      "Demo access can be prepared only from an active demo request.",
+      409,
+    );
   }
 
   const config = await readDemoAccessConfig();
@@ -50,7 +59,8 @@ export async function provisionDemoAccessForOnboarding(
     state?.dayKey === dayKey &&
     state?.scrambledAt == null &&
     typeof state?.password === "string";
-  if (!wouldReuse) {
+  const forceRefresh = mode === "reprovision";
+  if (forceRefresh || !wouldReuse) {
     await runDemoReseed(actor, "provision");
   }
 
@@ -62,6 +72,7 @@ export async function provisionDemoAccessForOnboarding(
       parentEmail: config.parentEmail,
     },
     dayKey,
+    forceRotate: forceRefresh,
   });
 
   await obRef.update({
@@ -76,7 +87,12 @@ export async function provisionDemoAccessForOnboarding(
     targetType: "onboarding",
     targetId: onboardingId,
     schoolId: config.schoolId,
-    after: { dayKey, reused: result.reused, accounts: result.accounts.length },
+    after: {
+      dayKey,
+      mode,
+      reused: result.reused,
+      accounts: result.accounts.length,
+    },
   }).catch((e) => {
     console.error("[onboarding] audit log failed for onboarding.demoProvision", e);
   });
