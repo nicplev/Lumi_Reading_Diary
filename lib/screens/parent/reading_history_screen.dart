@@ -340,18 +340,22 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
                       );
                     }
 
-                    return ListView(
+                    // Rows are built lazily so long months don't inflate
+                    // their whole history at once.
+                    final rows = <Widget>[
+                      _SummaryStrip(logs: logs),
+                      const SizedBox(height: LumiTokens.space5),
+                      ..._buildDayGroups(logs),
+                    ];
+                    return ListView.builder(
                       padding: const EdgeInsets.fromLTRB(
                         LumiTokens.space4,
                         LumiTokens.space2,
                         LumiTokens.space4,
                         _kNavClearance,
                       ),
-                      children: [
-                        _SummaryStrip(logs: logs),
-                        const SizedBox(height: LumiTokens.space5),
-                        ..._buildDayGroups(logs),
-                      ],
+                      itemCount: rows.length,
+                      itemBuilder: (context, i) => rows[i],
                     );
                   },
                 ),
@@ -377,29 +381,32 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
       );
     }
 
-    return ListView(
+    // All-time history can span hundreds of rows — build them lazily.
+    final rows = <Widget>[
+      _SummaryStrip(logs: _pagedHistory),
+      const SizedBox(height: LumiTokens.space2),
+      _LoadedHistoryNotice(
+        count: _pagedHistory.length,
+        complete: !_historyHasMore,
+      ),
+      const SizedBox(height: LumiTokens.space5),
+      ..._buildDayGroups(_pagedHistory),
+      _HistoryPaginationFooter(
+        hasMore: _historyHasMore,
+        loading: _historyLoading,
+        error: _historyError,
+        onLoadMore: _loadNextHistoryPage,
+      ),
+    ];
+    return ListView.builder(
       padding: const EdgeInsets.fromLTRB(
         LumiTokens.space4,
         LumiTokens.space2,
         LumiTokens.space4,
         _kNavClearance,
       ),
-      children: [
-        _SummaryStrip(logs: _pagedHistory),
-        const SizedBox(height: LumiTokens.space2),
-        _LoadedHistoryNotice(
-          count: _pagedHistory.length,
-          complete: !_historyHasMore,
-        ),
-        const SizedBox(height: LumiTokens.space5),
-        ..._buildDayGroups(_pagedHistory),
-        _HistoryPaginationFooter(
-          hasMore: _historyHasMore,
-          loading: _historyLoading,
-          error: _historyError,
-          onLoadMore: _loadNextHistoryPage,
-        ),
-      ],
+      itemCount: rows.length,
+      itemBuilder: (context, i) => rows[i],
     );
   }
 

@@ -1241,11 +1241,13 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                       ),
                       const Divider(height: 1, color: LumiTokens.rule),
                       Expanded(
-                        child: ListView(
+                        child: ListView.builder(
                           controller: controller,
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 6),
-                          children: all.map((student) {
+                          itemCount: all.length,
+                          itemBuilder: (context, index) {
+                            final student = all[index];
                             final isSel = selected.contains(student.id);
                             return InkWell(
                               borderRadius: BorderRadius.circular(
@@ -1282,7 +1284,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                                 ),
                               ),
                             );
-                          }).toList(),
+                          },
                         ),
                       ),
                       const Divider(height: 1, color: LumiTokens.rule),
