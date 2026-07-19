@@ -92,7 +92,22 @@ gcloud run services add-iam-policy-binding maintainclassdailyreading \
 
 This restores each service to exactly the binding its healthy siblings already have. Rollback is the same command with `remove-iam-policy-binding`.
 
-**Follow-up worth doing:** add the invoker-binding audit to the deploy checklist — a silently-missing binding produces no error anywhere except the target service's own logs.
+**Follow-up DONE:** `scripts/audit-function-health.sh` (read-only) now covers this bug class and four adjacent silent-failure classes; runbook §9a documents how to read it.
+
+### Full-estate audit result, 2026-07-20
+
+Ran across **81 Cloud Run services / 25 Eventarc triggers / 19 scheduler jobs**:
+
+| Check | Result |
+|---|---|
+| invoker-403s, 30d | Only the two known services (`maintainclassdailyreading` **982**, `processaievaljob` 18). Last occurrences 22:35:26 / 22:31:39 UTC — both **before** the fixes, i.e. historical. |
+| invoker bindings on all trigger/scheduler services | **0 gaps** |
+| dropped events (`no available instance`), 7d | `aggregatestudentstats` 51 — a **single burst** on 2026-07-19 02:00 UTC, nothing in the prior 30 days. Consistent with the C7 backfill saturating `maxScale=20` at `containerConcurrency=1`. Self-heals via `reconcileStatsScheduled` (ran 20 h ago, `ok`). Not an active incident; worth remembering before the next bulk write. |
+| scheduler jobs failed | **0**. Three show `code -1` but have never been attempted (`annualRollover` → 25 Jan; the two AI crons created hours earlier). |
+| cron heartbeats | 16/16 `ok`, none stale once weekly cadences are accounted for. The 3 scheduled functions without heartbeats are exactly the never-run ones. |
+| other ERROR-severity services, 7d | `requeststudentdeletion` — crashed 2026-07-17 on a missing `notifications/studentIds` COLLECTION_GROUP index. **Already resolved**: the field override is present in `firestore.indexes.json` and deployed, with zero errors since. |
+
+**Conclusion: no other silent breakage in the estate.** The two invoker gaps were the only instances of this bug class in 30 days of logs.
 
 ## SECOND INCIDENT: AI roles were granted to the wrong service account
 

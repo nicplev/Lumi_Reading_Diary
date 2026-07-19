@@ -93,6 +93,21 @@ TOKEN="$(gcloud auth print-access-token)" PROJECT=lumi-ninc-au \
 - **No secrets. No API keys.** Nothing to rotate; SA key hygiene is the platform's standard posture.
 - STT regional sync quota: 211 req/min vs maxInstances 5 — revisit before fleet scale.
 
+## 9a. Function-estate health audit
+
+A missing per-service `roles/run.invoker` is **invisible** — Eventarc retries, gives up, and the only trace is a 403 in that one service's logs. `maintainClassDailyReading` was broken that way for three days (982 dropped invocations) before an unrelated canary exposed it.
+
+```bash
+./scripts/audit-function-health.sh              # defaults to lumi-ninc-au / australia-southeast1
+```
+
+Read-only. Checks invoker-403s (with last-seen, so historical is distinguishable from live), invoker bindings on every eventarc/scheduler-backed service, dropped events from `maxInstances` saturation, genuinely-failed scheduler jobs, and cron-heartbeat staleness/errors. **Run it after any deploy that creates new functions, and after any IAM hardening pass.**
+
+Reading the output:
+- Scheduler jobs with `code -1` **and no `lastAttemptTime`** have simply never run (e.g. `annualRollover` fires each 25 Jan) — not failures.
+- Heartbeat ages must be judged against cadence: `pruneStaleFcmTokens` (Mondays) and `reconcileClassDailyReadingScheduled` (Sundays) are weekly, so ~7-day ages are healthy; the script's threshold is 8 days for that reason.
+- "no available instance" means trigger events were **dropped**. Under `retry:false` they are lost — confirm the matching reconciler ran (`reconcileStatsScheduled`, `reconcileClassDailyReadingScheduled`).
+
 ## 10. Deploy / rollback map
 
 | Piece | Deploy | Rollback |
