@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
@@ -18,6 +19,8 @@ import '../../data/models/reading_level_option.dart';
 import '../../data/models/reading_group_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/school_model.dart';
+import '../../core/config/dev_access.dart';
+import '../../data/providers/comprehension_eval_providers.dart';
 import '../../services/firebase_service.dart';
 import '../../services/platform_config_service.dart';
 import '../../services/reading_level_service.dart';
@@ -702,6 +705,45 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
               const SizedBox(width: 4),
               _buildComprehensionButton(selectedClass),
             ],
+            // AI comprehension review — pilot: dev-access + fail-closed
+            // entitlement gate (Consumer keeps this screen non-Riverpod).
+            if (hasDevAccess())
+              Consumer(builder: (context, ref, _) {
+                final aiOn = ref.watch(aiEvaluationEnabledProvider(
+                    widget.teacher.schoolId ?? ''));
+                if (!aiOn) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: _buildComprehensionReviewButton(selectedClass),
+                );
+              }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Header action opening the class-wide AI comprehension review screen.
+  Widget _buildComprehensionReviewButton(ClassModel selectedClass) {
+    return GestureDetector(
+      onTap: () => context.push(
+        '/teacher/comprehension-review',
+        extra: {'teacher': widget.teacher, 'classModel': selectedClass},
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.graphic_eq, size: 14, color: LumiTokens.blue),
+            const SizedBox(width: 5),
+            Text(
+              'Review',
+              style: LumiType.caption.copyWith(
+                color: LumiTokens.blue,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
       ),

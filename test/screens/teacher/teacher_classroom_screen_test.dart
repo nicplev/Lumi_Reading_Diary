@@ -1,7 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_core_platform_interface/test.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lumi_reading_tracker/data/providers/active_child_provider.dart'
+    show firestoreProvider;
 import 'package:lumi_reading_tracker/data/models/class_model.dart';
 import 'package:lumi_reading_tracker/data/models/user_model.dart';
 import 'package:lumi_reading_tracker/screens/teacher/teacher_classroom_screen.dart';
@@ -9,6 +14,16 @@ import 'package:lumi_reading_tracker/services/reading_level_service.dart';
 import 'package:lumi_reading_tracker/services/student_reading_level_service.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() async {
+    // The classroom header's dev-gated AI review affordance reads
+    // DevAccessService (FirebaseAuth-backed) + a Riverpod gate during
+    // build; core mocks + a ProviderScope keep both inert here.
+    setupFirebaseCoreMocks();
+    await Firebase.initializeApp();
+  });
+
   group('TeacherClassroomScreen', () {
     late FakeFirebaseFirestore firestore;
     late UserModel teacher;
@@ -349,15 +364,18 @@ Widget _wrapClassroom({
   required ReadingLevelService readingLevelService,
   required StudentReadingLevelService studentReadingLevelService,
 }) {
-  return MaterialApp(
-    home: Scaffold(
-      body: TeacherClassroomScreen(
-        teacher: teacher,
-        selectedClass: classModel,
-        classes: [classModel],
-        firestore: firestore,
-        readingLevelService: readingLevelService,
-        studentReadingLevelService: studentReadingLevelService,
+  return ProviderScope(
+    overrides: [firestoreProvider.overrideWithValue(firestore)],
+    child: MaterialApp(
+      home: Scaffold(
+        body: TeacherClassroomScreen(
+          teacher: teacher,
+          selectedClass: classModel,
+          classes: [classModel],
+          firestore: firestore,
+          readingLevelService: readingLevelService,
+          studentReadingLevelService: studentReadingLevelService,
+        ),
       ),
     ),
   );
