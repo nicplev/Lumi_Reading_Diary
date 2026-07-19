@@ -233,6 +233,7 @@ export {
 // re-dispatch/recovery mechanism. docs/AI_EVALUATION_GEMINI_PLAN.md.
 export {processAiEvalJob, sweepAiEvalJobs} from "./ai_evaluation/worker";
 export {aiEvalRetention} from "./ai_evaluation/retention";
+export {generateStudentReportNarrative} from "./ai_evaluation/report";
 
 // Idempotent account/student deletion jobs. All destructive work runs through
 // server-owned callables/the retry scheduler; clients can only request and
