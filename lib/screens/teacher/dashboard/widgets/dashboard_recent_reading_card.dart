@@ -105,7 +105,8 @@ class _DashboardRecentReadingCardState
       stream: _recentLogsStream,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return const InlineStreamError(message: "Couldn't load recent reading.");
+          return const InlineStreamError(
+              message: "Couldn't load recent reading.");
         }
         final logs = snapshot.data?.docs
                 .map((doc) => ReadingLogModel.fromFirestore(doc))
@@ -157,11 +158,11 @@ class _DashboardRecentReadingCardState
                   final student = studentMap[group.first.studentId];
                   return Column(
                     children: [
-                      if (index > 0)
-                        Divider(height: 1, color: LumiTokens.rule),
+                      if (index > 0) Divider(height: 1, color: LumiTokens.rule),
                       _RecentLogRow(
                         group: group,
-                        studentName: student?.firstNameWithLastInitial ?? '?',
+                        studentName: student?.firstNameWithLastInitial ??
+                            'Student unavailable',
                         initials: _getInitials(student),
                         characterId: student?.displayCharacterId,
                         onTap: student == null
@@ -195,7 +196,7 @@ class _DashboardRecentReadingCardState
   }
 
   String _getInitials(StudentModel? student) {
-    if (student == null) return '?';
+    if (student == null) return '–';
     final first = student.firstName.isNotEmpty ? student.firstName[0] : '';
     final last = student.lastName.isNotEmpty ? student.lastName[0] : '';
     return '$first$last'.toUpperCase();
@@ -279,8 +280,8 @@ class _RecentLogRow extends StatelessWidget {
                         ),
                         TextSpan(
                           text: '  ·  ${_relativeDate(rep.date)}',
-                          style:
-                              LumiType.caption.copyWith(color: LumiTokens.muted),
+                          style: LumiType.caption
+                              .copyWith(color: LumiTokens.muted),
                         ),
                       ],
                     ),

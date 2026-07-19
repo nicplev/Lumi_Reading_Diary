@@ -102,6 +102,19 @@ fetch.
 | `minAppVersion` | Blocks older releases behind the update screen. Malformed policy fails into support mode. |
 | `platforms`     | Optional `ios` / `android` targeting for the minimum-version policy.    |
 
+### Cold-start behaviour
+
+The first launch may briefly begin before Android or iOS has a usable network
+route. When there is no cached policy and the status request fails at the
+transport layer (timeout, connection failure, HTTP 408/429/5xx), Lumi continues
+into the app and retries after 2, 5, 15, 30 and then 60 seconds. A later valid
+minimum-version response takes effect immediately.
+
+This softening applies only to a confirmed transient transport failure. A
+missing build-time endpoint, unreadable installed version, malformed JSON or
+invalid policy response still enters the blocking support state. Any cached
+minimum-version policy remains enforceable while offline.
+
 ## Typical workflow during an outage
 
 1. **Confirm the outage** (Firebase status page, your own dashboards).

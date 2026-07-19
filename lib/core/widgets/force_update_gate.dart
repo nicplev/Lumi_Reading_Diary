@@ -43,7 +43,8 @@ String get _platformKey {
 
 /// Blocks the whole app behind an update screen when the status worker's
 /// message carries a `minAppVersion` above this build (see
-/// force_update_evaluator.dart). Release ambiguity enters support mode; debug
+/// force_update_evaluator.dart). Invalid release configuration enters support
+/// mode; confirmed transient transport failures retry without blocking. Debug
 /// builds retain fail-open ergonomics. This is the
 /// safety valve that lets rules/functions changes ship once old clients can
 /// be forced forward, and it finally consumes the payload fields the worker
@@ -55,22 +56,36 @@ class ForceUpdateGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final message = ref.watch(remoteMessageProvider).value;
-    final info = ref.watch(packageInfoProvider).value;
+    final messageState = ref.watch(remoteMessageProvider);
+    final packageInfoState = ref.watch(packageInfoProvider);
+    final message = messageState.value;
+    final info = packageInfoState.value;
     final configState = ref.watch(remoteMessageConfigStateProvider).value;
+    final transientConfigFailure =
+        configState == RemoteMessageConfigState.temporarilyUnavailable;
     final configAvailable = switch (configState) {
       RemoteMessageConfigState.available => true,
-      RemoteMessageConfigState.unavailable => false,
+      RemoteMessageConfigState.temporarilyUnavailable ||
+      RemoteMessageConfigState.unavailable =>
+        false,
       RemoteMessageConfigState.checking || null => null,
     };
-    final decision = evaluateForceUpdate(
-      requireVersionConfig: kReleaseMode,
-      configConfigured: isRemoteMessageConfigured,
-      configAvailable: configAvailable,
-      message: message,
-      currentVersion: info?.version,
-      platform: _platformKey,
-    );
+    // Stream/Future providers emit on separate microtasks. Do not flash the
+    // support screen if the policy or package metadata is simply warming up.
+    final providerWarmup =
+        configState == RemoteMessageConfigState.available && message == null ||
+            !transientConfigFailure && packageInfoState.isLoading;
+    final decision = providerWarmup
+        ? ForceUpdateDecision.checking
+        : evaluateForceUpdate(
+            requireVersionConfig: kReleaseMode,
+            configConfigured: isRemoteMessageConfigured,
+            configAvailable: configAvailable,
+            transientConfigFailure: transientConfigFailure,
+            message: message,
+            currentVersion: info?.version,
+            platform: _platformKey,
+          );
     return switch (decision) {
       ForceUpdateDecision.allow => child,
       ForceUpdateDecision.checking => const _VersionCheckScreen(),
@@ -79,8 +94,6 @@ class ForceUpdateGate extends ConsumerWidget {
           packageName: info?.packageName,
         ),
       ForceUpdateDecision.supportRequired => _VersionSupportScreen(
-          endpointUnreachable: isRemoteMessageConfigured &&
-              configState == RemoteMessageConfigState.unavailable,
           onRetry: isRemoteMessageConfigured
               ? () async {
                   await ref.read(remoteMessageControllerProvider)?.retry();
@@ -115,11 +128,9 @@ class _VersionCheckScreen extends StatelessWidget {
 
 class _VersionSupportScreen extends StatefulWidget {
   const _VersionSupportScreen({
-    required this.endpointUnreachable,
     this.onRetry,
   });
 
-  final bool endpointUnreachable;
   final Future<void> Function()? onRetry;
 
   @override
@@ -146,9 +157,8 @@ class _VersionSupportScreenState extends State<_VersionSupportScreen> {
   Widget build(BuildContext context) {
     return VersionGateLayout(
       title: 'Lumi needs a quick version check',
-      message: widget.endpointUnreachable
-          ? 'Lumi could not reach its independent version service. Try again, or contact support if this continues.'
-          : 'This build cannot verify that it is safe to use. Please contact Lumi support.',
+      message:
+          'This build could not verify its version settings. Try again, or contact Lumi support if this continues.',
       actions: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

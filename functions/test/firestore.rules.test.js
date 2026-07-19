@@ -7,7 +7,7 @@ const {
   assertSucceeds,
   assertFails,
 } = require('@firebase/rules-unit-testing');
-const { serverTimestamp } = require('firebase/firestore');
+const { serverTimestamp, documentId } = require('firebase/firestore');
 
 const PROJECT_ID = 'lumi-reading-tracker-rules-test';
 const RULES_PATH = path.resolve(__dirname, '../../firestore.rules');
@@ -3001,6 +3001,16 @@ test('class isolation: teacher queries must be constrained to an assigned class'
   const school = authDb('teacher_a').collection('schools').doc('school_1');
 
   await assertSucceeds(school.collection('students').where('classId', '==', 'class_a').get());
+  // A denormalised roster may briefly retain a deleted student id. The current
+  // fail-closed rule rejects a document-id `in` query that includes that
+  // missing resource, so dashboard clients must use the class-scoped query
+  // above and intersect the returned documents locally.
+  await assertFails(
+    school.collection('students')
+      .where('classId', '==', 'class_a')
+      .where(documentId(), 'in', ['student_a', 'missing_student'])
+      .get(),
+  );
   await assertFails(school.collection('students').get());
   await assertSucceeds(school.collection('readingLogs').where('classId', '==', 'class_a').get());
   await assertFails(school.collection('readingLogs').get());

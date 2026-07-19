@@ -140,7 +140,11 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
 
   @override
   Widget build(BuildContext context) {
-    final totalStudents = widget.classModel.studentIds.length;
+    // Use resolved profiles, not the denormalised class id array. A stale id
+    // left behind by a legacy deletion must not inflate engagement totals.
+    final rosterStudentIds =
+        widget.students.map((student) => student.id).toSet();
+    final totalStudents = rosterStudentIds.length;
 
     return StreamBuilder<QuerySnapshot>(
       stream: _logsStream,
@@ -153,16 +157,22 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
                 .map((doc) => ReadingLogModel.fromFirestore(doc))
                 .toList() ??
             [];
+        final rosterLogs = logs
+            .where((log) => rosterStudentIds.contains(log.studentId))
+            .toList();
 
-        final uniqueStudentsToday = logs.map((l) => l.studentId).toSet();
+        final uniqueStudentsToday =
+            rosterLogs.map((log) => log.studentId).toSet();
         final readCount = uniqueStudentsToday.length;
-        final teacherLoggedCount = logs
-            .where((l) => l.isTeacherProxy)
+        final teacherLoggedCount = rosterLogs
+            .where((log) => log.isTeacherProxy)
             .map((l) => l.studentId)
             .toSet()
             .length;
-        final totalMinutes =
-            logs.fold<int>(0, (total, log) => total + log.minutesRead);
+        final totalMinutes = rosterLogs.fold<int>(
+          0,
+          (total, log) => total + log.minutesRead,
+        );
 
         // Compute streak count from shared students data
         int onStreakCount = 0;

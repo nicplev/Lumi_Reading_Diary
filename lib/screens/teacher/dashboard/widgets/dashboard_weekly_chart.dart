@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/inline_stream_error.dart';
 import 'package:flutter/services.dart';
@@ -19,11 +20,13 @@ import '../../../../core/utils/image_decode.dart';
 class DashboardWeeklyChart extends StatefulWidget {
   final ClassModel classModel;
   final String schoolId;
+  final List<String> studentIds;
 
   const DashboardWeeklyChart({
     super.key,
     required this.classModel,
     required this.schoolId,
+    required this.studentIds,
   });
 
   @override
@@ -45,6 +48,7 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
   int? _prevWeekTotal;
   int? _prevWeekDayCount;
   bool _prevWeekLoaded = false;
+  int _comparisonFetchGeneration = 0;
 
   @override
   void initState() {
@@ -57,9 +61,16 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
   @override
   void didUpdateWidget(DashboardWeeklyChart oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.classModel.id != widget.classModel.id ||
-        oldWidget.schoolId != widget.schoolId) {
+    final classChanged = oldWidget.classModel.id != widget.classModel.id ||
+        oldWidget.schoolId != widget.schoolId;
+    final rosterChanged = !setEquals(
+      oldWidget.studentIds.toSet(),
+      widget.studentIds.toSet(),
+    );
+    if (classChanged) {
       _initStream();
+    }
+    if (classChanged || rosterChanged) {
       _fetchComparisonWeekData();
     }
   }
@@ -106,6 +117,8 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
   /// Fetch the week *before* the displayed one, for the trend footer.
   Future<void> _fetchComparisonWeekData() async {
     final requestOffset = _weekOffset;
+    final generation = ++_comparisonFetchGeneration;
+    final rosterIds = widget.studentIds.toSet();
     try {
       final now = DateTime.now();
       final startOfShownWeek = DateTime(
@@ -121,12 +134,17 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
       );
 
       // A stale response for a different offset must not clobber the footer.
-      if (!mounted || requestOffset != _weekOffset) return;
+      if (!mounted ||
+          generation != _comparisonFetchGeneration ||
+          requestOffset != _weekOffset) {
+        return;
+      }
 
-      final total = summaries.fold<int>(
-        0,
-        (sum, summary) => sum + summary.activeStudentCount,
-      );
+      final total = summaries.fold<int>(0, (sum, summary) {
+        final activeRosterStudents =
+            summary.students.keys.where(rosterIds.contains).length;
+        return sum + activeRosterStudents;
+      });
       final daysWithData = summaries.length;
 
       setState(() {
@@ -136,7 +154,9 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
       });
     } catch (e) {
       debugPrint('Error fetching comparison week data: $e');
-      if (mounted && requestOffset == _weekOffset) {
+      if (mounted &&
+          generation == _comparisonFetchGeneration &&
+          requestOffset == _weekOffset) {
         setState(() => _prevWeekLoaded = true);
       }
     }
@@ -144,7 +164,8 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
 
   @override
   Widget build(BuildContext context) {
-    final totalStudents = widget.classModel.studentIds.length;
+    final rosterIds = widget.studentIds.toSet();
+    final totalStudents = rosterIds.length;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -207,7 +228,8 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
                     .inDays
                     .abs();
                 if (dayIndex >= 0 && dayIndex < 7) {
-                  completionByDay[dayIndex] = summary.activeStudentCount;
+                  completionByDay[dayIndex] =
+                      summary.students.keys.where(rosterIds.contains).length;
                 }
               }
 

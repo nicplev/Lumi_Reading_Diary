@@ -155,6 +155,36 @@ void main() {
       );
     });
 
+    test('release continues during a confirmed transient transport failure',
+        () {
+      expect(
+        evaluateForceUpdate(
+          requireVersionConfig: true,
+          configConfigured: true,
+          configAvailable: false,
+          transientConfigFailure: true,
+          message: null,
+          currentVersion: '1.0.0',
+          platform: 'ios',
+        ),
+        ForceUpdateDecision.allow,
+      );
+    });
+
+    test('invalid configuration remains blocked', () {
+      expect(
+        evaluateForceUpdate(
+          requireVersionConfig: true,
+          configConfigured: true,
+          configAvailable: false,
+          message: null,
+          currentVersion: '1.0.0',
+          platform: 'ios',
+        ),
+        ForceUpdateDecision.supportRequired,
+      );
+    });
+
     test('release waits while the first version check is pending', () {
       expect(decide(available: null), ForceUpdateDecision.checking);
     });

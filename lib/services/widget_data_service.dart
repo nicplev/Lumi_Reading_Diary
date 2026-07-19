@@ -639,8 +639,13 @@ class _TeacherDashboardPayload {
       for (final summary in dailySummaries) summary.localDate: summary,
     };
     final hasSummaries = summariesByDate.isNotEmpty;
-    final logsForClass =
-        recentLogs.where((log) => log.classId == classModel.id).toList();
+    final studentById = {for (final student in students) student.id: student};
+    final rosterStudentIds = studentById.keys.toSet();
+    final logsForClass = recentLogs
+        .where((log) =>
+            log.classId == classModel.id &&
+            rosterStudentIds.contains(log.studentId))
+        .toList();
     final todayLogs = logsForClass
         .where((log) => WidgetDataService._dateOnly(log.date) == today)
         .toList();
@@ -658,7 +663,10 @@ class _TeacherDashboardPayload {
           readCount: hasSummaries
               ? summariesByDate[WidgetDataService._formatQueueDate(
                           calendarStart.add(Duration(days: i)))]
-                      ?.activeStudentCount ??
+                      ?.students
+                      .keys
+                      .where(rosterStudentIds.contains)
+                      .length ??
                   0
               : logsForClass
                   .where((log) =>
@@ -670,7 +678,6 @@ class _TeacherDashboardPayload {
         ),
     ];
 
-    final studentById = {for (final student in students) student.id: student};
     final minutesByStudent = <String, int>{};
     if (hasSummaries) {
       for (final summary in dailySummaries) {
@@ -678,6 +685,7 @@ class _TeacherDashboardPayload {
           continue;
         }
         for (final entry in summary.students.entries) {
+          if (!rosterStudentIds.contains(entry.key)) continue;
           minutesByStudent.update(
             entry.key,
             (minutes) => minutes + entry.value.minutes,
@@ -723,11 +731,16 @@ class _TeacherDashboardPayload {
     final todaySummary =
         summariesByDate[WidgetDataService._formatQueueDate(today)];
     final todayStudentIds = hasSummaries
-        ? todaySummary?.students.keys.toSet() ?? <String>{}
+        ? todaySummary?.students.keys
+                .where(rosterStudentIds.contains)
+                .toSet() ??
+            <String>{}
         : todayLogs.map((log) => log.studentId).toSet();
     final teacherLoggedStudentIds = hasSummaries
         ? todaySummary?.students.entries
-                .where((entry) => entry.value.teacherLogs > 0)
+                .where((entry) =>
+                    rosterStudentIds.contains(entry.key) &&
+                    entry.value.teacherLogs > 0)
                 .map((entry) => entry.key)
                 .toSet() ??
             <String>{}
@@ -741,14 +754,22 @@ class _TeacherDashboardPayload {
       schoolId: teacher.schoolId ?? classModel.schoolId,
       classId: classModel.id,
       className: classModel.name,
-      totalStudents: classModel.studentIds.length,
+      totalStudents: students.length,
       readTodayCount: todayStudentIds.length,
-      sessionsTodayCount:
-          hasSummaries ? todaySummary?.logCount ?? 0 : todayLogs.length,
+      sessionsTodayCount: hasSummaries
+          ? todaySummary?.students.entries
+                  .where((entry) => rosterStudentIds.contains(entry.key))
+                  .fold<int>(0, (total, entry) => total + entry.value.logs) ??
+              0
+          : todayLogs.length,
       teacherLoggedTodayCount: teacherLoggedStudentIds.length,
       onStreakCount: onStreakCount,
       totalMinutesToday: hasSummaries
-          ? todaySummary?.totalMinutes ?? 0
+          ? todaySummary?.students.entries
+                  .where((entry) => rosterStudentIds.contains(entry.key))
+                  .fold<int>(
+                      0, (total, entry) => total + entry.value.minutes) ??
+              0
           : todayLogs.fold<int>(0, (total, log) => total + log.minutesRead),
       todayDate: WidgetDataService._formatQueueDate(today),
       todayStudentIds: todayStudentIds,

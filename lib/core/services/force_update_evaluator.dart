@@ -70,16 +70,15 @@ bool shouldForceUpdate({
 
 /// Release-safe decision for the app-wide gate.
 ///
-/// A release never silently treats a missing endpoint, an unreachable first
-/// fetch, an unreadable version or malformed minimum version as permission to
-/// continue against a potentially incompatible backend. Those cases enter a
-/// support screen. Callers may offer an explicit offline-only escape only for
-/// the network-unreachable case; build misconfiguration and malformed policy
-/// remain blocked.
+/// A release blocks on missing configuration, invalid policy data or an
+/// unreadable installed version. A confirmed transient transport failure may
+/// temporarily fail open while the caller retries in the background; an
+/// actual cached or remote minimum-version policy remains enforceable.
 ForceUpdateDecision evaluateForceUpdate({
   required bool requireVersionConfig,
   required bool configConfigured,
   required bool? configAvailable,
+  bool transientConfigFailure = false,
   required RemoteMessage? message,
   required String? currentVersion,
   required String platform,
@@ -91,7 +90,9 @@ ForceUpdateDecision evaluateForceUpdate({
     return ForceUpdateDecision.checking;
   }
   if (requireVersionConfig && configAvailable == false) {
-    return ForceUpdateDecision.supportRequired;
+    return transientConfigFailure
+        ? ForceUpdateDecision.allow
+        : ForceUpdateDecision.supportRequired;
   }
   if (message == null) {
     return requireVersionConfig

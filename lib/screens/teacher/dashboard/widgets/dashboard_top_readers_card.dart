@@ -19,9 +19,15 @@ class DashboardTopReadersCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final studentMap = {for (final student in students) student.id: student};
+
     // Aggregate minutes by student
     final minutesByStudent = <String, int>{};
     for (final log in weeklyLogs) {
+      // Historical/legacy cleanup can leave a log behind after its student is
+      // no longer resolvable. It must not take a leaderboard place away from a
+      // current roster member.
+      if (!studentMap.containsKey(log.studentId)) continue;
       minutesByStudent.update(
         log.studentId,
         (v) => v + log.minutesRead,
@@ -33,7 +39,6 @@ class DashboardTopReadersCard extends StatelessWidget {
       ..sort((a, b) => b.value.compareTo(a.value));
     final top = sorted.take(5).toList();
 
-    final studentMap = {for (final s in students) s.id: s};
     final maxMinutes = top.isNotEmpty ? top.first.value : 1;
 
     return Container(
@@ -92,7 +97,7 @@ class DashboardTopReadersCard extends StatelessWidget {
       _ => LumiTokens.muted.withValues(alpha: 0.45),
     };
     final isTopThree = rank <= 3;
-    final name = student?.firstNameWithLastInitial ?? 'Unknown';
+    final name = student?.firstNameWithLastInitial ?? 'Student unavailable';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -117,7 +122,7 @@ class DashboardTopReadersCard extends StatelessWidget {
               ? StudentAvatar.fromStudent(student, size: 32)
               : StudentAvatar(
                   characterId: null,
-                  initial: '?',
+                  initial: '–',
                   avatarColor: LumiTokens.tintBlue,
                   size: 32,
                 ),
@@ -177,8 +182,7 @@ class DashboardTopReadersCard extends StatelessWidget {
         child: Column(
           children: [
             Icon(Icons.emoji_events_rounded,
-                size: 32,
-                color: LumiTokens.muted.withValues(alpha: 0.3)),
+                size: 32, color: LumiTokens.muted.withValues(alpha: 0.3)),
             const SizedBox(height: 8),
             Text(
               'No reading logged yet this week',

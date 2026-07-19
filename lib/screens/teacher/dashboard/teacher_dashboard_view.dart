@@ -11,6 +11,7 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/teacher_constants.dart';
 import '../../../core/tour/lumi_app_tour.dart';
+import '../../../core/widgets/inline_stream_error.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
 import '../../../theme/section_theme.dart';
@@ -23,6 +24,8 @@ import '../../../data/models/student_model.dart';
 import '../../../data/models/user_model.dart';
 import '../../../services/firebase_service.dart';
 import '../../../services/class_daily_reading_service.dart';
+import '../../../services/crash_reporting_service.dart';
+import '../../../services/dashboard_student_roster_service.dart';
 import '../../../services/staff_notification_service.dart';
 import '../../../services/widget_data_service.dart';
 import 'models/student_achievement.dart';
@@ -71,10 +74,14 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
   int _bellAnimCount = 0;
   String? _dailyInsight;
   int? _momentumDiff; // positive = up, negative = down
+  int _heroFetchGeneration = 0;
   List<StudentModel> _students = [];
   bool _studentsLoaded = false;
+  Object? _studentsLoadError;
+  int _studentFetchGeneration = 0;
   List<ReadingLogModel> _weeklyLogs = [];
   bool _weeklyLogsLoaded = false;
+  int _weeklyLogsFetchGeneration = 0;
   List<ReadingGroupModel> _readingGroups = [];
   bool _readingGroupsLoaded = false;
   StreamSubscription<QuerySnapshot>? _readingGroupsSubscription;
@@ -82,6 +89,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
   final ValueNotifier<int> _engagementResetSignal = ValueNotifier<int>(0);
   bool _messagingEnabled = true;
   int _teacherWidgetRefreshGeneration = 0;
+  late final DashboardStudentRosterService _studentRosterService;
 
   // Widget customisation
   late DashboardWidgetConfig _widgetConfig;
@@ -90,6 +98,9 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
   @override
   void initState() {
     super.initState();
+    _studentRosterService = DashboardStudentRosterService(
+      firestore: FirebaseService.instance.firestore,
+    );
     _widgetConfig =
         DashboardWidgetConfig.fromPreferences(widget.user.preferences);
     _computeHeroIntelligence();
@@ -230,6 +241,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
     if (!neededBefore[WidgetDataDependency.students]! &&
         def.dataDependencies.contains(WidgetDataDependency.students)) {
       _studentsLoaded = false;
+      _studentsLoadError = null;
       _fetchStudents();
     }
     if (!neededBefore[WidgetDataDependency.weeklyLogs]! &&
@@ -289,6 +301,18 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
 
   /// Launches all required fetches in parallel based on active widget deps.
   void _fetchAllDependencies() {
+    // Clear class-scoped state synchronously. Without this, a fast class switch
+    // can render the previous class's roster/logs until the new reads finish.
+    _students = [];
+    _recentAchievements = [];
+    _studentsLoaded = false;
+    _studentsLoadError = null;
+    _weeklyLogs = [];
+    _weeklyLogsLoaded = false;
+    _weeklyLogsFetchGeneration++;
+    _readingGroups = [];
+    _readingGroupsLoaded = false;
+
     // The iOS teacher home-screen widgets also depend on the roster, even when
     // the in-app dashboard has no currently visible student-dependent cards.
     _fetchStudents();
@@ -305,14 +329,23 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
   }
 
   Future<void> _fetchStudents() async {
-    final studentIds = widget.selectedClass.studentIds;
+    final selectedClass = widget.selectedClass;
+    final studentIds = selectedClass.studentIds;
     final schoolId = widget.user.schoolId;
+    final generation = ++_studentFetchGeneration;
+
+    bool isCurrentRequest() =>
+        mounted &&
+        generation == _studentFetchGeneration &&
+        widget.selectedClass.id == selectedClass.id;
+
     if (studentIds.isEmpty || schoolId == null) {
-      if (mounted) {
+      if (isCurrentRequest()) {
         setState(() {
           _students = [];
           _recentAchievements = [];
           _studentsLoaded = true;
+          _studentsLoadError = null;
         });
         unawaited(_refreshTeacherHomeWidget());
       }
@@ -320,38 +353,27 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
     }
 
     try {
-      final List<StudentModel> students = [];
+      final result = await _studentRosterService.fetch(
+        schoolId: schoolId,
+        classId: selectedClass.id,
+        rosterStudentIds: studentIds,
+      );
+      if (!isCurrentRequest()) return;
+
+      final students = result.entries.map((entry) => entry.student).toList();
       final List<StudentAchievement> achievements = [];
-      // Batch in groups of 30 (Firestore whereIn limit)
-      for (var i = 0; i < studentIds.length; i += 30) {
-        final batch = studentIds.sublist(
-          i,
-          i + 30 > studentIds.length ? studentIds.length : i + 30,
-        );
-        final snapshot = await FirebaseService.instance.firestore
-            .collection('schools')
-            .doc(schoolId)
-            .collection('students')
-            .where('classId', isEqualTo: widget.selectedClass.id)
-            .where(FieldPath.documentId, whereIn: batch)
-            .get();
-        for (final doc in snapshot.docs) {
-          final student = StudentModel.fromFirestore(doc);
-          students.add(student);
-          // Extract achievements from raw doc (piggyback — zero extra reads)
-          final data = doc.data();
-          final achievementsData = data['achievements'] as List<dynamic>? ?? [];
-          for (final a in achievementsData) {
-            try {
-              achievements.add(StudentAchievement(
-                studentId: doc.id,
-                studentDisplayName: student.firstNameWithLastInitial,
-                achievement:
-                    AchievementModel.fromMap(Map<String, dynamic>.from(a)),
-              ));
-            } catch (_) {
-              // Skip malformed achievements
-            }
+      for (final entry in result.entries) {
+        for (final rawAchievement in entry.achievementData) {
+          try {
+            achievements.add(StudentAchievement(
+              studentId: entry.student.id,
+              studentDisplayName: entry.student.firstNameWithLastInitial,
+              achievement: AchievementModel.fromMap(
+                Map<String, dynamic>.from(rawAchievement as Map),
+              ),
+            ));
+          } catch (_) {
+            // One malformed achievement must not hide the student/profile.
           }
         }
       }
@@ -359,19 +381,51 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
       achievements.sort(
           (a, b) => b.achievement.earnedAt.compareTo(a.achievement.earnedAt));
 
-      if (!mounted) return;
+      if (students.isEmpty && result.warningCount > 0) {
+        throw StateError(
+          'No valid dashboard students were resolved from a non-empty roster.',
+        );
+      }
+
       setState(() {
         _students = students;
         _recentAchievements = achievements;
         _studentsLoaded = true;
+        _studentsLoadError = null;
       });
-      unawaited(_refreshTeacherHomeWidget());
-    } catch (e) {
-      debugPrint('Error fetching students for dashboard: $e');
-      if (mounted) {
-        setState(() => _studentsLoaded = true);
-        unawaited(_refreshTeacherHomeWidget());
+
+      if (result.warningCount > 0) {
+        debugPrint(
+          'Dashboard roster loaded with ${result.warningCount} unresolved '
+          'or malformed student record(s).',
+        );
+        unawaited(CrashReportingService.instance.recordError(
+          StateError('Teacher dashboard roster integrity mismatch'),
+          StackTrace.current,
+          reason: 'school/class roster contained ${result.warningCount} '
+              'unresolved or malformed student record(s)',
+        ));
       }
+      unawaited(_computeHeroIntelligence(
+        resolvedStudentIds: students.map((student) => student.id).toSet(),
+      ));
+      unawaited(_refreshTeacherHomeWidget());
+    } catch (e, stackTrace) {
+      if (!isCurrentRequest()) return;
+      debugPrint('Error fetching students for dashboard: $e');
+      setState(() {
+        _students = [];
+        _recentAchievements = [];
+        _studentsLoaded = true;
+        _studentsLoadError = e;
+      });
+      // Do not overwrite the native home-widget cache with a confident empty
+      // roster when the read failed. Keep the last known-good payload instead.
+      unawaited(CrashReportingService.instance.recordError(
+        e,
+        stackTrace,
+        reason: 'Teacher dashboard roster fetch failed',
+      ));
     }
   }
 
@@ -418,9 +472,17 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
   }
 
   Future<void> _fetchWeeklyLogs() async {
+    final selectedClass = widget.selectedClass;
     final schoolId = widget.user.schoolId;
+    final generation = ++_weeklyLogsFetchGeneration;
+
+    bool isCurrentRequest() =>
+        mounted &&
+        generation == _weeklyLogsFetchGeneration &&
+        widget.selectedClass.id == selectedClass.id;
+
     if (schoolId == null) {
-      if (mounted) {
+      if (isCurrentRequest()) {
         setState(() {
           _weeklyLogs = [];
           _weeklyLogsLoaded = true;
@@ -438,12 +500,12 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
           .collection('schools')
           .doc(schoolId)
           .collection('readingLogs')
-          .where('classId', isEqualTo: widget.selectedClass.id)
+          .where('classId', isEqualTo: selectedClass.id)
           .where('date',
               isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek))
           .get();
 
-      if (!mounted) return;
+      if (!isCurrentRequest()) return;
       setState(() {
         _weeklyLogs = snapshot.docs
             .map((doc) => ReadingLogModel.fromFirestore(doc))
@@ -452,7 +514,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
       });
     } catch (e) {
       debugPrint('Error fetching weekly logs for dashboard: $e');
-      if (mounted) setState(() => _weeklyLogsLoaded = true);
+      if (isCurrentRequest()) setState(() => _weeklyLogsLoaded = true);
     }
   }
 
@@ -499,7 +561,10 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
     );
   }
 
-  Future<void> _computeHeroIntelligence() async {
+  Future<void> _computeHeroIntelligence(
+      {Set<String>? resolvedStudentIds}) async {
+    final selectedClass = widget.selectedClass;
+    final generation = ++_heroFetchGeneration;
     try {
       final schoolId = widget.user.schoolId;
       if (schoolId == null) return;
@@ -507,7 +572,8 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
       final yesterday = today.subtract(const Duration(days: 1));
-      final totalStudents = widget.selectedClass.studentIds.length;
+      final totalStudents =
+          resolvedStudentIds?.length ?? selectedClass.studentIds.length;
 
       final startOfWeek =
           DateTime(now.year, now.month, now.day - (now.weekday - 1));
@@ -516,7 +582,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
 
       final summaries = await _dailyReadingService.fetchRange(
         schoolId: schoolId,
-        classId: widget.selectedClass.id,
+        classId: selectedClass.id,
         startInclusive: thirtyDaysAgo,
         endInclusive: today,
       );
@@ -525,15 +591,20 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
       final Set<String> thisWeekStudents = {};
       final Set<String> lastWeekStudents = {};
 
+      Iterable<String> rosterOnly(Iterable<String> studentIds) =>
+          resolvedStudentIds == null
+              ? studentIds
+              : studentIds.where(resolvedStudentIds.contains);
+
       for (final summary in summaries) {
         final date = summary.date;
         if (!date.isBefore(yesterday) && date.isBefore(today)) {
-          yesterdayStudents.addAll(summary.students.keys);
+          yesterdayStudents.addAll(rosterOnly(summary.students.keys));
         }
         if (!date.isBefore(startOfWeek)) {
-          thisWeekStudents.addAll(summary.students.keys);
+          thisWeekStudents.addAll(rosterOnly(summary.students.keys));
         } else if (!date.isBefore(startOfLastWeek)) {
-          lastWeekStudents.addAll(summary.students.keys);
+          lastWeekStudents.addAll(rosterOnly(summary.students.keys));
         }
       }
 
@@ -542,7 +613,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
         insight = 'Everyone read yesterday!';
       } else if (totalStudents > 0 && yesterdayStudents.isNotEmpty) {
         final pct = (yesterdayStudents.length / totalStudents * 100).round();
-        insight = '$pct% of ${widget.selectedClass.name} read yesterday';
+        insight = '$pct% of ${selectedClass.name} read yesterday';
       }
 
       int? momentum;
@@ -555,7 +626,11 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
         if (diff.abs() >= 5) momentum = diff;
       }
 
-      if (!mounted) return;
+      if (!mounted ||
+          generation != _heroFetchGeneration ||
+          widget.selectedClass.id != selectedClass.id) {
+        return;
+      }
       setState(() {
         _dailyInsight = insight;
         _momentumDiff = momentum;
@@ -680,31 +755,37 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
     // jump up the page when overscrolling at the bottom. The dashboard has a
     // small fixed widget count, so eager build is cheap and the extent stays
     // exact.
-    // First pass: keep only widgets that have loaded their data AND opt in to
-    // rendering. Skipping here — rather than inserting a zero-height placeholder
-    // — means a hidden card consumes no separator space, so a conditional widget
-    // that renders nothing (e.g. Priority Nudges with no items) doesn't leave a
-    // doubled gap between its neighbours.
-    final visible = <DashboardWidgetDefinition>[];
+    // Keep only widgets that have loaded their data AND opt in to rendering.
+    // A roster read failure replaces student-dependent widgets with one honest,
+    // retryable error card instead of letting an empty map produce '?' names.
+    final visibleWidgets = <Widget>[];
+    var rosterStatusAdded = false;
     for (final def in defs) {
-      final isLoading = (def.dataDependencies
-                  .contains(WidgetDataDependency.students) &&
-              !_studentsLoaded) ||
+      final needsStudents =
+          def.dataDependencies.contains(WidgetDataDependency.students);
+      final isLoading = (needsStudents && !_studentsLoaded) ||
           (def.dataDependencies.contains(WidgetDataDependency.weeklyLogs) &&
               !_weeklyLogsLoaded) ||
           (def.dataDependencies.contains(WidgetDataDependency.readingGroups) &&
               !_readingGroupsLoaded);
       if (isLoading) continue;
       if (def.isVisible != null && !def.isVisible!(ctx)) continue;
-      visible.add(def);
+
+      if (needsStudents && _studentsLoadError != null) {
+        if (!rosterStatusAdded) {
+          visibleWidgets.add(_buildStudentRosterErrorCard());
+          rosterStatusAdded = true;
+        }
+        continue;
+      }
+      visibleWidgets.add(def.builder(ctx));
     }
 
     final children = <Widget>[];
-    for (var i = 0; i < visible.length; i++) {
+    for (var i = 0; i < visibleWidgets.length; i++) {
       if (i > 0) children.add(const SizedBox(height: 24));
       children.add(
-        visible[i]
-            .builder(ctx)
+        visibleWidgets[i]
             .animate()
             .fadeIn(delay: (60 * i).ms, duration: 300.ms, curve: Curves.easeOut)
             .slideY(begin: 0.02, end: 0, duration: 300.ms),
@@ -760,15 +841,21 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
                 final def = defs[index];
                 final needsStudents = def.dataDependencies
                     .contains(WidgetDataDependency.students);
+                final Widget child;
+                if (needsStudents && !_studentsLoaded) {
+                  child = _buildWidgetPlaceholder(def);
+                } else if (needsStudents && _studentsLoadError != null) {
+                  child = _buildStudentRosterErrorCard();
+                } else {
+                  child = def.builder(ctx);
+                }
 
                 return Padding(
                   key: ValueKey(def.id),
                   padding: const EdgeInsets.only(bottom: 20),
                   child: EditModeWrapper(
                     onRemove: () => _removeWidget(def.id),
-                    child: (needsStudents && !_studentsLoaded)
-                        ? _buildWidgetPlaceholder(def)
-                        : def.builder(ctx),
+                    child: child,
                   ),
                 );
               },
@@ -802,6 +889,33 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
                     .copyWith(color: AppColors.textSecondary)),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildStudentRosterErrorCard() {
+    return Container(
+      key: const ValueKey('dashboard-roster-error'),
+      decoration: BoxDecoration(
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+        border: Border.all(
+          color: LumiTokens.red.withValues(alpha: 0.35),
+        ),
+        boxShadow: LumiTokens.shadowCard,
+      ),
+      child: InlineStreamError(
+        message:
+            "Couldn't load this class's students. Reading data is safe; try again.",
+        onRetry: () {
+          setState(() {
+            _students = [];
+            _recentAchievements = [];
+            _studentsLoaded = false;
+            _studentsLoadError = null;
+          });
+          _fetchStudents();
+        },
       ),
     );
   }

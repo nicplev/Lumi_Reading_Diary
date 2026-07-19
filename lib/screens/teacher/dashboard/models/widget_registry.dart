@@ -84,10 +84,11 @@ class DashboardWidgetRegistry {
       displayName: 'Weekly Chart',
       description: "Bar chart of this week's reading activity",
       icon: Icons.bar_chart_rounded,
-      dataDependencies: {},
+      dataDependencies: {WidgetDataDependency.students},
       builder: (ctx) => DashboardWeeklyChart(
         classModel: ctx.classModel,
         schoolId: ctx.schoolId,
+        studentIds: ctx.students.map((student) => student.id).toList(),
       ),
     ),
     'priority_nudges': DashboardWidgetDefinition(
@@ -185,7 +186,6 @@ class DashboardWidgetRegistry {
   static DashboardWidgetDefinition? get(String id) => _widgets[id];
 
   /// Returns widgets that are **not** currently active.
-  static List<DashboardWidgetDefinition> getInactive(
-          List<String> activeIds) =>
+  static List<DashboardWidgetDefinition> getInactive(List<String> activeIds) =>
       _widgets.values.where((w) => !activeIds.contains(w.id)).toList();
 }

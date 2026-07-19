@@ -35,7 +35,9 @@ final remoteMessageControllerProvider =
 
 /// Whether the independent status/version endpoint is usable. A cached
 /// response counts as available during a transient outage because it still
-/// carries the last known minimum-version policy.
+/// carries the last known minimum-version policy. With no cache, transport
+/// failures are identified separately so startup can continue while the
+/// controller retries; invalid policy/configuration remains unavailable.
 final remoteMessageConfigStateProvider =
     StreamProvider<RemoteMessageConfigState>((ref) async* {
   final controller = ref.watch(remoteMessageControllerProvider);

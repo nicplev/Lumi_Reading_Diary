@@ -89,7 +89,8 @@ class _DashboardUnreadCommentsCardState
       stream: _logsStream,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return const InlineStreamError(message: "Couldn't load parent comments.");
+          return const InlineStreamError(
+              message: "Couldn't load parent comments.");
         }
         final logs = snapshot.data?.docs
                 .map((doc) => ReadingLogModel.fromFirestore(doc))
@@ -153,8 +154,7 @@ class _DashboardUnreadCommentsCardState
                   final student = studentMap[log.studentId];
                   return Column(
                     children: [
-                      if (index > 0)
-                        Divider(height: 1, color: LumiTokens.rule),
+                      if (index > 0) Divider(height: 1, color: LumiTokens.rule),
                       _UnreadCommentRow(
                         log: log,
                         student: student,
@@ -203,7 +203,7 @@ class _UnreadCommentRow extends StatelessWidget {
   });
 
   String _initials(StudentModel? s) {
-    if (s == null) return '?';
+    if (s == null) return '–';
     final f = s.firstName.isNotEmpty ? s.firstName[0] : '';
     final l = s.lastName.isNotEmpty ? s.lastName[0] : '';
     return '$f$l'.toUpperCase();
@@ -221,7 +221,7 @@ class _UnreadCommentRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = student?.firstNameWithLastInitial ?? 'Unknown';
+    final name = student?.firstNameWithLastInitial ?? 'Student unavailable';
     return InkWell(
       onTap: student == null
           ? null

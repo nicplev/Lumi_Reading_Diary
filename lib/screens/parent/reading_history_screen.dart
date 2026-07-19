@@ -18,6 +18,7 @@ import 'library/book_detail_sheet.dart';
 import 'library/book_history_item.dart';
 import 'library/reading_feeling_visuals.dart';
 import 'library/session_detail_sheet.dart';
+import 'widgets/bookshelf_history_footer.dart';
 import '../../core/utils/image_decode.dart';
 
 /// Vertical space the parent's floating glass nav occupies; scroll content
@@ -604,40 +605,54 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
     return Column(
       children: [
         _buildBooksToolbar(count: books.length, showSearch: books.length > 8),
-        _LoadedHistoryNotice(
-          count: _pagedHistory.length,
-          complete: !_historyHasMore,
-        ),
-        _HistoryPaginationFooter(
-          hasMore: _historyHasMore,
-          loading: _historyLoading,
-          error: _historyError,
-          onLoadMore: _loadNextHistoryPage,
-          compact: true,
-        ),
         Expanded(
-          child: shelf.isEmpty
-              ? const _EmptyState(
-                  icon: Icons.search_off_rounded,
-                  title: 'No matches',
-                  message: 'No books match your search.',
+          child: CustomScrollView(
+            slivers: [
+              if (shelf.isEmpty)
+                const SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: 260,
+                    child: _EmptyState(
+                      icon: Icons.search_off_rounded,
+                      title: 'No matches',
+                      message: 'No books match your search.',
+                    ),
+                  ),
                 )
-              : GridView.builder(
+              else
+                SliverPadding(
                   padding: const EdgeInsets.fromLTRB(
                     LumiTokens.space4,
                     LumiTokens.space2,
                     LumiTokens.space4,
-                    _kNavClearance,
+                    0,
                   ),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    childAspectRatio: 0.50,
-                    crossAxisSpacing: LumiTokens.space3,
-                    mainAxisSpacing: LumiTokens.space4,
+                  sliver: SliverGrid(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      childAspectRatio: 0.50,
+                      crossAxisSpacing: LumiTokens.space3,
+                      mainAxisSpacing: LumiTokens.space4,
+                    ),
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) => _buildBookTile(shelf[index]),
+                      childCount: shelf.length,
+                    ),
                   ),
-                  itemCount: shelf.length,
-                  itemBuilder: (context, index) => _buildBookTile(shelf[index]),
                 ),
+              SliverToBoxAdapter(
+                child: BookshelfHistoryFooter(
+                  loadedSessionCount: _pagedHistory.length,
+                  hasMore: _historyHasMore,
+                  loading: _historyLoading,
+                  error: _historyError,
+                  onLoadMore: _loadNextHistoryPage,
+                  bottomClearance: _kNavClearance,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -1314,14 +1329,12 @@ class _HistoryPaginationFooter extends StatelessWidget {
     required this.loading,
     required this.error,
     required this.onLoadMore,
-    this.compact = false,
   });
 
   final bool hasMore;
   final bool loading;
   final Object? error;
   final VoidCallback onLoadMore;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -1329,9 +1342,9 @@ class _HistoryPaginationFooter extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.fromLTRB(
         LumiTokens.space4,
-        compact ? LumiTokens.space2 : LumiTokens.space3,
+        LumiTokens.space3,
         LumiTokens.space4,
-        compact ? LumiTokens.space2 : LumiTokens.space5,
+        LumiTokens.space5,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
