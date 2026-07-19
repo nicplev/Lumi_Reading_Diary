@@ -41,13 +41,19 @@ Admin portal was already live: CI auto-deployed it on the #460 merge.
 
 Script: `functions/scripts/ai-eval-canary.mjs` (committed). Audio is macOS `say` speech — never a child. Creates a throwaway `zz_canary_ai_eval` school and removes **every** artifact in a `finally` block.
 
-**Phase A (negative, zero provider spend) — BLOCKED, not failed.** Job created but never claimed: `status: queued, attempts: 0`. Cause was not the pipeline (see incident below) — the Eventarc trigger fired and was rejected at the Cloud Run boundary before any Lumi code ran.
+**FINAL RESULT: both phases PASS** (after the two IAM fixes below).
 
-**Phase B (positive) — not reached.**
+**Phase A — negative, zero provider spend: PASS.** With the kill switch OFF and the canary school entitled, the deployed worker claimed the job, re-checked the gate and terminated `status: done, doneReason: disabled`, **no eval doc, no provider call**. This is the fail-closed guarantee verified against real production infrastructure, not a unit test.
 
-**Cleanup verified regardless:** residue check `{job:false, school:false, evalDoc:false, audio:false}` → zero residue, kill switch confirmed back to `false`.
+**Phase B — positive, full pipeline: PASS.** Kill switch ON briefly → job → STT (Sydney) → Gemini (Sydney) → eval doc written:
 
-The canary is re-runnable in one command once the IAM gap below is closed.
+- job `done`, eval `status: complete`, `overallLevel: secure`
+- transcript: *"The dog found a bone in the garden and then he buried at near the big tree because he did not want the cat to take it."* (one benign ASR slip, "buried at" for "buried it" — exactly the disfluency-tolerance the prompt is built for)
+- summary: *"The student accurately recalled the initial event of the dog finding a bone and burying it, providing details about where and why. The events were presented in a logical order."*
+
+**Cleanup on every run:** residue check `{job:false, school:false, evalDoc:false, audio:false}` → zero residue, kill switch confirmed back to `false`.
+
+Re-run any time: `cd functions && node scripts/ai-eval-canary.mjs <synthetic.m4a>`.
 
 ## INCIDENT FOUND: missing `run.invoker` on two Cloud Run services
 
@@ -68,7 +74,9 @@ Symptom in logs: `The request was not authenticated… The IAM principal lacks {
 - `maintainClassDailyReading` maintains sharded class daily-reading aggregates on reading-log writes. Live updates have been failing since Jul 16 — **but `reconcileClassDailyReadingScheduled` is running successfully** (heartbeat `ok @ 2026-07-18T18:30Z`), which recomputes those aggregates. So the effect is *delayed/stale* class daily-reading figures between reconciles, not permanent data loss.
 - `processAiEvalJob` — no impact today (feature dark, zero jobs). If left unfixed when the pilot starts, evaluations would not run on upload; the 6-hourly sweep's stale-queued clause would eventually pick them up (it calls the worker inline and has a working invoker binding), so results would appear hours late rather than never.
 
-**Fix (blocked pending your approval — modifies production IAM):**
+**RESOLVED 2026-07-20** — both bindings applied and verified; `maintainclassdailyreading` immediately resumed executing (403 WARNINGs replaced by INFO executions). All **25** Eventarc-triggered services were then audited: no remaining gaps.
+
+**Commands applied:**
 
 ```bash
 gcloud run services add-iam-policy-binding processaievaljob \
@@ -84,4 +92,28 @@ gcloud run services add-iam-policy-binding maintainclassdailyreading \
 
 This restores each service to exactly the binding its healthy siblings already have. Rollback is the same command with `remove-iam-policy-binding`.
 
-**Follow-up worth doing:** audit every Gen2 trigger service for the binding (a single sweep), and add it to the deploy checklist — a silently-missing invoker binding produces no error anywhere except the target service's own logs.
+**Follow-up worth doing:** add the invoker-binding audit to the deploy checklist — a silently-missing binding produces no error anywhere except the target service's own logs.
+
+## SECOND INCIDENT: AI roles were granted to the wrong service account
+
+With the invoker fixed, Phase B still failed `lastError: http_403` on the first provider call. Root cause was **an error in the Phase 0 IAM work**: the roles were granted to `lumi-ninc-au@appspot.gserviceaccount.com` because that SA name was taken from the plan document, but the functions actually run as **`lumi-functions-runtime@lumi-ninc-au.iam.gserviceaccount.com`**.
+
+Worse, the Phase 0 record asserted the runtime SA already held `roles/speech.client`. It did not — **no principal in the project held that role at all**. The Phase 0 STT probes had run on the operator's own user credentials, which masked the gap completely. A green probe against an endpoint proves the *endpoint* works; it proves nothing about the *service identity* that will call it in production.
+
+**Applied:**
+```bash
+gcloud projects add-iam-policy-binding lumi-ninc-au \
+  --member="serviceAccount:lumi-functions-runtime@lumi-ninc-au.iam.gserviceaccount.com" \
+  --role="projects/lumi-ninc-au/roles/lumiAiEvalPredictor"
+gcloud projects add-iam-policy-binding lumi-ninc-au \
+  --member="serviceAccount:lumi-functions-runtime@lumi-ninc-au.iam.gserviceaccount.com" \
+  --role="roles/speech.client"
+# least privilege — the appspot SA never needed it
+gcloud projects remove-iam-policy-binding lumi-ninc-au \
+  --member="serviceAccount:lumi-ninc-au@appspot.gserviceaccount.com" \
+  --role="projects/lumi-ninc-au/roles/lumiAiEvalPredictor"
+```
+
+Note the roles take **1–3 minutes to propagate**: a canary run ~30 s after granting still returned 403, and the same run ~4 minutes later passed. Docs corrected in the same PR (plan §12.5, runbook header, checklist Phase 0 rows).
+
+**Final runtime SA role set:** `lumiAiEvalPredictor`, `roles/speech.client`, `roles/datastore.user`, `roles/eventarc.eventReceiver`, `roles/firebaseappcheck.tokenVerifier`, `lumiFcmSender`, `lumiFunctionsAuthRuntime`, plus bucket-level `roles/storage.objectUser` and per-service `roles/run.invoker`.

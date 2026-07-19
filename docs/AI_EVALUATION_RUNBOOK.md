@@ -2,7 +2,10 @@
 
 **Scope:** the dark-shipped pipeline from PRs #456 (enqueue), #457 (worker/sweep) and the retention cron. Design: `docs/AI_EVALUATION_GEMINI_PLAN.md` · execution checklist: `docs/AI_COMPREHENSION_EVAL_CHECKLIST.md`.
 
-**Prod state assumptions:** project `lumi-ninc-au`, all AI processing pinned to `australia-southeast1`. No API keys exist — auth is the Functions runtime SA (`lumi-ninc-au@appspot.gserviceaccount.com`) with `roles/speech.client` + custom role `lumiAiEvalPredictor` (`aiplatform.endpoints.predict`).
+**Prod state assumptions:** project `lumi-ninc-au`, all AI processing pinned to `australia-southeast1`. No API keys exist — auth is the Functions runtime SA **`lumi-functions-runtime@lumi-ninc-au.iam.gserviceaccount.com`** with `roles/speech.client` + custom role `lumiAiEvalPredictor` (`aiplatform.endpoints.predict`), plus bucket-level `roles/storage.objectUser` on the audio bucket and a per-service `roles/run.invoker` binding on each trigger service.
+
+> **Service-identity gotcha (cost a debugging cycle on 2026-07-20):** an earlier record named `lumi-ninc-au@appspot.gserviceaccount.com` as the runtime SA. It is not. Always derive it from the deployed service:
+> `gcloud run services describe <service> --project lumi-ninc-au --region australia-southeast1 --format="value(spec.template.spec.serviceAccountName)"`
 
 ---
 
