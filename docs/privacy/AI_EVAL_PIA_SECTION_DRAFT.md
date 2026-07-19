@@ -86,15 +86,24 @@ exact production request shape; all other Gemini models 404 — the probe
 discriminates), structured output and injection resistance verified, IAM role
 created and verified.
 
-**Still open:** the dated capture of Google's **during-ML-processing** (not
-just at-rest) residency commitment for `australia-southeast1`, and the pin of
-Vertex generative-AI data-governance terms (no training on customer content;
-abuse-monitoring/logging posture) into `docs/privacy/vendor-evidence/`.
+**Update (20 July 2026):** leg 2 is now **PASS** — the during-ML-processing
+commitment for `australia-southeast1` was captured into
+`docs/privacy/vendor-evidence/2026-07-20/vertex-au-ml-processing-residency.md`.
+The commitment covers exactly `gemini-2.5-flash` at the **128k context
+tier**; the tier boundary is mechanically enforced in code (prompt asserted
+against a residency character budget before any provider call).
 
-**Until both are captured, all documents use the tier-2 claim** ("processed via
-Google Cloud's Sydney regional endpoint; Google's formal in-region processing
-commitment for generative AI in Australia is pending"), never an unqualified
-"data never leaves Australia". See plan §6 for the full ladder.
+**Still open:** the pin of Vertex generative-AI data-governance terms (leg
+3: no training on customer content; abuse-monitoring/logging posture), and —
+for a whole-pipeline (rather than LLM-stage) claim — the formal residency
+terms of the separate Speech-to-Text product.
+
+**All drafts currently use the tier-2 claim** ("processed via Google Cloud's
+Sydney regional endpoint; Google's formal in-region processing commitment for
+generative AI in Australia is pending"), never an unqualified "data never
+leaves Australia". With leg 2 captured, upgrading the published wording to
+tier 1 is now within reach — that upgrade is a Nic/counsel decision to be
+made once leg 3 and the STT terms are pinned. See plan §6 for the ladder.
 
 ## 4. APP analysis
 
@@ -145,10 +154,12 @@ commitment for generative AI in Australia is pending"), never an unqualified
   (stated in the notice; changes require privacy review); classification cache
   ~365 days, containing no verbatim student content; audio retention is the
   school's existing 30/90/365-day setting, unchanged. Retention is enforced by
-  a daily cron (03:30 Sydney) with monotonic-cursor sweep. **Open gate:** the
-  student/account deletion cascade must be extended to evaluation and job
-  documents before any school is enabled (runbook §5.5) — this is an
-  engineering pre-enablement blocker, tracked on the checklist.
+  a daily cron (03:30 Sydney) with monotonic-cursor sweep. The student/
+  account deletion cascade was extended to evaluation and job documents on
+  20 July 2026 (PR #464: student deletion removes evals + jobs per log with
+  an orphan sweep; account de-identification strips eval transcripts and
+  drops pending jobs; emulator integration tests cover both paths) — closing
+  the former runbook §5.5 pre-enablement gate.
 - **Children's best interests / Children's Online Privacy Code (exposure
   draft):** the feature defaults off at two levels, collects nothing new,
   shows children no AI output, makes no automated decisions with legal or
@@ -216,9 +227,11 @@ notice and the selected opt-out/consent route).
 
 1. Counsel + Nic approve: this PIA section, the collection notice (with
    effective date), the opt-out model, and the APP 8 addendum position.
-2. Residency during-ML-processing evidence + data-governance terms captured,
-   dated, into `docs/privacy/vendor-evidence/`; claims wording tier confirmed.
-3. Deletion-cascade extension to evals/jobs implemented and tested.
+2. Residency evidence completed: during-ML-processing capture DONE
+   (2026-07-20, vendor-evidence); data-governance terms pin still required;
+   claims wording tier confirmed by Nic/counsel.
+3. ~~Deletion-cascade extension to evals/jobs~~ DONE (PR #464, 2026-07-20) —
+   include in counsel's review pack.
 4. 5–10 authorised representative recordings pass the teacher blind-review
    accuracy gate; rubric/prompt frozen (regression suite green).
 5. State/sector DoE screening completed for each pilot school.

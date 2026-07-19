@@ -36,8 +36,12 @@ school (APP 5 notice for an APP 6 secondary use). Companion documents:
      *"processed via Google Cloud's Sydney regional endpoint; Google's formal
      in-region processing commitment for generative AI in Australia is
      pending."* Never claim "your data never leaves Australia" as an
-     unqualified absolute. If the tier-1 evidence lands before publication,
-     counsel may upgrade the wording to the tier-1 sentence in §6 of the plan.
+     unqualified absolute. **Status 20 July 2026:** the during-ML-processing
+     evidence (leg 2) was captured that day
+     (`vendor-evidence/2026-07-20/vertex-au-ml-processing-residency.md` —
+     covers `gemini-2.5-flash` @128k, mechanically enforced); the tier-1
+     upgrade is now a Nic/counsel decision once the data-governance terms
+     (leg 3) and STT product terms are also pinned.
    - No safeguarding/monitoring claims. No numeric scores are shown anywhere;
      do not imply scoring or ranking.
 3. **Placeholders that MUST be resolved before publication:**
@@ -125,11 +129,10 @@ data. Google does not use this content to train its AI models.
 | Transcript (text of the answer) | 90 days, then removed from the evaluation record |
 | Teacher-only evaluation summary | Up to 730 days (2 years), then deleted |
 
-If your child's student record is deleted, associated recordings are deleted as
-part of the existing deletion process. Deletion of evaluations and related
-processing records is part of the same commitment. [Drafting note: the
-deletion-cascade extension covering evaluation documents is a pre-enablement
-engineering gate — see PIA section; confirm complete before publication.]
+If your child's student record is deleted, associated recordings, transcripts
+and evaluations are deleted as part of the same deletion process. [Drafting
+note: the deletion-cascade extension covering evaluation documents shipped on
+20 July 2026 (PR #464); re-confirm deployed state at publication.]
 
 #### Recordings made before this notice
 
