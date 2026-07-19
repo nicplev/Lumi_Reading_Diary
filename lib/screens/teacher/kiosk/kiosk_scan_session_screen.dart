@@ -15,6 +15,7 @@ import '../../../data/models/user_model.dart';
 import '../../../services/isbn_assignment_service.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
+import '../../../core/utils/image_decode.dart';
 
 /// Outcome of a single kiosk scan, used to label the session list + banner.
 enum _KioskOutcome { added, renewed, reread }
@@ -433,6 +434,7 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
     return Image.asset(
       _celebrateAsset!,
       height: 120,
+      cacheHeight: decodeCacheSize(context, 120),
       key: ValueKey(_celebrateTick),
     )
         .animate(key: ValueKey(_celebrateTick))

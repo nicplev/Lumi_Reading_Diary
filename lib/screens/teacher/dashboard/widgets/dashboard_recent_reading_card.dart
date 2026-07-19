@@ -11,6 +11,7 @@ import '../../../../data/models/reading_log_model.dart';
 import '../../../../data/models/student_model.dart';
 import '../../../../data/models/user_model.dart';
 import '../../../../services/firebase_service.dart';
+import '../../../../core/utils/image_decode.dart';
 
 /// Dashboard Recent Reading Card
 ///
@@ -301,6 +302,7 @@ class _RecentLogRow extends StatelessWidget {
               Image.asset(
                 'assets/blobs/blob-${rep.childFeeling!.name}.png',
                 width: 20,
+                cacheWidth: decodeCacheSize(context, 20),
                 height: 20,
                 fit: BoxFit.contain,
                 errorBuilder: (_, __, ___) => const SizedBox.shrink(),

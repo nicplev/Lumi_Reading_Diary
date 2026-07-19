@@ -9,6 +9,7 @@ import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_input.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../services/firebase_service.dart';
+import '../../core/utils/image_decode.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -113,6 +114,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       : Image.asset(
                           'assets/UI Lumi/password+lock.png',
                           height: 132,
+                          cacheHeight: decodeCacheSize(context, 132),
                           fit: BoxFit.contain,
                         ),
                 ),

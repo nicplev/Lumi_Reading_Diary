@@ -9,6 +9,7 @@ import '../../services/firebase_service.dart';
 import '../../services/terms_acceptance_service.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
+import '../../core/utils/image_decode.dart';
 
 class TermsAcceptanceScreen extends ConsumerStatefulWidget {
   const TermsAcceptanceScreen({super.key, this.returnTo});
@@ -460,6 +461,7 @@ class TermsAccountLoadError extends StatelessWidget {
               Image.asset(
                 'assets/UI Lumi/lumi welcome.png',
                 width: 190,
+                cacheWidth: decodeCacheSize(context, 190),
                 height: 190,
                 fit: BoxFit.contain,
               ),

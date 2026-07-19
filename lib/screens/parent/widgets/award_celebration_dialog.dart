@@ -8,6 +8,7 @@ import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../data/models/student_model.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
+import '../../../core/utils/image_decode.dart';
 
 /// Remembers which award celebrations a parent has already seen, so the
 /// on-open modal fires exactly once per distinct award. Keyed by student +
@@ -137,6 +138,7 @@ class _AwardCelebrationDialog extends StatelessWidget {
                   ? Image.asset(
                       asset,
                       width: 110,
+                      cacheWidth: decodeCacheSize(context, 110),
                       height: 110,
                       fit: BoxFit.contain,
                     )

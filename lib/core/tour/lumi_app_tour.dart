@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../characters/lumi_character.dart';
+import '../../core/utils/image_decode.dart';
 
 enum LumiTourRole { parent, teacher }
 
@@ -701,7 +702,11 @@ class _TourCard extends StatelessWidget {
                 SizedBox(
                   width: 62,
                   height: 62,
-                  child: Image.asset(character.assetPath, fit: BoxFit.contain),
+                  child: Image.asset(
+                    character.assetPath,
+                    fit: BoxFit.contain,
+                    cacheWidth: decodeCacheSize(context, 62),
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(

@@ -12,6 +12,7 @@ import '../../services/notification_service.dart';
 import '../../services/analytics_service.dart';
 import '../../services/phone_verification_recovery_service.dart';
 import '../../core/exceptions/session_exceptions.dart';
+import '../../core/utils/image_decode.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -186,6 +187,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             child: Image.asset(
               'assets/lumi/Lumi_Splash_Screen.png',
               fit: BoxFit.cover,
+              // 4097×6145 source — decode at device resolution, not full size.
+              cacheWidth:
+                  decodeCacheSize(context, MediaQuery.sizeOf(context).width),
             ),
           ),
           Positioned(

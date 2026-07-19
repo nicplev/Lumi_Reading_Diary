@@ -16,6 +16,7 @@ import '../../data/providers/active_child_provider.dart';
 import '../../services/firebase_service.dart';
 import '../auth/link_code_scanner_screen.dart';
 import 'widgets/character_grid.dart';
+import '../../core/utils/image_decode.dart';
 
 enum _LinkStage { code, confirm, character, success }
 
@@ -192,6 +193,7 @@ class _LinkChildScreenState extends ConsumerState<LinkChildScreen> {
           child: Image.asset(
             'assets/UI Lumi/Lumi wKIds.png',
             height: 140,
+            cacheHeight: decodeCacheSize(context, 140),
             fit: BoxFit.contain,
           ),
         ),
@@ -255,6 +257,7 @@ class _LinkChildScreenState extends ConsumerState<LinkChildScreen> {
           child: Image.asset(
             'assets/UI Lumi/Lumi wKIds.png',
             height: 140,
+            cacheHeight: decodeCacheSize(context, 140),
             fit: BoxFit.contain,
           ),
         ),

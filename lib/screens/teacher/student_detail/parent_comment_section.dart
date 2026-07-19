@@ -9,6 +9,7 @@ import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
 import 'reading_log_snapshot.dart';
 import 'section_info_card.dart';
+import '../../../core/utils/image_decode.dart';
 
 /// "Latest Parent Comment" card on the teacher student-detail screen. Watches
 /// the shared comment-logs provider and memoizes parent-name lookups locally.
@@ -177,6 +178,7 @@ class _ParentCommentSectionState extends ConsumerState<ParentCommentSection> {
                                       Image.asset(
                                         'assets/blobs/blob-${latest.feeling}.png',
                                         width: 22,
+                                        cacheWidth: decodeCacheSize(context, 22),
                                         height: 22,
                                       ),
                                       const SizedBox(width: 5),

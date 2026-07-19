@@ -11,6 +11,7 @@ import '../../data/models/reading_log_model.dart';
 import '../../data/models/student_model.dart';
 import '../../services/firebase_service.dart';
 import '../../services/reading_history_service.dart';
+import '../../core/utils/image_decode.dart';
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
@@ -616,6 +617,7 @@ class _TeacherStudentReadingHistoryScreenState
                   Image.asset(
                     'assets/blobs/blob-${log.childFeeling}.png',
                     width: 18,
+                    cacheWidth: decodeCacheSize(context, 18),
                     height: 18,
                     fit: BoxFit.contain,
                     errorBuilder: (_, __, ___) => const SizedBox.shrink(),
@@ -696,6 +698,7 @@ class _TeacherStudentReadingHistoryScreenState
                         child: Image.asset(
                           'assets/blobs/blob-$f.png',
                           width: 20,
+                          cacheWidth: decodeCacheSize(context, 20),
                           height: 20,
                         ),
                       ),
@@ -874,6 +877,7 @@ class _BlobFilterChip extends StatelessWidget {
           child: Image.asset(
             'assets/blobs/blob-$feeling.png',
             width: 22,
+            cacheWidth: decodeCacheSize(context, 22),
             height: 22,
           ),
         ),

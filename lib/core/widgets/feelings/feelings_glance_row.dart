@@ -5,6 +5,7 @@ import '../../feelings/feeling_aggregator.dart';
 import '../../feelings/feeling_scale.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/teacher_constants.dart';
+import '../../../core/utils/image_decode.dart';
 
 /// The "at a glance" row — one tile per day showing the blob character for that
 /// day's feeling. Days with no recorded feeling show a neutral dashed
@@ -51,7 +52,7 @@ class _Tile extends StatelessWidget {
             aspectRatio: 1,
             child: feeling == null
                 ? _placeholder()
-                : _blob(feeling),
+                : _blob(context, feeling),
           ),
           const SizedBox(height: 6),
           // Feeling word (e.g. "Good") rather than its 1–5 number. scaleDown
@@ -74,7 +75,7 @@ class _Tile extends StatelessWidget {
     );
   }
 
-  Widget _blob(ReadingFeeling feeling) {
+  Widget _blob(BuildContext context, ReadingFeeling feeling) {
     return Container(
       decoration: BoxDecoration(
         color: feeling.color.withValues(alpha: 0.14),
@@ -84,6 +85,7 @@ class _Tile extends StatelessWidget {
       child: Image.asset(
         feeling.asset,
         fit: BoxFit.contain,
+        cacheWidth: decodeCacheSize(context, 32),
         errorBuilder: (_, __, ___) => Center(
           child: Text(
             feeling.label[0],

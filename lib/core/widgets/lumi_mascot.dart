@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../theme/app_colors.dart';
+import '../utils/image_decode.dart';
 
 /// Named variants of the Lumi flame mascot. Each value maps to one PNG in
 /// `assets/lumi/`. Add a new value + asset path here when a new mascot
@@ -55,6 +56,8 @@ class LumiMascot extends StatelessWidget {
       child: Image.asset(
         variant.asset,
         fit: BoxFit.contain,
+        // Source PNGs are 863px+; cap the decode at the rendered size.
+        cacheWidth: decodeCacheSize(context, size),
         errorBuilder: (context, error, stackTrace) => Icon(
           Icons.local_fire_department_rounded,
           size: size * 0.8,

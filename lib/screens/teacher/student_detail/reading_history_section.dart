@@ -8,6 +8,7 @@ import '../../../data/providers/student_detail_providers.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
 import 'reading_log_snapshot.dart';
+import '../../../core/utils/image_decode.dart';
 
 /// "Recent Reading" section on the teacher student-detail screen. Watches the
 /// shared recent-logs provider; retry invalidates only this section's stream.
@@ -224,6 +225,7 @@ class _ReadingGroupRow extends StatelessWidget {
               Image.asset(
                 'assets/blobs/blob-${rep.childFeeling}.png',
                 width: 18,
+                cacheWidth: decodeCacheSize(context, 18),
                 height: 18,
               ),
             if (hasAudio) ...[

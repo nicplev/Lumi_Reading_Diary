@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../data/models/reading_log_model.dart';
 import '../../../theme/lumi_tokens.dart';
+import '../../utils/image_decode.dart';
 import '../../theme/lumi_text_styles.dart';
 
 /// A widget that displays 5 blob characters for the child to rate
@@ -154,6 +155,8 @@ class _BlobSelectorState extends State<BlobSelector> {
                     child: Image.asset(
                       blob.asset,
                       fit: BoxFit.contain,
+                      // 328px source rendered at 46px — cap the decode.
+                      cacheWidth: decodeCacheSize(context, 46),
                       errorBuilder: (_, __, ___) => Center(
                         child: Text(
                           blob.label[0],

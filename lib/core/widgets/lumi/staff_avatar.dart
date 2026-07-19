@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/characters/staff_lumi_character.dart';
 import '../../../data/models/user_model.dart';
+import '../../../core/utils/image_decode.dart';
 
 /// Renders a staff member's avatar — the staff counterpart of [StudentAvatar].
 ///
@@ -61,6 +62,7 @@ class StaffAvatar extends StatelessWidget {
         width: size,
         height: size,
         fit: BoxFit.contain,
+        cacheWidth: decodeCacheSize(context, size),
       );
     }
 

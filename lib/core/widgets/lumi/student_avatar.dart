@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/characters/lumi_character.dart';
 import '../../../data/models/student_model.dart';
+import '../../../core/utils/image_decode.dart';
 
 /// Renders a student's avatar.
 ///
@@ -69,6 +70,7 @@ class StudentAvatar extends StatelessWidget {
         width: size,
         height: size,
         fit: BoxFit.contain,
+        cacheWidth: decodeCacheSize(context, size),
       );
     }
 
