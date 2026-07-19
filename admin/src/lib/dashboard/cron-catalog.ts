@@ -60,6 +60,12 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
     staleAfterMs: 8 * HOUR,
   },
   {
+    name: "aiEvalRetention",
+    label: "AI eval retention",
+    scheduleLabel: "daily 03:30 Syd",
+    staleAfterMs: 26 * HOUR,
+  },
+  {
     name: "cleanupExpiredLinkCodes",
     label: "Link-code expiry",
     scheduleLabel: "daily 02:00 LA",

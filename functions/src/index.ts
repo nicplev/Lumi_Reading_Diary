@@ -232,6 +232,7 @@ export {
 // Worker claims deny-all aiEvalJobs docs; the 6-hourly sweep is the only
 // re-dispatch/recovery mechanism. docs/AI_EVALUATION_GEMINI_PLAN.md.
 export {processAiEvalJob, sweepAiEvalJobs} from "./ai_evaluation/worker";
+export {aiEvalRetention} from "./ai_evaluation/retention";
 
 // Idempotent account/student deletion jobs. All destructive work runs through
 // server-owned callables/the retry scheduler; clients can only request and
