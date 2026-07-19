@@ -1252,6 +1252,32 @@ test('students: staff cannot write the server-owned access map or parentIds', as
       autoAward: { characterId: 'gold_lumi', name: 'Reader of the Week' },
     }),
   );
+
+  // View aggregates are server-only (stats trigger + weekly reconcile).
+  // latestParentComment renders in the teacher UI attributed to a parent, so
+  // a client-forged value would misattribute speech to a real parent.
+  await assertFails(
+    studentRef(authDb('teacher_1')).update({
+      latestParentComment: {
+        logId: 'log_1', freeText: 'forged', parentName: 'Some Parent',
+      },
+    }),
+  );
+  await assertFails(
+    studentRef(authDb('admin_1')).update({
+      latestParentComment: null,
+    }),
+  );
+  await assertFails(
+    studentRef(authDb('teacher_1')).update({
+      feelingsByDay: { '2026-07-19': { great: 3 } },
+    }),
+  );
+  await assertFails(
+    studentRef(authDb('admin_1')).update({
+      feelingsByDay: {},
+    }),
+  );
 });
 
 test('classes: teacher of the class can write award settings', async () => {

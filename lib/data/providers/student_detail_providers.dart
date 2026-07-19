@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'active_child_provider.dart' show firestoreProvider;
+import '../models/student_model.dart';
 
 /// Composite family key for the teacher student-detail screen's streams,
 /// following the repo's `*Lookup` convention (see StudentLookup/ClassLookup).
@@ -108,4 +109,20 @@ final allocationLogsProvider = StreamProvider.autoDispose
       .orderBy('date', descending: true)
       .limit(200)
       .snapshots();
+});
+
+/// Live student doc for the detail screen — the read side of the C7
+/// server-maintained view aggregates (`feelingsByDay`,
+/// `latestParentComment`). One doc subscription that, once the backfill has
+/// run, replaces the 400-log and 50-log section streams.
+final studentDocProvider = StreamProvider.autoDispose
+    .family<StudentModel?, StudentDetailLookup>((ref, lookup) {
+  return ref
+      .watch(firestoreProvider)
+      .collection('schools')
+      .doc(lookup.schoolId)
+      .collection('students')
+      .doc(lookup.studentId)
+      .snapshots()
+      .map((doc) => doc.exists ? StudentModel.fromFirestore(doc) : null);
 });

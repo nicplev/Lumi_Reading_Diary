@@ -525,6 +525,11 @@ service cloud.firestore {
         // topReaderAward Cloud Function (Admin SDK); clients must not spoof it.
         // (`manualAward`, the teacher's special award, is intentionally NOT
         // blocked — teachers set it from the app.)
+        // `feelingsByDay` and `latestParentComment` are server-maintained view
+        // aggregates (stats trigger + weekly reconcile). latestParentComment
+        // renders in the teacher UI attributed to a parent, so a client-forged
+        // value would put words in a parent's mouth — server-only, like
+        // `access`/`autoAward`.
         allow update: if (isSchoolAdmin(schoolId) ||
               (isTeacher(schoolId) &&
                 teacherTeachesClass(schoolId, resource.data.classId) &&
@@ -536,7 +541,9 @@ service cloud.firestore {
                   'parentIds',
                   'autoAward',
                   'pendingDeletion',
-                  'pendingDeletionAt'
+                  'pendingDeletionAt',
+                  'feelingsByDay',
+                  'latestParentComment'
                 ]);
 
         // Deletion is intentionally server-only. The requestStudentDeletion
