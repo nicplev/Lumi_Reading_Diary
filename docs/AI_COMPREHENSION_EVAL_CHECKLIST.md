@@ -85,17 +85,17 @@ The per-phase checkboxes below are retained as the detailed spec; THIS table is 
 
 ### GCP / Speech-to-Text (go/no-go)
 - [x] Enable `speech.googleapis.com` in `lumi-ninc-au`
-- [x] Grant `roles/speech.client` to `lumi-ninc-au@appspot.gserviceaccount.com`
+- [x] Grant `roles/speech.client` to the runtime SA — **CORRECTED 2026-07-20**: originally recorded against `lumi-ninc-au@appspot.gserviceaccount.com`, but no principal actually held the role (Phase 0 probes ran on operator credentials). Now granted to the real runtime SA `lumi-functions-runtime@lumi-ninc-au.iam.gserviceaccount.com`
 - [~] **GO/NO-GO:** verify STT v2 `latest_short` + `en-AU` serves from `australia-southeast1` with a real child-style `.m4a` (fallbacks: `long`/`chirp` if AU-resident → global-endpoint-with-caveat → Gemini-on-Vertex decision). **Synthetic result:** direct AAC/M4A is viable in AU with `long`; `latest_short` worked only for the 1.35 s sample; Chirp 2 is unavailable. A properly authorised representative child-style M4A and teacher review remain mandatory.
 - [x] Verify STT billing granularity (per-second vs per-request minimum). Official V2 pricing and live observations confirm successful requests round up to one-second increments; an empty successful response is still billable.
 - [x] Verify regional recognize **quota** covers evening-peak jobs/min at target `maxInstances`. Live quota is 211 synchronous requests/minute/region versus planned `maxInstances=5`; load-test and revisit before fleet scale.
 
 ### Vertex AI (Gemini) — replaces the former Anthropic gates (provider pivot 2026-07-19)
 - [x] **GO/NO-GO model probe (2026-07-19):** live probe of 10 model ids against `australia-southeast1-aiplatform.googleapis.com` — **only `gemini-2.5-flash` is served from Sydney** (flash-lite and all 3.x: 404). Pilot pins `gemini-2.5-flash` (Nic accepts the Oct-2026 retirement for the few-school pilot; model revisited before wider rollout). Structured-output + injection probes passed; `thinkingBudget:0` verified (no thought tokens). Evidence: `AI_EVALUATION_GEMINI_PLAN.md` §12
-- [ ] **Residency evidence:** current Google data-residency doc shows the **during-ML-processing** commitment (not just at-rest) for `australia-southeast1`; dated capture into `docs/privacy/vendor-evidence/`; pick the claims-ladder tier (§6)
+- [x] **Residency evidence (2026-07-20):** Google's matrix grants `australia-southeast1` the **during-ML-processing** commitment for `gemini-2.5-flash` **at the 128k context tier only** (1M row / Flash-Lite / all 3.x: none). Enforced in code (config clamp + `ResidencyBudgetError`). Capture: `docs/privacy/vendor-evidence/2026-07-20/`. Tier-1 claim available but not authorised until the two legs below are filed — drafts stay on tier-2 wording
 - [ ] Pin Vertex gen-AI data-governance terms (no training on customer data; abuse-monitoring/logging posture) into vendor-evidence, dated
-- [x] IAM (2026-07-19): custom role `lumiAiEvalPredictor` (`aiplatform.endpoints.predict` only) created + granted to `lumi-ninc-au@appspot.gserviceaccount.com`, binding verified; `aiplatform.googleapis.com` enabled; rollback commands in §12.5. **No API key / secret exists in this design**
-- [ ] GCP billing budget + alert thresholds on Vertex AI + Speech SKUs (alert-only — app-level caps remain the hard stop)
+- [x] IAM — **CORRECTED 2026-07-20**: custom role `lumiAiEvalPredictor` (`aiplatform.endpoints.predict` only) + `roles/speech.client` now held by the REAL runtime SA `lumi-functions-runtime@lumi-ninc-au.iam.gserviceaccount.com`; the misplaced appspot grant was removed. Plus a per-service `roles/run.invoker` on `processaievaljob` (and on `maintainclassdailyreading`, a pre-existing outage the canary exposed). All 25 Eventarc trigger services audited — no remaining gaps. `aiplatform.googleapis.com` enabled. **No API key / secret exists in this design**
+- [x] GCP billing budget + alert thresholds (2026-07-19): A$150/mo budget "Lumi AI eval (Vertex+Speech) daily-scale guard" scoped to the Vertex AI + Cloud Speech SKUs, alerting at 50/90/100% (alert-only — app-level caps remain the hard stop)
 - [ ] Also probe: Claude models in Model Garden `australia-southeast1` (quality-fallback candidate #4; still no Anthropic DPA needed — Google is the processor)
 
 ### Prompt spike
