@@ -14,6 +14,8 @@ import {
 } from "@/lib/firestore/school-subscriptions";
 import { isDemoSchool, listAllDemoAccessEmails } from "@/lib/firestore/demo-access";
 import { SchoolDetailTabs } from "./school-detail-tabs";
+import { getAiEvaluationSchoolConfig } from "@lumi/server-ops";
+import { getAdminDb } from "@/lib/firebase-admin";
 
 export default async function SchoolDetailPage({
   params,
@@ -39,6 +41,8 @@ export default async function SchoolDetailPage({
     getCurrentAcademicYear(),
     isDemoSchool(schoolId),
   ]);
+
+  const aiEvaluation = await getAiEvaluationSchoolConfig(getAdminDb(), schoolId);
 
   if (!school) notFound();
 
@@ -66,6 +70,7 @@ export default async function SchoolDetailPage({
         subscriptions={subscriptions}
         currentAcademicYear={currentAcademicYear}
         demoAccessEmails={demoAccessEmails}
+        aiEvaluation={aiEvaluation}
       />
     </>
   );

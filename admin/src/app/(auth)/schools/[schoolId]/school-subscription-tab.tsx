@@ -25,6 +25,8 @@ import type {
   SubscriptionTier,
 } from "@lumi/types";
 import type { SchoolSubscriptionRow } from "@/lib/firestore/school-subscriptions";
+import type { AiEvaluationSchoolConfig } from "@lumi/server-ops";
+import { AiEvaluationCard } from "./ai-evaluation-card";
 
 const STATUSES: SubscriptionStatus[] = [
   "paid",
@@ -48,6 +50,7 @@ interface Props {
   currentAcademicYear: number;
   initialSubscriptions: SchoolSubscriptionRow[];
   initialAccessMode: AccessMode;
+  initialAiEvaluation: AiEvaluationSchoolConfig;
 }
 
 export function SchoolSubscriptionTab({
@@ -56,6 +59,7 @@ export function SchoolSubscriptionTab({
   currentAcademicYear,
   initialSubscriptions,
   initialAccessMode,
+  initialAiEvaluation,
 }: Props) {
   const router = useRouter();
   const [rows, setRows] = useState<SchoolSubscriptionRow[]>(
@@ -178,6 +182,12 @@ export function SchoolSubscriptionTab({
           </div>
         </CardContent>
       </Card>
+
+      <AiEvaluationCard
+        schoolId={schoolId}
+        studentCount={studentCount}
+        initialConfig={initialAiEvaluation}
+      />
 
       <Card>
         <CardHeader>

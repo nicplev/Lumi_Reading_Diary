@@ -11,6 +11,7 @@ import { StudentRoster } from './student-roster';
 import { ReadingGroupsTab } from './reading-groups-tab';
 import { AllocationsTab } from './allocations-tab';
 import { ClassReportTab } from './class-report-tab';
+import { ComprehensionEvalTab } from './comprehension-eval-tab';
 import { ComprehensionQuestionCard } from './comprehension-question-card';
 import type { SchoolClass, ReadingLevelOption } from '@/lib/types';
 
@@ -39,6 +40,7 @@ export function ClassDetail({ schoolClass, levelOptions, classOptions = [], leve
     { id: 'groups', label: 'Reading Groups', icon: <Icon name="library_books" size={18} /> },
     { id: 'allocations', label: 'Allocations', icon: <Icon name="inventory_2" size={18} /> },
     { id: 'report', label: 'Report', icon: <Icon name="assessment" size={18} /> },
+    { id: 'comprehension', label: 'Comprehension', icon: <Icon name="graphic_eq" size={18} /> },
   ];
 
   return (
@@ -75,6 +77,9 @@ export function ClassDetail({ schoolClass, levelOptions, classOptions = [], leve
       {activeTab === 'allocations' && <AllocationsTab classId={schoolClass.id} levelOptions={levelOptions} />}
       {activeTab === 'report' && (
         <ClassReportTab classId={schoolClass.id} className={schoolClass.name} yearLevel={schoolClass.yearLevel} defaultMinutesTarget={schoolClass.defaultMinutesTarget} levelsEnabled={levelsEnabled} />
+      )}
+      {activeTab === 'comprehension' && (
+        <ComprehensionEvalTab classId={schoolClass.id} className={schoolClass.name} />
       )}
     </div>
   );

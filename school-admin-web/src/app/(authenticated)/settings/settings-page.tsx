@@ -29,6 +29,7 @@ import { FloatingPhonePreview } from './floating-phone-preview';
 import { QuickLoggingSettingsSection } from './quick-logging-settings';
 import { ComprehensionRecordingSettingsSection } from './comprehension-recording-settings';
 import { ComprehensionAudioCleanupSection } from './comprehension-audio-cleanup';
+import { AiEvaluationStatusCard } from './ai-evaluation-status-card';
 import { MessagingSettingsSection } from './messaging-settings';
 import type { RenewalRosterEntry, RenewalBatchSummary } from '@/lib/firestore/renewals';
 
@@ -550,6 +551,9 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
 
             {/* Comprehension Audio Cleanup */}
             <ComprehensionAudioCleanupSection isAdmin={isAdmin} />
+
+            {/* AI Comprehension Evaluation — read-only status (Lumi-switched) */}
+            <AiEvaluationStatusCard />
           </div>
 
           {/* Parent Comments */}
