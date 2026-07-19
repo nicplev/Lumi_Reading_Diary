@@ -74,6 +74,23 @@ test('account cascade removes identity while preserving deidentified school read
     body: 'retain school feedback',
     createdAt: admin.firestore.Timestamp.now(),
   });
+  await school.collection('comprehensionEvals').doc('log_1').set({
+    schoolId: school.id,
+    logId: 'log_1',
+    studentId: 'student_1',
+    classId: 'class_1',
+    status: 'complete',
+    transcript: 'the dog found a bone',
+    summary: 'Recalled the main event.',
+    overallLevel: 'developing',
+    assessable: true,
+  });
+  await db.collection('aiEvalJobs').doc(`${school.id}_log_1`).set({
+    schoolId: school.id,
+    logId: 'log_1',
+    studentId: 'student_1',
+    status: 'queued',
+  });
   await db.collection('feedback').doc('feedback_1').set({ userId: uid });
   await db.collection('userSchoolIndex').doc('index_1').set({ userId: uid });
   await db.collection('users').doc(uid).set({ email: 'delete@example.test' });
@@ -105,6 +122,11 @@ test('account cascade removes identity while preserving deidentified school read
   assert.equal((await log.collection('comments').doc('teacher').get()).exists, true);
   assert.equal((await audio.exists())[0], false);
   assert.equal((await pendingAudio.exists())[0], false);
+  const strippedEval = (await school.collection('comprehensionEvals').doc('log_1').get()).data();
+  assert.equal(strippedEval.transcript, undefined);
+  assert.ok(strippedEval.transcriptRemovedAt);
+  assert.equal(strippedEval.summary, 'Recalled the main event.');
+  assert.equal((await db.collection('aiEvalJobs').doc(`${school.id}_log_1`).get()).exists, false);
   assert.equal((await db.collection('feedback').doc('feedback_1').get()).exists, false);
   assert.equal((await db.collection('userSchoolIndex').doc('index_1').get()).exists, false);
   assert.equal((await db.collection('users').doc(uid).get()).exists, false);
@@ -146,6 +168,34 @@ test('student cascade removes the profile, history, audio and every linked roste
   const log = school.collection('readingLogs').doc('log_student');
   await log.set({ schoolId: school.id, studentId, parentId: 'parent_1' });
   await log.collection('comments').doc('comment_1').set({ body: 'nested' });
+  await school.collection('comprehensionEvals').doc('log_student').set({
+    schoolId: school.id,
+    logId: 'log_student',
+    studentId,
+    classId: 'class_1',
+    status: 'complete',
+    transcript: 'answer',
+  });
+  await db.collection('aiEvalJobs').doc(`${school.id}_log_student`).set({
+    schoolId: school.id,
+    logId: 'log_student',
+    studentId,
+    status: 'queued',
+  });
+  // Orphan pair: eval/job whose reading log no longer exists.
+  await school.collection('comprehensionEvals').doc('log_gone').set({
+    schoolId: school.id,
+    logId: 'log_gone',
+    studentId,
+    classId: 'class_1',
+    status: 'flagged',
+  });
+  await db.collection('aiEvalJobs').doc(`${school.id}_log_gone`).set({
+    schoolId: school.id,
+    logId: 'log_gone',
+    studentId,
+    status: 'deferred',
+  });
   const audio = admin.storage().bucket().file(
     `schools/${school.id}/comprehension_audio/log_student.m4a`
   );
@@ -172,5 +222,9 @@ test('student cascade removes the profile, history, audio and every linked roste
   assert.equal((await school.collection('parents').doc('parent_1')
     .collection('notifications').doc('notification_1').get()).exists, false);
   assert.equal((await db.collection('studentLinkCodes').doc('code_1').get()).exists, false);
+  assert.equal((await school.collection('comprehensionEvals').doc('log_student').get()).exists, false);
+  assert.equal((await school.collection('comprehensionEvals').doc('log_gone').get()).exists, false);
+  assert.equal((await db.collection('aiEvalJobs').doc(`${school.id}_log_student`).get()).exists, false);
+  assert.equal((await db.collection('aiEvalJobs').doc(`${school.id}_log_gone`).get()).exists, false);
   assert.equal((await school.get()).data().studentCount, 0);
 });
