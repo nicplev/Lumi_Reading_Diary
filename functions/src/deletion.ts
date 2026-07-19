@@ -172,6 +172,52 @@ async function deleteStorageFile(path: string, counts: Counts): Promise<void> {
   }
 }
 
+// AI comprehension-eval artifacts for a log: the teacher-only eval doc and
+// the deny-all pipeline job. Deleted whenever the log itself is deleted.
+async function deleteAiEvalArtifacts(
+  schoolId: string,
+  logId: string,
+  counts: Counts
+): Promise<void> {
+  const db = admin.firestore();
+  const evalRef = db.doc(`schools/${schoolId}/comprehensionEvals/${logId}`);
+  if ((await evalRef.get()).exists) {
+    await evalRef.delete();
+    bump(counts, "aiEvalsDeleted");
+  }
+  const jobRef = db.doc(`aiEvalJobs/${schoolId}_${logId}`);
+  if ((await jobRef.get()).exists) {
+    await jobRef.delete();
+    bump(counts, "aiEvalJobsDeleted");
+  }
+}
+
+// De-identification counterpart: the log survives, so the eval's educational
+// judgment (levels/criteria) stays with the student — but the transcript is
+// derived from the same household voice recording being removed, so it goes
+// too, and any pending pipeline job is dropped (its audio is gone).
+async function stripAiEvalTranscript(
+  schoolId: string,
+  logId: string,
+  counts: Counts
+): Promise<void> {
+  const db = admin.firestore();
+  const evalRef = db.doc(`schools/${schoolId}/comprehensionEvals/${logId}`);
+  const snap = await evalRef.get();
+  if (snap.exists && typeof snap.data()?.transcript === "string") {
+    await evalRef.update({
+      transcript: admin.firestore.FieldValue.delete(),
+      transcriptRemovedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    bump(counts, "aiEvalTranscriptsRemoved");
+  }
+  const jobRef = db.doc(`aiEvalJobs/${schoolId}_${logId}`);
+  if ((await jobRef.get()).exists) {
+    await jobRef.delete();
+    bump(counts, "aiEvalJobsDeleted");
+  }
+}
+
 async function deleteReadingLog(
   log: FirebaseFirestore.QueryDocumentSnapshot,
   counts: Counts
@@ -186,6 +232,7 @@ async function deleteReadingLog(
       `comprehension_audio_uploads/${schoolId}/${log.id}.m4a`,
       counts
     );
+    await deleteAiEvalArtifacts(schoolId, log.id, counts);
   }
   await admin.firestore().recursiveDelete(log.ref);
   bump(counts, "readingLogsDeleted");
@@ -207,6 +254,7 @@ async function deidentifyAuthoredReadingLog(
       `comprehension_audio_uploads/${schoolId}/${log.id}.m4a`,
       counts
     );
+    await stripAiEvalTranscript(schoolId, log.id, counts);
   }
   const former = log.data().loggedByRole === "teacher" ?
     "Former staff member" : "Former guardian";
@@ -588,6 +636,27 @@ export async function deleteStudentData(
     .where("studentId", "==", studentId)
     .get();
   for (const log of logs.docs) await deleteReadingLog(log, counts);
+
+  // Safety sweep: evals/jobs whose reading log vanished through some earlier
+  // path still carry the student's derived content — remove them by
+  // studentId (single-field queries; jobs filtered to this school in code).
+  const orphanEvals = await db
+    .collection(`schools/${schoolId}/comprehensionEvals`)
+    .where("studentId", "==", studentId)
+    .get();
+  for (const doc of orphanEvals.docs) {
+    await doc.ref.delete();
+    bump(counts, "aiEvalsDeleted");
+  }
+  const orphanJobs = await db
+    .collection("aiEvalJobs")
+    .where("studentId", "==", studentId)
+    .get();
+  for (const doc of orphanJobs.docs) {
+    if (doc.data().schoolId !== schoolId) continue;
+    await doc.ref.delete();
+    bump(counts, "aiEvalJobsDeleted");
+  }
 
   for (const parentId of parentIds) {
     const parentRef = db.doc(`schools/${schoolId}/parents/${parentId}`);
