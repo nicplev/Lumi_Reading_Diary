@@ -30,6 +30,8 @@ import {
   validateAndTranscodeAudioBuffer,
   type ValidatedAudioBuffer,
 } from "./audio_media_validation";
+import {classComprehensionQuestion} from "./ai_evaluation/question";
+import {enqueueAfterAudioConfirm} from "./ai_evaluation/enqueue";
 
 const RETENTION_DOC = "platformConfig/comprehensionRetention";
 const RECORDING_FLAG_DOC = "platformConfig/comprehensionRecording";
@@ -939,6 +941,30 @@ export const confirmComprehensionAudioUpload = onCall(
       1,
       Math.min(60, Math.round(validated.durationMs / 1000))
     );
+
+    // Snapshot the class comprehension question onto the log so a later AI
+    // evaluation scores against the question the child actually answered,
+    // even if the teacher edits the class question afterwards. Best-effort:
+    // an unreadable class doc falls back to the default question.
+    const questionClassId =
+      typeof logData.classId === "string" ? logData.classId.trim() : "";
+    let comprehensionQuestionText = classComprehensionQuestion(undefined);
+    if (questionClassId) {
+      try {
+        const classSnap = await db
+          .doc(`schools/${schoolId}/classes/${questionClassId}`)
+          .get();
+        comprehensionQuestionText = classComprehensionQuestion(
+          classSnap.data()
+        );
+      } catch (err: unknown) {
+        functions.logger.warn(
+          "Comprehension question read failed; using default",
+          {errorCode: errorCodeForLog(err)}
+        );
+      }
+    }
+
     try {
       await db.runTransaction(async (transaction) => {
         const [freshFlag, freshSchool, freshLog] = await Promise.all([
@@ -981,6 +1007,8 @@ export const confirmComprehensionAudioUpload = onCall(
           comprehensionAudioValidationVersion: AUDIO_VALIDATION_VERSION,
           comprehensionAudioValidatedDurationMs: validated.durationMs,
           comprehensionAudioSha256: validated.sha256,
+          comprehensionQuestionText,
+          comprehensionQuestionCapturedAt: FieldValue.serverTimestamp(),
         });
       });
     } catch (err: unknown) {
@@ -1008,6 +1036,11 @@ export const confirmComprehensionAudioUpload = onCall(
         errorCode: errorCodeForLog(err),
       });
     }
+
+    // AI evaluation enqueue (dark until platform + school gates open).
+    // Never throws — confirmation is already committed.
+    await enqueueAfterAudioConfirm({schoolId, logId});
+
     return {
       confirmed: true,
       durationSec: validatedDurationSec,

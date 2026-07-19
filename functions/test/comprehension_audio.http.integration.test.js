@@ -55,6 +55,21 @@ async function seedFlag(enabled = true) {
   });
 }
 
+// The confirm callable now also requires the per-school audio authority
+// (PR #420); mirror the shape used by comprehension_audio.integration.test.js.
+async function seedSchoolAuthority(schoolId) {
+  await admin.firestore().doc(`schools/${schoolId}`).set({
+    settings: {
+      comprehensionRecording: {
+        enabled: true,
+        authorityVersion: 'school-audio-v1-2026-07-17',
+        authorityConfirmedAt: admin.firestore.Timestamp.now(),
+        retentionDays: 30,
+      },
+    },
+  }, {merge: true});
+}
+
 async function seedLog({schoolId, logId, classId, parentId, uploaded = false}) {
   const canonicalPath = `schools/${schoolId}/comprehension_audio/${logId}.m4a`;
   const ref = admin.firestore().doc(`schools/${schoolId}/readingLogs/${logId}`);
@@ -143,6 +158,7 @@ test('authenticated owner confirms a canonical upload through HTTP', async () =>
   const schoolId = 'school_http_confirm';
   const logId = 'log_http_confirm';
   await seedFlag(true);
+  await seedSchoolAuthority(schoolId);
   const {ref, canonicalPath} = await seedLog({
     schoolId,
     logId,
