@@ -42,6 +42,22 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
   final AchievementCustomization _customization =
       AchievementCustomization.empty;
 
+  // Created once so rebuilds reuse the live Firestore subscription (the
+  // screen is pushed per student, so no re-key needed).
+  late final Stream<DocumentSnapshot> _studentStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _studentStream = FirebaseFirestore.instance
+        .collection('schools')
+        .doc(widget.schoolId)
+        .collection('students')
+        .doc(widget.studentId)
+        .snapshots()
+        .asBroadcastStream();
+  }
+
   @override
   Widget build(BuildContext context) {
     return LumiSectionScope(
@@ -56,12 +72,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
           title: Text('Achievements', style: LumiType.subhead),
         ),
         body: StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('schools')
-              .doc(widget.schoolId)
-              .collection('students')
-              .doc(widget.studentId)
-              .snapshots(),
+          stream: _studentStream,
           builder: (context, snapshot) {
             if (snapshot.hasError) {
               return const _ErrorState(

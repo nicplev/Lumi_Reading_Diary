@@ -371,20 +371,26 @@ class _ClassroomKioskScreenState extends State<ClassroomKioskScreen> {
     );
   }
 
+  // Created once so rebuilds (kiosk selections, banners) reuse the live
+  // roster subscription instead of re-subscribing every build.
+  Stream<QuerySnapshot<Map<String, dynamic>>>? _rosterStream;
+
   Widget _buildRoster() {
     if (_schoolId.isEmpty) {
       return Center(
         child: Text('Missing school for this teacher.', style: LumiType.caption),
       );
     }
-    final query = FirebaseFirestore.instance
+    _rosterStream ??= FirebaseFirestore.instance
         .collection('schools')
         .doc(_schoolId)
         .collection('students')
-        .where('classId', isEqualTo: widget.classModel.id);
+        .where('classId', isEqualTo: widget.classModel.id)
+        .snapshots()
+        .asBroadcastStream();
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: query.snapshots(),
+      stream: _rosterStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());

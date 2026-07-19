@@ -15,19 +15,52 @@ import '../../data/models/reading_log_model.dart';
 /// Detailed progress for one child — the calm momentum card on Home links
 /// here. Houses everything that used to clutter Home: full stats, the weekly
 /// breakdown, the 30-night rhythm grid, and a link into achievements.
-class ProgressScreen extends StatelessWidget {
+class ProgressScreen extends StatefulWidget {
   final StudentModel student;
 
   const ProgressScreen({super.key, required this.student});
 
   @override
-  Widget build(BuildContext context) {
+  State<ProgressScreen> createState() => _ProgressScreenState();
+}
+
+class _ProgressScreenState extends State<ProgressScreen> {
+  // Created once so rebuilds reuse the live Firestore subscriptions instead of
+  // re-subscribing (the screen is pushed per student, so no re-key needed).
+  late final Stream<DocumentSnapshot> _studentStream;
+  late final Stream<QuerySnapshot> _windowLogsStream;
+
+  StudentModel get student => widget.student;
+
+  @override
+  void initState() {
+    super.initState();
     final firestore = FirebaseFirestore.instance;
+    final now = DateTime.now();
+    final windowStart = DateTime(now.year, now.month, now.day)
+        .subtract(const Duration(days: 29));
+    _studentStream = firestore
+        .collection('schools')
+        .doc(student.schoolId)
+        .collection('students')
+        .doc(student.id)
+        .snapshots()
+        .asBroadcastStream();
+    _windowLogsStream = firestore
+        .collection('schools')
+        .doc(student.schoolId)
+        .collection('readingLogs')
+        .where('studentId', isEqualTo: student.id)
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(windowStart))
+        .snapshots()
+        .asBroadcastStream();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final now = DateTime.now();
     final startOfWeek = DateTime(now.year, now.month, now.day)
         .subtract(Duration(days: now.weekday - 1));
-    final windowStart = DateTime(now.year, now.month, now.day)
-        .subtract(const Duration(days: 29));
 
     return LumiSectionScope(
       section: LumiSectionTheme.home,
@@ -46,12 +79,7 @@ class ProgressScreen extends StatelessWidget {
           children: [
             // Headline stats: total nights, current streak, best streak.
             StreamBuilder<DocumentSnapshot>(
-              stream: firestore
-                  .collection('schools')
-                  .doc(student.schoolId)
-                  .collection('students')
-                  .doc(student.id)
-                  .snapshots(),
+              stream: _studentStream,
               builder: (context, snap) {
                 StudentStats? stats;
                 if (snap.hasData && snap.data!.exists) {
@@ -70,14 +98,7 @@ class ProgressScreen extends StatelessWidget {
             // This week + 30-night rhythm both derive from the last-30-days
             // window, so one stream feeds both.
             StreamBuilder<QuerySnapshot>(
-              stream: firestore
-                  .collection('schools')
-                  .doc(student.schoolId)
-                  .collection('readingLogs')
-                  .where('studentId', isEqualTo: student.id)
-                  .where('date',
-                      isGreaterThanOrEqualTo: Timestamp.fromDate(windowStart))
-                  .snapshots(),
+              stream: _windowLogsStream,
               builder: (context, snap) {
                 final completedDays = <int>{};
                 final readDays = <DateTime>{};

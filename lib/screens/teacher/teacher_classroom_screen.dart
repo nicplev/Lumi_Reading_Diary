@@ -342,14 +342,25 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     return null;
   }
 
+  // Memoized per class so rebuilds (and switching back to a class) reuse the
+  // live Firestore subscriptions instead of re-subscribing every build.
+  final Map<String, Stream<QuerySnapshot<Map<String, dynamic>>>>
+      _studentsStreams = {};
+  final Map<String, Stream<QuerySnapshot<Map<String, dynamic>>>>
+      _allocationsStreams = {};
+
   Stream<QuerySnapshot<Map<String, dynamic>>> _studentsStream(
       ClassModel classModel) {
-    return _firestore
-        .collection('schools')
-        .doc(widget.teacher.schoolId)
-        .collection('students')
-        .where('classId', isEqualTo: classModel.id)
-        .snapshots();
+    return _studentsStreams.putIfAbsent(
+      classModel.id,
+      () => _firestore
+          .collection('schools')
+          .doc(widget.teacher.schoolId)
+          .collection('students')
+          .where('classId', isEqualTo: classModel.id)
+          .snapshots()
+          .asBroadcastStream(),
+    );
   }
 
   Query<Map<String, dynamic>> _allocationsQuery(ClassModel classModel) {
@@ -362,7 +373,10 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
 
   Stream<QuerySnapshot<Map<String, dynamic>>> _allocationsStream(
       ClassModel classModel) {
-    return _allocationsQuery(classModel).snapshots();
+    return _allocationsStreams.putIfAbsent(
+      classModel.id,
+      () => _allocationsQuery(classModel).snapshots().asBroadcastStream(),
+    );
   }
 
   Set<String> _assignedStudentIdsFromAllocationDocs({

@@ -119,6 +119,25 @@ class _ActiveAllocationsTabState extends State<ActiveAllocationsTab> {
     }
   }
 
+  // Memoized per class so rebuilds (and switching back to a class) reuse the
+  // live Firestore subscription instead of re-subscribing every build.
+  final Map<String, Stream<QuerySnapshot>> _allocationsStreams = {};
+
+  Stream<QuerySnapshot> _allocationsStream(String classId) {
+    return _allocationsStreams.putIfAbsent(
+      classId,
+      () => _firebaseService.firestore
+          .collection('schools')
+          .doc(widget.teacher.schoolId!)
+          .collection('allocations')
+          .where('classId', isEqualTo: classId)
+          .where('isActive', isEqualTo: true)
+          .orderBy('createdAt', descending: true)
+          .snapshots()
+          .asBroadcastStream(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.selectedClass == null) {
@@ -133,14 +152,7 @@ class _ActiveAllocationsTabState extends State<ActiveAllocationsTab> {
     }
 
     return StreamBuilder<QuerySnapshot>(
-      stream: _firebaseService.firestore
-          .collection('schools')
-          .doc(widget.teacher.schoolId!)
-          .collection('allocations')
-          .where('classId', isEqualTo: widget.selectedClass!.id)
-          .where('isActive', isEqualTo: true)
-          .orderBy('createdAt', descending: true)
-          .snapshots(),
+      stream: _allocationsStream(widget.selectedClass!.id),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(

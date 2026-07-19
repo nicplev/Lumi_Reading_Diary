@@ -472,14 +472,26 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen>
     );
   }
 
-  Widget _buildChildStreakBadge(StudentModel child) {
-    return StreamBuilder<DocumentSnapshot>(
-      stream: _firebaseService.firestore
+  // One live student-doc stream per child, created once — rebuilds of the
+  // profile screen reuse the subscription instead of re-subscribing per frame.
+  final Map<String, Stream<DocumentSnapshot>> _childStreakStreams = {};
+
+  Stream<DocumentSnapshot> _childStreakStream(StudentModel child) {
+    return _childStreakStreams.putIfAbsent(
+      child.id,
+      () => _firebaseService.firestore
           .collection('schools')
           .doc(widget.user.schoolId)
           .collection('students')
           .doc(child.id)
-          .snapshots(),
+          .snapshots()
+          .asBroadcastStream(),
+    );
+  }
+
+  Widget _buildChildStreakBadge(StudentModel child) {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: _childStreakStream(child),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const SizedBox.shrink();
         final data = snapshot.data!.data() as Map<String, dynamic>?;

@@ -199,27 +199,55 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
       .collection('readingLogs')
       .where('studentId', isEqualTo: widget.studentId);
 
+  // Memoized per (student, range, month) so ordinary rebuilds (tab switches,
+  // parent setState) reuse the live Firestore subscription instead of tearing
+  // it down and re-subscribing. Retry clears the cache explicitly.
+  Stream<QuerySnapshot>? _activityStreamCache;
+  String? _activityStreamStudentId;
+  _Range? _activityStreamRange;
+  DateTime? _activityStreamMonth;
+
+  void _invalidateActivityStream() {
+    _activityStreamCache = null;
+  }
+
   Stream<QuerySnapshot> _activityStream() {
+    final cached = _activityStreamCache;
+    if (cached != null &&
+        _activityStreamStudentId == widget.studentId &&
+        _activityStreamRange == _range &&
+        _activityStreamMonth == _selectedMonth) {
+      return cached;
+    }
+
+    final Stream<QuerySnapshot> stream;
     switch (_range) {
       case _Range.week:
         final start = ReadingHistoryDateRange.startOfWeek(DateTime.now());
         final end = start.add(const Duration(days: 7));
-        return _logsCollection
+        stream = _logsCollection
             .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
             .where('date', isLessThan: Timestamp.fromDate(end))
             .orderBy('date', descending: true)
-            .snapshots();
+            .snapshots()
+            .asBroadcastStream();
       case _Range.month:
         final start = ReadingHistoryDateRange.startOfMonth(_selectedMonth);
         final end = ReadingHistoryDateRange.startOfNextMonth(_selectedMonth);
-        return _logsCollection
+        stream = _logsCollection
             .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
             .where('date', isLessThan: Timestamp.fromDate(end))
             .orderBy('date', descending: true)
-            .snapshots();
+            .snapshots()
+            .asBroadcastStream();
       case _Range.all:
         throw StateError('All-time history uses bounded cursor pagination.');
     }
+    _activityStreamCache = stream;
+    _activityStreamStudentId = widget.studentId;
+    _activityStreamRange = _range;
+    _activityStreamMonth = _selectedMonth;
+    return stream;
   }
 
   @override
@@ -286,7 +314,9 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
                   stream: _activityStream(),
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
-                      return _ErrorState(onRetry: () => setState(() {}));
+                      return _ErrorState(
+                        onRetry: () => setState(_invalidateActivityStream),
+                      );
                     }
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(
