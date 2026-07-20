@@ -1,37 +1,20 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    function isStaffAtSchool(schoolId) {
-      let staff = firestore.get(
-        /databases/(default)/documents/schools/$(schoolId)/users/$(request.auth.uid)
-      );
-      return request.auth != null &&
-          (staff.data.role == 'teacher' || staff.data.role == 'schoolAdmin');
-    }
-
     function isDemoAccount() {
       return request.auth != null
           && request.auth.token.get('demoAccount', false) == true;
     }
 
-    function comprehensionRecordingEnabled() {
-      let config = firestore.get(
-        /databases/(default)/documents/platformConfig/comprehensionRecording
-      );
-      return config.data.enabled == true;
-    }
-
-    function schoolAudioCollectionAuthorised(schoolId) {
-      let school = firestore.get(
-        /databases/(default)/documents/schools/$(schoolId)
-      );
-      let audio = school.data.get('settings', {})
-          .get('comprehensionRecording', {});
-      return audio.get('enabled', false) == true
-          && audio.get('authorityVersion', '') == 'school-audio-v1-2026-07-17'
-          && audio.get('authorityConfirmedAt', null) is timestamp
-          && audio.get('retentionDays', 0) in [30, 90, 365];
-    }
+    // NOTE: there are deliberately NO firestore.get() helpers in this file.
+    // Storage rules cannot read Firestore in this project — the compiler
+    // reports "Invalid function name: firestore.get" and every guarded write
+    // fails closed with [firebase_storage/unauthorized]. Removed in PR #107
+    // (2026-06-19), silently reintroduced by PR #390 (2026-07-15) — which
+    // broke comprehension uploads and book covers for five days — and removed
+    // again in PR #475. scripts/check-storage-rules.sh now fails the build if
+    // it comes back. Enforce Firestore-dependent conditions in a callable,
+    // never here.
 
     // NOTE: deliberately does NOT call firestore.get(). Cross-service
     // Firestore reads from Storage rules do not work in this project — they
@@ -72,7 +55,12 @@ service firebase.storage {
                    && !isDemoAccount()
                    && request.resource.metadata.schoolId is string
                    && request.resource.metadata.uploaderUid == request.auth.uid
-                   && isStaffAtSchool(request.resource.metadata.schoolId)
+                   // Staff-only was enforced via isStaffAtSchool(), which used
+                   // the broken cross-service lookup and blocked ALL cover
+                   // uploads from 2026-07-15. Any authenticated non-demo user
+                   // may now create a cover: accounts are invite-only, and the
+                   // `resource == null` guard above keeps this create-only, so
+                   // an existing cover can never be overwritten.
                    && request.resource.size < 2 * 1024 * 1024
                    && request.resource.contentType == 'image/jpeg';
     }
