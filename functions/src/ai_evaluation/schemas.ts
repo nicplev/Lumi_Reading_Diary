@@ -37,7 +37,13 @@ export const WORKER_FLAGS: readonly string[] = [
 ];
 
 export const MAX_SUMMARY_CHARS = 700;
-export const MAX_EVIDENCE_CHARS = 300;
+// Safety nets only - the prompt asks for a <=15 word span. The model
+// mostly complies but occasionally quotes a whole passage instead, so we
+// clamp on words first (the limit the prompt states) and chars second (a
+// backstop against one absurdly long "word"). A visibly clipped quote is
+// the signal we want the teacher, and us, to notice.
+export const MAX_EVIDENCE_WORDS = 18;
+export const MAX_EVIDENCE_CHARS = 200;
 export const MIN_CRITERION_SCORE = 0;
 export const MAX_CRITERION_SCORE = 3;
 
@@ -56,7 +62,13 @@ export const EVAL_RESPONSE_SCHEMA = {
         properties: {
           criterionId: {type: "STRING"},
           score: {type: "INTEGER"},
-          evidence: {type: "STRING"},
+          evidence: {
+            type: "STRING",
+            description: "Shortest verbatim span from the transcript " +
+              "showing this criterion. Hard limit 15 words, max one " +
+              "sentence; a fragment is preferred. Empty if nothing " +
+              "supports it.",
+          },
         },
         required: ["criterionId", "score", "evidence"],
       },
@@ -110,6 +122,27 @@ function truncate(value: string, max: number): string {
   return value.length <= max ? value : value.slice(0, max);
 }
 
+// Clips an evidence quote to the word limit the prompt states, then to a
+// char backstop, marking the cut so it reads as "quote, truncated" rather
+// than a word sliced in half.
+function clampEvidence(value: string): string {
+  let out = value;
+  let clipped = false;
+
+  const words = out.split(/\s+/);
+  if (words.length > MAX_EVIDENCE_WORDS) {
+    out = words.slice(0, MAX_EVIDENCE_WORDS).join(" ");
+    clipped = true;
+  }
+  if (out.length > MAX_EVIDENCE_CHARS) {
+    const cut = out.slice(0, MAX_EVIDENCE_CHARS);
+    const lastSpace = cut.lastIndexOf(" ");
+    out = lastSpace > MAX_EVIDENCE_CHARS * 0.5 ? cut.slice(0, lastSpace) : cut;
+    clipped = true;
+  }
+  return clipped ? out.trimEnd() + "…" : out;
+}
+
 // Re-validates a parsed model response against the rubric. Tolerant where
 // safe (drop unknown flags/criteria, clamp scores, truncate strings) and
 // strict where it matters (enums, required shape).
@@ -161,7 +194,7 @@ export function validateEvalResponse(
     );
     const evidence =
       typeof item.evidence === "string" ?
-        truncate(item.evidence.trim(), MAX_EVIDENCE_CHARS) :
+        clampEvidence(item.evidence.trim()) :
         "";
     criterionScores.push({criterionId, score, evidence});
   }

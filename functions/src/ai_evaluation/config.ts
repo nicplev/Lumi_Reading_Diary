@@ -87,7 +87,9 @@ export const AI_EVAL_OPS_DEFAULTS: AiEvalOpsConfig = {
   maxAttempts: 3,
   transcriptRetentionDays: 90,
   evalRetentionDays: 730,
-  promptVersion: 1,
+  // v2 (2026-07-20): evidence must be a short per-criterion span, not the
+  // whole answer. Report trends segment on this, so v1 evals stay separate.
+  promptVersion: 2,
   costAlarmDailyUsd: 25,
 };
 

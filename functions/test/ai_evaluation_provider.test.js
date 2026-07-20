@@ -29,6 +29,7 @@ const {
   computeSortKey,
   validateClassificationResponse,
   MAX_SUMMARY_CHARS,
+  MAX_EVIDENCE_WORDS,
   MODEL_FLAGS,
 } = require('../lib/ai_evaluation/schemas.js');
 const {
@@ -216,6 +217,26 @@ test('eval response validation: tolerant drops + clamps', () => {
     [['relevance', 3], ['understanding', 0]]);
   assert.deepEqual(result.value.flags, ['off_topic']);
 });
+
+// The model is asked for a <=15 word span but occasionally quotes a whole
+// passage instead. The clamp is the backstop, and it must MARK the cut —
+// an unmarked clip reads to a teacher as a complete quote when it isn't.
+test('eval response validation: evidence clamped to a marked short span',
+  () => {
+    const long = Array.from({length: 40}, (_, i) => `w${i}`).join(' ');
+    const clamped = validateEvalResponse(validParsed({
+      criterionScores: [
+        {criterionId: 'relevance', score: 3, evidence: long},
+        {criterionId: 'understanding', score: 3, evidence: 'a short quote'},
+      ],
+    }), RUBRIC);
+    assert.equal(clamped.ok, true);
+    const [first, second] = clamped.value.criterionScores;
+    assert.equal(first.evidence.split(/\s+/).length, MAX_EVIDENCE_WORDS);
+    assert.ok(first.evidence.endsWith('…'), 'clipped evidence must be marked');
+    // A compliant quote passes through untouched, ellipsis included.
+    assert.equal(second.evidence, 'a short quote');
+  });
 
 test('eval response validation: strict failures', () => {
   assert.equal(validateEvalResponse(null, RUBRIC).ok, false);
