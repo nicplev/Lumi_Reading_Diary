@@ -72,18 +72,38 @@ function toStudent(doc: FirebaseFirestore.DocumentSnapshot): Student {
 
 export async function getStudents(
   schoolId: string,
-  filters?: { classId?: string; isActive?: boolean }
+  filters?: { classId?: string; classIds?: string[]; isActive?: boolean }
 ): Promise<Student[]> {
-  let query: FirebaseFirestore.Query = adminDb
+  const isActive = filters?.isActive ?? true;
+  const base = adminDb
     .collection('schools')
     .doc(schoolId)
     .collection('students');
 
+  // Teacher scoping: restrict to an explicit set of classes. An empty set
+  // (a teacher who teaches no classes) returns nothing. Firestore 'in'
+  // caps at 30 values, so chunk and merge for teachers with many classes.
+  if (filters?.classIds) {
+    if (filters.classIds.length === 0) return [];
+    const chunks: string[][] = [];
+    for (let i = 0; i < filters.classIds.length; i += 30) {
+      chunks.push(filters.classIds.slice(i, i + 30));
+    }
+    const snaps = await Promise.all(
+      chunks.map((chunk) =>
+        base
+          .where('classId', 'in', chunk)
+          .where('isActive', '==', isActive)
+          .get()
+      )
+    );
+    return snaps.flatMap((snap) => snap.docs.map(toStudent));
+  }
+
+  let query: FirebaseFirestore.Query = base;
   if (filters?.classId) {
     query = query.where('classId', '==', filters.classId);
   }
-
-  const isActive = filters?.isActive ?? true;
   query = query.where('isActive', '==', isActive);
 
   const snap = await query.get();

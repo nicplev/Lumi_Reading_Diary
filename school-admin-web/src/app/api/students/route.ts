@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
 import { getStudents, createStudent } from '@/lib/firestore/students';
+import { getClasses } from '@/lib/firestore/classes';
+import { teacherTeachesClass } from '@/lib/firestore/comprehensionEvals';
 import { z } from 'zod';
 
 function serializeStudent(s: Record<string, unknown>) {
@@ -55,11 +57,35 @@ export async function GET(request: NextRequest) {
   // ?status=archived flips the existing isActive filter to the archived side
   // (getStudents defaults to active-only).
   const status = searchParams.get('status');
+  const activeFilter = status === 'archived' ? { isActive: false } : {};
 
   try {
+    // Teachers are scoped to the classes they teach; schoolAdmin sees the
+    // whole school. A teacher requesting a specific class must teach it; a
+    // teacher with no classId gets only their own classes' students (never
+    // the whole-school roster).
+    if (session.role !== 'schoolAdmin') {
+      if (classId) {
+        const teaches = await teacherTeachesClass(session.schoolId, classId, session.uid);
+        if (!teaches) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        const students = await getStudents(session.schoolId, { classId, ...activeFilter });
+        return NextResponse.json(
+          students.map((s) => serializeStudent(s as unknown as Record<string, unknown>)),
+        );
+      }
+      const myClasses = await getClasses(session.schoolId, { teacherId: session.uid });
+      const students = await getStudents(session.schoolId, {
+        classIds: myClasses.map((c) => c.id),
+        ...activeFilter,
+      });
+      return NextResponse.json(
+        students.map((s) => serializeStudent(s as unknown as Record<string, unknown>)),
+      );
+    }
+
     const students = await getStudents(session.schoolId, {
       classId,
-      ...(status === 'archived' ? { isActive: false } : {}),
+      ...activeFilter,
     });
     return NextResponse.json(students.map((s) => serializeStudent(s as unknown as Record<string, unknown>)));
   } catch {

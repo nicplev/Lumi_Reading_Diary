@@ -6,6 +6,7 @@ import {
   updateComprehensionRecordingPreference,
 } from '@/lib/firestore/comprehension-authority';
 import { isComprehensionRecordingGloballyEnabled } from '@/lib/firestore/platform-config';
+import { stripAdminOnlySchoolFields } from '@/lib/firestore/school-visibility';
 import { z } from 'zod';
 
 function serializeDateLike(value: unknown): unknown {
@@ -59,10 +60,11 @@ export async function GET() {
       isComprehensionRecordingGloballyEnabled(),
     ]);
     if (!school) return NextResponse.json({ error: 'School not found' }, { status: 404 });
-    return NextResponse.json({
+    const payload: Record<string, unknown> = {
       ...serializeSchool(school as unknown as Record<string, unknown>),
       platformFlags: { comprehensionRecordingEnabled },
-    });
+    };
+    return NextResponse.json(stripAdminOnlySchoolFields(payload, session.role));
   } catch {
     return NextResponse.json({ error: 'Failed to fetch school settings' }, { status: 500 });
   }

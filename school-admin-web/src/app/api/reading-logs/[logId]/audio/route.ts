@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
 import { getComprehensionAudio } from '@/lib/firestore/reading-logs';
+import { teacherTeachesClass } from '@/lib/firestore/comprehensionEvals';
 import { adminDb, adminStorage } from '@/lib/firebase/admin';
 import {
   AUDIO_VALIDATION_VERSION,
@@ -49,11 +50,23 @@ export async function GET(
 
   const { logId } = await params;
   try {
-    const [flagSnap, schoolSnap, audio] = await Promise.all([
+    const [flagSnap, schoolSnap, audio, logSnap] = await Promise.all([
       adminDb.doc('platformConfig/comprehensionRecording').get(),
       adminDb.doc(`schools/${session.schoolId}`).get(),
       getComprehensionAudio(session.schoolId, logId),
+      adminDb.doc(`schools/${session.schoolId}/readingLogs/${logId}`).get(),
     ]);
+
+    // A teacher may only play a recording from a class they teach; schoolAdmin
+    // may play any recording in their school.
+    if (session.role !== 'schoolAdmin') {
+      const classId = logSnap.data()?.classId;
+      const teaches =
+        typeof classId === 'string' &&
+        classId.length > 0 &&
+        (await teacherTeachesClass(session.schoolId, classId, session.uid));
+      if (!teaches) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
     if (
       !flagSnap.exists ||
       !platformAudioPlaybackIsEnabled(flagSnap.data()) ||

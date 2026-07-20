@@ -5,6 +5,8 @@ import {
   createTeacherLog,
   type ReadingLogRecord,
 } from '@/lib/firestore/reading-logs';
+import { getStudent } from '@/lib/firestore/students';
+import { teacherTeachesClass } from '@/lib/firestore/comprehensionEvals';
 import { z } from 'zod';
 
 function serialize(log: ReadingLogRecord) {
@@ -23,6 +25,16 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const studentId = searchParams.get('studentId');
   if (!studentId) return NextResponse.json({ error: 'studentId is required' }, { status: 400 });
+
+  // A teacher may only read logs for a student in a class they teach;
+  // schoolAdmin reads any student in their school.
+  if (session.role !== 'schoolAdmin') {
+    const student = await getStudent(session.schoolId, studentId);
+    const teaches =
+      !!student?.classId &&
+      (await teacherTeachesClass(session.schoolId, student.classId, session.uid));
+    if (!teaches) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   // Optional date window. Invalid dates are ignored (treated as no bound) — the
   // 2-year hard floor is enforced server-side in getReadingLogsForStudent.

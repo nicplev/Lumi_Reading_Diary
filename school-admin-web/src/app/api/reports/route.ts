@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
 import { getClassReport } from '@/lib/firestore/reports';
+import { teacherTeachesClass } from '@/lib/firestore/comprehensionEvals';
 import {
   getSchoolTimezone,
   localDateString,
@@ -26,6 +27,13 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const classId = searchParams.get('classId');
   if (!classId) return NextResponse.json({ error: 'classId is required' }, { status: 400 });
+
+  // A teacher may only pull a report for a class they teach; schoolAdmin sees
+  // any class in their school. Mirrors /api/comprehension-evals.
+  if (session.role !== 'schoolAdmin') {
+    const teaches = await teacherTeachesClass(session.schoolId, classId, session.uid);
+    if (!teaches) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   // Day boundaries are the SCHOOL's calendar days, not the server's — the
   // portal runs in a non-AU region, so server-local setHours() started
