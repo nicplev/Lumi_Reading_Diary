@@ -711,6 +711,20 @@ async function unlinkActorRole(
   return role === "teacher" || role === "schoolAdmin" ? role : null;
 }
 
+// Pure: whether a class document assigns the given teacher uid. Mirrors
+// authorizeStudentDeletion (deletion.ts) and the teacherTeachesClass rule so
+// a teacher acts only within their own classes, never school-wide.
+export function teacherAssignedToClass(
+  classData: unknown,
+  uid: string
+): boolean {
+  const data = classData && typeof classData === "object" ?
+    (classData as Record<string, unknown>) :
+    {};
+  if (data.teacherId === uid) return true;
+  return Array.isArray(data.teacherIds) && data.teacherIds.includes(uid);
+}
+
 export const unlinkParentFromStudent = onCall(
   parentLinkingRuntime({timeoutSeconds: 15, memory: "256MiB"}),
   async (request) => {
@@ -751,6 +765,25 @@ export const unlinkParentFromStudent = onCall(
           "parent-doc-missing",
           "Parent profile not found."
         );
+      }
+
+      // A teacher may unlink only for a student in a class they teach;
+      // schoolAdmin (and the parent themselves) are not class-scoped. This
+      // read stays in the transaction's read phase (before any write).
+      if (actorRole === "teacher") {
+        const classId = studentSnap.data()?.classId;
+        const classSnap =
+          typeof classId === "string" && classId !== "" ?
+            await tx.get(
+              db().collection("schools").doc(schoolId)
+                .collection("classes").doc(classId)
+            ) :
+            null;
+        if (!classSnap || !teacherAssignedToClass(classSnap.data(), uid)) {
+          throw permissionDenied(
+            "Teachers may unlink only for students in an assigned class."
+          );
+        }
       }
 
       const parentIds = Array.isArray(studentSnap.data()?.parentIds) ?
