@@ -33,20 +33,28 @@ service firebase.storage {
           && audio.get('retentionDays', 0) in [30, 90, 365];
     }
 
+    // NOTE: deliberately does NOT call firestore.get(). Cross-service
+    // Firestore reads from Storage rules do not work in this project — they
+    // fail closed and every upload returns [firebase_storage/unauthorized].
+    // This was diagnosed and removed once already (PR #107, 2026-06-19) and
+    // silently reintroduced by PR #390 (2026-07-15), which broke comprehension
+    // uploads AND community book covers for five days. Do not re-add it
+    // without first proving a real-device upload still succeeds.
+    //
+    // Security is unaffected: this is the UNTRUSTED holding area. Reads are
+    // denied outright, and confirmComprehensionAudioUpload re-validates
+    // everything with Admin credentials before anything is promoted —
+    // parent ownership, teacher-proxy rejection, the platform kill switch,
+    // school authority, ftyp signature, size, duration and rate limits —
+    // then publishes a separate server-produced canonical object. Residue
+    // here expires via the pending-cleanup cron.
     function ownsAudioLog(schoolId, fileName) {
       let logId = request.resource.metadata.logId;
-      let log = firestore.get(
-        /databases/(default)/documents/schools/$(schoolId)/readingLogs/$(logId)
-      );
       return request.auth != null &&
           request.resource.metadata.schoolId == schoolId &&
           request.resource.metadata.ownerUid == request.auth.uid &&
           logId is string &&
-          fileName == logId + '.m4a' &&
-          log.data.schoolId == schoolId &&
-          log.data.parentId == request.auth.uid &&
-          log.data.get('loggedByRole', 'parent') != 'teacher' &&
-          log.data.get('comprehensionAudioUploaded', false) != true;
+          fileName == logId + '.m4a';
     }
 
     // Community book covers: any authenticated user can read.
@@ -75,11 +83,12 @@ service firebase.storage {
     // playback object with Admin credentials, then deletes this pending copy.
     match /comprehension_audio_uploads/{schoolId}/{fileName} {
       allow read: if false;
+      // The kill switch and school authority are enforced app-side before the
+      // upload is attempted, and again server-side in the confirm callable
+      // (the actual boundary). They are NOT checked here — see ownsAudioLog.
       allow write: if request.resource != null
                    && !isDemoAccount()
                    && ownsAudioLog(schoolId, fileName)
-                   && comprehensionRecordingEnabled()
-                   && schoolAudioCollectionAuthorised(schoolId)
                    && request.resource.size < 2 * 1024 * 1024
                    && request.resource.contentType == 'audio/mp4';
     }
