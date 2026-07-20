@@ -639,12 +639,35 @@ export interface SweepResult {
   deferredSwept: boolean;
   backlogRuns: number;
   safetyNetEnqueued: number;
+  /** True when the sweep stopped because the platform kill switch is off. */
+  platformDisabled?: boolean;
 }
 
 export async function sweepAiEvalJobsCore(
   deps: WorkerDeps
 ): Promise<SweepResult> {
   const {db} = deps;
+
+  // Kill switch FIRST, before any work is selected. processAiEvalJobCore
+  // re-checks this at claim time, so nothing could ever have been evaluated
+  // with the switch off — but until 2026-07-20 the sweep's safety net still
+  // CREATED job docs for entitled schools, each of which triggered a worker
+  // that immediately terminated "disabled". Flipping the switch left the
+  // queue churning instead of quiescent, which is not what an operator
+  // reaching for a kill switch expects to see. Fails closed: a missing or
+  // unreadable flag doc stops the sweep.
+  const flagSnap = await db.doc(AI_EVALUATION_FLAG_DOC).get();
+  if (!flagSnap.exists || !platformAiEvaluationEnabled(flagSnap.data())) {
+    return {
+      selected: 0,
+      processed: 0,
+      deferredSwept: false,
+      backlogRuns: 0,
+      safetyNetEnqueued: 0,
+      platformDisabled: true,
+    };
+  }
+
   const cfg = await deps.readOpsConfig();
   const now = deps.now();
   const jobIds = new Set<string>();
@@ -727,6 +750,11 @@ export async function sweepAiEvalJobsCore(
       .get();
     const cutoff = Timestamp.fromMillis(now.getTime() - 24 * 60 * 60 * 1000);
     for (const school of entitled.docs) {
+      // Firestore can only index the bare flag, so re-apply the real gate:
+      // a school switched on but never confirmed (or confirmed against
+      // superseded terms) must not have jobs minted for it just to have the
+      // worker terminate them "disabled".
+      if (!schoolAiEvaluationEnabled(school.data())) continue;
       const recent = await db
         .collection(`schools/${school.id}/readingLogs`)
         .where("comprehensionAudioUploadedAt", ">", cutoff)

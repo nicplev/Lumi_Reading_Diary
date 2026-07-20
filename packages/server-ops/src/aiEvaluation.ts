@@ -1,6 +1,10 @@
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { z } from "zod";
 import { logAuditEvent, ServerOpsValidationError, type Actor } from "./audit";
+import {
+  AI_EVAL_AUTHORITY_VERSION,
+  schoolAiEvaluationEnabled,
+} from "./aiEvalAuthority";
 
 // AI comprehension-evaluation controls (super-admin portal only).
 //
@@ -31,7 +35,19 @@ export interface AiEvaluationSchoolConfig {
   capPerDay: number;
   plan: string;
   notes: string;
-  termsVersionAccepted: string;
+  /** The version the school was last confirmed against, "" if never. */
+  authorityVersion: string;
+  /** The version a fresh confirmation would record. */
+  currentAuthorityVersion: string;
+  /**
+   * True only when the entitlement actually opens the gate — i.e. what
+   * functions/src/ai_evaluation/gates.ts would decide. `enabled` alone can
+   * be true while this is false, for a school confirmed under superseded
+   * terms or never properly confirmed at all.
+   */
+  authorityCurrent: boolean;
+  authorityConfirmedAt: string | null;
+  authorityConfirmedByEmail?: string;
   updatedAt: string | null;
   updatedByEmail?: string;
   usageMonth?: string;
@@ -137,8 +153,15 @@ export async function getAiEvaluationSchoolConfig(
         : AI_EVAL_DEFAULT_SCHOOL_CAP,
     plan: typeof meta.plan === "string" ? meta.plan : "",
     notes: typeof meta.notes === "string" ? meta.notes : "",
-    termsVersionAccepted:
-      typeof ai.termsVersionAccepted === "string" ? ai.termsVersionAccepted : "",
+    authorityVersion:
+      typeof ai.authorityVersion === "string" ? ai.authorityVersion : "",
+    currentAuthorityVersion: AI_EVAL_AUTHORITY_VERSION,
+    authorityCurrent: schoolAiEvaluationEnabled(schoolSnap.data()),
+    authorityConfirmedAt: toISO(ai.authorityConfirmedAt),
+    authorityConfirmedByEmail:
+      typeof ai.authorityConfirmedByEmail === "string"
+        ? ai.authorityConfirmedByEmail
+        : undefined,
     updatedAt: toISO(ai.updatedAt) ?? toISO(meta.updatedAt),
     updatedByEmail:
       typeof meta.updatedByEmail === "string" ? meta.updatedByEmail : undefined,
@@ -153,7 +176,11 @@ const schoolParams = z.object({
   capPerDay: z.number().int().min(0).max(10000),
   plan: z.string().trim().max(100).optional().default(""),
   notes: z.string().trim().max(2000).optional().default(""),
-  termsVersionAccepted: z.string().trim().max(100).optional().default(""),
+  // An explicit attestation, not free text. The caller must send the exact
+  // current authority version; the portal sources it from the same constant
+  // the reader gate checks, so a stale client cannot enable a school under
+  // superseded terms.
+  authorityVersion: z.string().trim().max(100).optional().default(""),
 });
 
 export async function setAiEvaluationSchoolConfig(
@@ -165,16 +192,19 @@ export async function setAiEvaluationSchoolConfig(
   if (!parsed.success) {
     throw new ServerOpsValidationError("Invalid school AI-evaluation input");
   }
-  const { schoolId, enabled, capPerDay, plan, notes, termsVersionAccepted } =
+  const { schoolId, enabled, capPerDay, plan, notes, authorityVersion } =
     parsed.data;
   const schoolRef = db.doc(`schools/${schoolId}`);
   const schoolSnap = await schoolRef.get();
   if (!schoolSnap.exists) {
     throw new ServerOpsValidationError("School not found");
   }
-  if (enabled && !termsVersionAccepted) {
+  // Must match exactly. The previous check accepted any non-empty string,
+  // which let the pilot school go live with the UI label text as its
+  // "accepted terms" — evidence that proved nothing.
+  if (enabled && authorityVersion !== AI_EVAL_AUTHORITY_VERSION) {
     throw new ServerOpsValidationError(
-      "Terms version must be recorded before enabling"
+      "Confirm the current AI evaluation terms before enabling this school"
     );
   }
 
@@ -183,11 +213,27 @@ export async function setAiEvaluationSchoolConfig(
     schoolRef,
     {
       settings: {
-        aiEvaluation: {
-          enabled,
-          termsVersionAccepted,
-          updatedAt: FieldValue.serverTimestamp(),
-        },
+        aiEvaluation: enabled
+          ? {
+              enabled: true,
+              authorityVersion: AI_EVAL_AUTHORITY_VERSION,
+              authorityConfirmedAt: FieldValue.serverTimestamp(),
+              authorityConfirmedBy: actor.uid,
+              ...(actor.email
+                ? { authorityConfirmedByEmail: actor.email }
+                : {}),
+              updatedAt: FieldValue.serverTimestamp(),
+            }
+          : // Disabling clears the evidence, so re-enabling requires a fresh
+            // confirmation rather than silently reviving a stale one.
+            {
+              enabled: false,
+              authorityVersion: FieldValue.delete(),
+              authorityConfirmedAt: FieldValue.delete(),
+              authorityConfirmedBy: FieldValue.delete(),
+              authorityConfirmedByEmail: FieldValue.delete(),
+              updatedAt: FieldValue.serverTimestamp(),
+            },
       },
     },
     { merge: true }

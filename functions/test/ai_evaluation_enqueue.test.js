@@ -9,7 +9,16 @@ const {
   platformAiEvaluationEnabled,
   schoolAiEvaluationEnabled,
   AI_EVALUATION_FLAG_DOC,
+  AI_EVAL_AUTHORITY_VERSION,
 } = require("../lib/ai_evaluation/gates.js");
+
+// A school entitlement that actually opens the gate: the switch plus current,
+// stamped authority evidence. `{enabled: true}` alone no longer entitles.
+const ENTITLED = {
+  enabled: true,
+  authorityVersion: AI_EVAL_AUTHORITY_VERSION,
+  authorityConfirmedAt: Timestamp.fromDate(new Date("2026-07-20T00:00:00Z")),
+};
 const {
   DEFAULT_COMPREHENSION_QUESTION,
   MAX_COMPREHENSION_QUESTION_CHARS,
@@ -49,8 +58,61 @@ test("school gate fails closed on missing/malformed settings", () => {
     false
   );
   assert.equal(
-    schoolAiEvaluationEnabled({settings: {aiEvaluation: {enabled: true}}}),
+    schoolAiEvaluationEnabled({settings: {aiEvaluation: ENTITLED}}),
     true
+  );
+});
+
+test("school gate requires current, stamped authority evidence", () => {
+  // The switch alone is not entitlement.
+  assert.equal(
+    schoolAiEvaluationEnabled({settings: {aiEvaluation: {enabled: true}}}),
+    false
+  );
+  // What the pilot school actually held in prod before 2026-07-20: the free
+  // text box accepted any non-empty string, so its "accepted terms" was the
+  // field's own label.
+  assert.equal(
+    schoolAiEvaluationEnabled({
+      settings: {
+        aiEvaluation: {
+          enabled: true,
+          termsVersionAccepted: "Terms version accepted",
+        },
+      },
+    }),
+    false
+  );
+  // Superseded terms fall out of entitlement until re-confirmed.
+  assert.equal(
+    schoolAiEvaluationEnabled({
+      settings: {
+        aiEvaluation: {
+          ...ENTITLED,
+          authorityVersion: "school-ai-eval-v0-2026-01-01",
+        },
+      },
+    }),
+    false
+  );
+  // Version without a confirmation stamp.
+  assert.equal(
+    schoolAiEvaluationEnabled({
+      settings: {
+        aiEvaluation: {
+          enabled: true,
+          authorityVersion: AI_EVAL_AUTHORITY_VERSION,
+        },
+      },
+    }),
+    false
+  );
+  // Confirmed but switched off.
+  assert.equal(
+    schoolAiEvaluationEnabled({
+      settings: {aiEvaluation: {...ENTITLED, enabled: false}},
+    }),
+    false
   );
 });
 
@@ -183,7 +245,7 @@ function alreadyExistsError() {
 }
 
 test("enqueue: platform gate closed (missing doc) skips", async () => {
-  const {db, calls} = stubDb({school: {settings: {aiEvaluation: {enabled: true}}}, log: validLogData()});
+  const {db, calls} = stubDb({school: {settings: {aiEvaluation: ENTITLED}}, log: validLogData()});
   const outcome = await enqueueAiEvalJobCore(db, {schoolId: "s1", logId: "l1"});
   assert.equal(outcome, "skipped:platform_disabled");
   assert.equal(calls.creates.length, 0);
@@ -203,7 +265,7 @@ test("enqueue: platform on, school gate closed skips", async () => {
 test("enqueue: gates open + valid receipt creates the job", async () => {
   const {db, calls} = stubDb({
     platform: {enabled: true},
-    school: {settings: {aiEvaluation: {enabled: true}}},
+    school: {settings: {aiEvaluation: ENTITLED}},
     log: validLogData(),
   });
   const outcome = await enqueueAiEvalJobCore(db, {schoolId: "s1", logId: "l1"});
@@ -224,7 +286,7 @@ test("enqueue: legacy/invalid receipt is never processed", async () => {
   for (const log of bad) {
     const {db, calls} = stubDb({
       platform: {enabled: true},
-      school: {settings: {aiEvaluation: {enabled: true}}},
+      school: {settings: {aiEvaluation: ENTITLED}},
       log,
     });
     const outcome =
@@ -239,7 +301,7 @@ test("enqueue: teacher-proxy logs cannot reach enqueue with ids missing", async 
   // structurally the enqueue also refuses any log without student/class ids.
   const {db, calls} = stubDb({
     platform: {enabled: true},
-    school: {settings: {aiEvaluation: {enabled: true}}},
+    school: {settings: {aiEvaluation: ENTITLED}},
     log: validLogData({studentId: ""}),
   });
   const outcome = await enqueueAiEvalJobCore(db, {schoolId: "s1", logId: "l1"});
@@ -250,7 +312,7 @@ test("enqueue: teacher-proxy logs cannot reach enqueue with ids missing", async 
 test("enqueue: missing log skips", async () => {
   const {db} = stubDb({
     platform: {enabled: true},
-    school: {settings: {aiEvaluation: {enabled: true}}},
+    school: {settings: {aiEvaluation: ENTITLED}},
   });
   const outcome = await enqueueAiEvalJobCore(db, {schoolId: "s1", logId: "l1"});
   assert.equal(outcome, "skipped:log_missing");
@@ -259,7 +321,7 @@ test("enqueue: missing log skips", async () => {
 test("enqueue: ALREADY_EXISTS with older job resets it to queued", async () => {
   const {db, calls} = stubDb({
     platform: {enabled: true},
-    school: {settings: {aiEvaluation: {enabled: true}}},
+    school: {settings: {aiEvaluation: ENTITLED}},
     log: validLogData(),
     existingJob: {
       status: "done",
@@ -280,7 +342,7 @@ test("enqueue: ALREADY_EXISTS with older job resets it to queued", async () => {
 test("enqueue: ALREADY_EXISTS with same-or-newer job is left alone", async () => {
   const {db, calls} = stubDb({
     platform: {enabled: true},
-    school: {settings: {aiEvaluation: {enabled: true}}},
+    school: {settings: {aiEvaluation: ENTITLED}},
     log: validLogData(),
     existingJob: {status: "processing", sourceUploadedAt: UPLOADED_AT},
     createError: alreadyExistsError(),
@@ -295,7 +357,7 @@ test("enqueue: unexpected create error propagates to the caller", async () => {
   boom.code = 14;
   const {db} = stubDb({
     platform: {enabled: true},
-    school: {settings: {aiEvaluation: {enabled: true}}},
+    school: {settings: {aiEvaluation: ENTITLED}},
     log: validLogData(),
     createError: boom,
   });

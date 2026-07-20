@@ -16,6 +16,16 @@ const {AUDIO_VALIDATION_VERSION} =
   require('../lib/audio_media_validation.js');
 
 const {memDb} = require('./helpers/mem_firestore.js');
+const {AI_EVAL_AUTHORITY_VERSION} =
+  require('../lib/ai_evaluation/gates.js');
+
+// A school entitlement that actually opens the gate: the switch plus current,
+// stamped authority evidence. `{enabled: true}` alone no longer entitles.
+const ENTITLED = {
+  enabled: true,
+  authorityVersion: AI_EVAL_AUTHORITY_VERSION,
+  authorityConfirmedAt: Timestamp.fromDate(new Date('2026-07-20T00:00:00Z')),
+};
 
 const NOW = new Date('2026-07-19T10:00:00Z');
 const UPLOADED_AT = Timestamp.fromDate(new Date('2026-07-19T09:00:00Z'));
@@ -29,7 +39,7 @@ const EVAL = `schools/${S}/comprehensionEvals/${L}`;
 function seed(overrides = {}) {
   return {
     'platformConfig/aiEvaluation': {enabled: true},
-    [`schools/${S}`]: {settings: {aiEvaluation: {enabled: true}}},
+    [`schools/${S}`]: {settings: {aiEvaluation: ENTITLED}},
     [JOB]: {
       schoolId: S, logId: L, studentId: 'stu1', classId: 'c1',
       status: 'queued', attempts: 0,
@@ -380,7 +390,7 @@ test('worker: mid-flight re-upload leaves the job queued for re-run',
 function sweepSeed(jobs) {
   const base = {
     'platformConfig/aiEvaluation': {enabled: true},
-    [`schools/${S}`]: {settings: {aiEvaluation: {enabled: true}}},
+    [`schools/${S}`]: {settings: {aiEvaluation: ENTITLED}},
     'aiEvalOpsConfig/sweepState': {
       lastDeferredSweepDate: sydneyDayKey(NOW),
       backlogRuns: 0,
@@ -428,6 +438,47 @@ test('sweep: recovers stale queued jobs, leaves fresh ones', async () => {
   assert.equal(result.processed, 1);
   assert.equal(store.get(JOB).status, 'done');
   assert.equal(store.get(`aiEvalJobs/${S}_fresh`).status, 'queued');
+});
+
+// The claim-time gate already stopped any evaluation happening with the
+// switch off, but the safety net still created job docs, so an operator who
+// pulled the kill switch watched the queue keep churning. Quiescent now.
+test('sweep: platform kill switch stops the sweep before any work', async () => {
+  const seed = sweepSeed({[`${S}_${L}`]: staleJob()});
+  const logDoc = {
+    studentId: 'stu1', classId: 'c1', date: LOG_DATE,
+    comprehensionAudioUploaded: true,
+    comprehensionAudioUploadedAt: UPLOADED_AT,
+    comprehensionAudioObjectGeneration: 'gen-1',
+    comprehensionAudioValidationVersion: AUDIO_VALIDATION_VERSION,
+    comprehensionAudioDurationSec: 30,
+    comprehensionQuestionText: 'Q?',
+  };
+
+  for (const [label, flag] of [
+    ['switch off', {enabled: false}],
+    ['flag doc missing', undefined],
+  ]) {
+    const docs = {
+      ...seed,
+      [`schools/${S}/readingLogs/${L}`]: logDoc,
+      [`schools/${S}/readingLogs/unqueued`]: logDoc,
+      [`schools/${S}/students/stu1`]: {name: 'Milo'},
+    };
+    if (flag === undefined) delete docs['platformConfig/aiEvaluation'];
+    else docs['platformConfig/aiEvaluation'] = flag;
+
+    const {db, store} = memDb(docs);
+    const {deps: d} = deps(db);
+    const result = await sweepAiEvalJobsCore(d);
+    assert.equal(result.platformDisabled, true, label);
+    assert.equal(result.selected, 0, label);
+    assert.equal(result.processed, 0, label);
+    assert.equal(result.safetyNetEnqueued, 0, label);
+    // The existing job is untouched and no new job doc was minted.
+    assert.equal(store.get(JOB).status, 'queued', label);
+    assert.equal(store.get(`aiEvalJobs/${S}_unqueued`), undefined, label);
+  }
 });
 
 test('sweep: retries eligible failed jobs only', async () => {

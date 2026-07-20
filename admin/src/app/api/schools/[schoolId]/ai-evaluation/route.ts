@@ -40,7 +40,7 @@ export async function PUT(
         capPerDay: Number(body.capPerDay),
         plan: body.plan,
         notes: body.notes,
-        termsVersionAccepted: body.termsVersionAccepted,
+        authorityVersion: body.authorityVersion,
       }
     );
     return NextResponse.json(config);
