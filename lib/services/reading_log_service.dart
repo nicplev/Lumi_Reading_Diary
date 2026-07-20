@@ -496,9 +496,15 @@ class ReadingLogService {
   /// Throws on Storage or Firestore failure — the caller is expected to
   /// queue the upload via [OfflineService.enqueueComprehensionAudioUpload]
   /// when this throws so retries happen with backoff.
+  /// [onProgress] receives 0..1 as bytes reach Storage. It is only a
+  /// fraction of the wall-clock wait — the confirm callable that follows
+  /// decodes and transcodes server-side with no progress to report — so
+  /// callers should reserve part of any progress bar for that leg rather
+  /// than treating 1.0 here as "done".
   Future<void> uploadComprehensionAudio({
     required ReadingLogModel log,
     required String localFilePath,
+    void Function(double fraction)? onProgress,
   }) async {
     final storagePath = comprehensionAudioUploadStoragePath(
       schoolId: log.schoolId,
@@ -509,7 +515,7 @@ class ReadingLogService {
       throw const ComprehensionAudioMissingException();
     }
 
-    await FirebaseStorage.instance.ref(storagePath).putFile(
+    final task = FirebaseStorage.instance.ref(storagePath).putFile(
           file,
           SettableMetadata(
             contentType: 'audio/mp4',
@@ -523,6 +529,27 @@ class ReadingLogService {
             },
           ),
         );
+
+    StreamSubscription<TaskSnapshot>? progressSub;
+    if (onProgress != null) {
+      progressSub = task.snapshotEvents.listen(
+        (snapshot) {
+          final total = snapshot.totalBytes;
+          if (total > 0) {
+            onProgress(snapshot.bytesTransferred / total);
+          }
+        },
+        // Never let a progress listener be the thing that fails an upload —
+        // the await below is the real error path.
+        onError: (_) {},
+      );
+    }
+
+    try {
+      await task;
+    } finally {
+      await progressSub?.cancel();
+    }
 
     await ComprehensionAudioService().confirmUpload(
       schoolId: log.schoolId,
