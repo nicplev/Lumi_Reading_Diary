@@ -501,12 +501,11 @@ class AppRouter {
         ),
       ),
 
-      // App-icon pack is still in testing — dev-access accounts only, like
-      // /dev/impersonate. Drop the redirect to release it publicly.
+      // Released to all iOS users 2026-07-20. The screen itself renders an
+      // "iOS only" message on other platforms, so no redirect is needed.
       GoRoute(
         path: '/settings/app-icon',
         name: 'app-icon',
-        redirect: (context, state) => hasDevAccess() ? null : '/auth/login',
         builder: (context, state) => const AppIconScreen(),
       ),
 
