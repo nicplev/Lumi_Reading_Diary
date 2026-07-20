@@ -3920,3 +3920,41 @@ test('classDailyReading: assigned teacher can query only their class; clients ca
       .collection('readingLogSummaryState').doc('log_1').get(),
   );
 });
+
+test('users/parents: teacher directory list denied; admin allowed; teacher get retained', async () => {
+  // The over-broad `isTeacher` clause on the users + parents `list` rules was
+  // removed — directory listing is school-admin only. Teachers keep `get`
+  // (incl. their own doc); no teacher feature lists the whole directory.
+  await seedData(async (db) => {
+    await db.collection('schools').doc('school_1').set({
+      name: 'Lumi School', createdBy: 'admin_1',
+    });
+    await db.collection('schools').doc('school_1').collection('users').doc('admin_1').set({
+      role: 'schoolAdmin', schoolId: 'school_1', isActive: true,
+    });
+    await db.collection('schools').doc('school_1').collection('users').doc('teacher_1').set({
+      role: 'teacher', schoolId: 'school_1', isActive: true,
+      email: 't@example.com', fullName: 'Teacher One',
+    });
+    await db.collection('schools').doc('school_1').collection('parents').doc('parent_1').set({
+      role: 'parent', schoolId: 'school_1', fullName: 'Parent One', linkedChildren: [],
+    });
+  });
+
+  const teacherDb = authDb('teacher_1');
+  const adminDb = authDb('admin_1');
+  const users = (db) => db.collection('schools').doc('school_1').collection('users');
+  const parents = (db) => db.collection('schools').doc('school_1').collection('parents');
+
+  // Teacher may NOT list the staff or parent directories.
+  await assertFails(users(teacherDb).get());
+  await assertFails(parents(teacherDb).get());
+
+  // Teacher retains `get` on their own user doc and on a parent doc.
+  await assertSucceeds(users(teacherDb).doc('teacher_1').get());
+  await assertSucceeds(parents(teacherDb).doc('parent_1').get());
+
+  // schoolAdmin may still list both directories.
+  await assertSucceeds(users(adminDb).get());
+  await assertSucceeds(parents(adminDb).get());
+});
