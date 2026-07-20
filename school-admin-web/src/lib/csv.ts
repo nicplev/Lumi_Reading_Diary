@@ -8,7 +8,6 @@ export const HEADER_ALIASES: Record<string, string[]> = {
   lastName: ['last name', 'lastname', 'last_name', 'surname', 'family name', 'last'],
   className: ['class', 'class name', 'classname', 'class_name', 'room', 'group'],
   yearLevel: ['year level', 'year', 'yearlevel', 'year_level', 'year lvl', 'grade', 'grade level'],
-  dateOfBirth: ['dob', 'date of birth', 'dateofbirth', 'date_of_birth', 'birthday', 'birth date'],
   parentEmail: ['parent email', 'parent_email', 'parentemail', 'email', 'parent'],
   readingLevel: ['reading level', 'readinglevel', 'reading_level', 'level'],
 };

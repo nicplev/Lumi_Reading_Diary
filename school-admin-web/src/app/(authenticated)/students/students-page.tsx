@@ -301,7 +301,7 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess, is
     }
   };
 
-  const handleEdit = async (data: { studentId?: string; firstName: string; lastName: string; classId: string; dateOfBirth?: string; currentReadingLevel?: string; parentEmail?: string }) => {
+  const handleEdit = async (data: { studentId?: string; firstName: string; lastName: string; classId: string; currentReadingLevel?: string; parentEmail?: string }) => {
     if (!editingStudent) return;
     try {
       await updateStudent.mutateAsync({
@@ -502,7 +502,7 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess, is
     },
   ];
 
-  const handleCreate = async (data: { studentId?: string; firstName: string; lastName: string; classId: string; dateOfBirth?: string; currentReadingLevel?: string; parentEmail?: string }) => {
+  const handleCreate = async (data: { studentId?: string; firstName: string; lastName: string; classId: string; currentReadingLevel?: string; parentEmail?: string }) => {
     try {
       await createStudent.mutateAsync(data);
       setShowAdd(false);
@@ -679,7 +679,6 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess, is
           firstName: editingStudent.firstName,
           lastName: editingStudent.lastName,
           classId: editingStudent.classId,
-          dateOfBirth: editingStudent.dateOfBirth ? editingStudent.dateOfBirth.split('T')[0] : '',
           currentReadingLevel: editingStudent.currentReadingLevel ?? '',
           parentEmail: editingStudent.parentEmail ?? '',
         } : undefined}

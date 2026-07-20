@@ -9,7 +9,6 @@ function serializeStudent(s: Record<string, unknown>) {
   return {
     ...s,
     createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
-    dateOfBirth: s.dateOfBirth instanceof Date ? s.dateOfBirth.toISOString() : s.dateOfBirth ?? null,
     enrolledAt: s.enrolledAt instanceof Date ? s.enrolledAt.toISOString() : s.enrolledAt ?? null,
     archivedAt: s.archivedAt instanceof Date ? s.archivedAt.toISOString() : s.archivedAt ?? null,
     readingLevelUpdatedAt: s.readingLevelUpdatedAt instanceof Date ? s.readingLevelUpdatedAt.toISOString() : s.readingLevelUpdatedAt ?? null,
@@ -98,7 +97,6 @@ const createStudentSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   classId: z.string().min(1, 'Class is required'),
-  dateOfBirth: z.string().optional(),
   currentReadingLevel: z.string().optional(),
   parentEmail: z
     .string()

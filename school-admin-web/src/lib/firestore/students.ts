@@ -19,7 +19,6 @@ function toStudent(doc: FirebaseFirestore.DocumentSnapshot): Student {
     readingLevelUpdatedBy: data.readingLevelUpdatedBy,
     readingLevelSource: data.readingLevelSource,
     parentIds: data.parentIds ?? [],
-    dateOfBirth: data.dateOfBirth?.toDate(),
     profileImageUrl: data.profileImageUrl,
     characterId: data.characterId,
     isActive: data.isActive ?? true,
@@ -132,7 +131,6 @@ export async function createStudent(
     firstName: string;
     lastName: string;
     classId: string;
-    dateOfBirth?: string;
     currentReadingLevel?: string;
     parentEmail?: string;
     createdBy: string;
@@ -160,7 +158,6 @@ export async function createStudent(
     .add({
       ...data,
       schoolId,
-      dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
       parentIds: [],
       isActive: true,
       createdAt: new Date(),
@@ -726,7 +723,6 @@ export interface CSVRow {
   firstName: string;
   lastName: string;
   className: string;
-  dateOfBirth?: string;
   parentEmail?: string;
   readingLevel?: string;
 }
@@ -736,55 +732,6 @@ export interface ImportResult {
   errorCount: number;
   errors: { row: number; message: string }[];
   createdClassNames: string[];
-}
-
-/**
- * Parse a date-of-birth cell from a CSV import into a valid Date, or null.
- * Handles ISO `yyyy-mm-dd`, Australian `dd/mm/yyyy` (and `dd-mm-yyyy`, 2-digit
- * years), and Excel serial numbers. Crucially it NEVER returns an Invalid Date:
- * `new Date("22/05/2020")` yields Invalid Date, and writing that to Firestore
- * throws "Value for argument \"seconds\" is not a valid integer", which used to
- * fail the entire 400-row batch. Unrecognised cells return null so the student
- * still imports (without a DOB) instead of nuking the import.
- */
-export function parseImportDate(raw: string | undefined | null): Date | null {
-  if (raw == null) return null;
-  const s = String(raw).trim();
-  if (s === '') return null;
-
-  // Excel serial (days since the 1899-12-30 epoch). Bare integer, plausible range.
-  if (/^\d{1,6}$/.test(s)) {
-    const serial = parseInt(s, 10);
-    if (serial > 0 && serial < 200000) {
-      const d = new Date(Date.UTC(1899, 11, 30) + serial * 86400000);
-      return isNaN(d.getTime()) ? null : d;
-    }
-    return null;
-  }
-
-  // Australian dd/mm/yyyy (or dd-mm-yyyy / dd.mm.yyyy, 2- or 4-digit year).
-  const au = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/);
-  if (au) {
-    const day = parseInt(au[1], 10);
-    const month = parseInt(au[2], 10);
-    let year = parseInt(au[3], 10);
-    if (year < 100) year += year < 50 ? 2000 : 1900;
-    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      const d = new Date(Date.UTC(year, month - 1, day));
-      // Reject overflow (e.g. 31/02 rolling into March).
-      if (d.getUTCMonth() === month - 1 && d.getUTCDate() === day) return d;
-    }
-    return null;
-  }
-
-  // ISO yyyy-mm-dd.
-  if (/^\d{4}-\d{1,2}-\d{1,2}/.test(s)) {
-    const d = new Date(s);
-    return isNaN(d.getTime()) ? null : d;
-  }
-
-  // Anything else is ambiguous/locale-dependent — refuse rather than guess.
-  return null;
 }
 
 export async function importStudents(
@@ -833,19 +780,6 @@ export async function importStudents(
         continue;
       }
 
-      // Validate the date-of-birth PER ROW, before it can reach the batch —
-      // a bad cell nulls the DOB (with a per-row note) instead of throwing.
-      let dob: Date | null = null;
-      if (row.dateOfBirth && row.dateOfBirth.trim() !== '') {
-        dob = parseImportDate(row.dateOfBirth);
-        if (dob === null) {
-          result.errors.push({
-            row: rowIndex,
-            message: `Unrecognised date of birth "${row.dateOfBirth}" — imported without it (use dd/mm/yyyy or yyyy-mm-dd)`,
-          });
-        }
-      }
-
       // Find or create the class.
       const classKey = row.className.toLowerCase();
       let classId = classMap.get(classKey);
@@ -879,7 +813,6 @@ export async function importStudents(
             firstName: row.firstName,
             lastName: row.lastName,
             classId,
-            dateOfBirth: dob,
             currentReadingLevel: row.readingLevel || null,
             parentEmail: row.parentEmail || null,
             updatedAt: new Date(),
@@ -898,7 +831,6 @@ export async function importStudents(
           lastName: row.lastName,
           classId,
           schoolId,
-          dateOfBirth: dob,
           currentReadingLevel: row.readingLevel || null,
           parentEmail: row.parentEmail || null,
           enrollmentStatus: 'not_enrolled',

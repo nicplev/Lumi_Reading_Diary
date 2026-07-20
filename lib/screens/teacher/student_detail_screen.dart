@@ -1108,7 +1108,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       readingLevelUpdatedBy: widget.teacher.id,
       readingLevelSource: StudentReadingLevelService.sourceTeacher,
       parentIds: current.parentIds,
-      dateOfBirth: current.dateOfBirth,
       profileImageUrl: current.profileImageUrl,
       isActive: current.isActive,
       createdAt: current.createdAt,
