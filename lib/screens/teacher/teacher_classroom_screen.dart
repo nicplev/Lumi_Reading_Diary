@@ -1482,12 +1482,8 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
 
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
-            return Container(
+            return _SheetSurface(
               height: MediaQuery.of(sheetContext).size.height * 0.78,
-              decoration: const BoxDecoration(
-                color: LumiTokens.paper,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
               child: Column(
                 children: [
@@ -1788,11 +1784,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: LumiTokens.paper,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
+      builder: (context) => _SheetSurface(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1851,11 +1843,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: LumiTokens.paper,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
+      builder: (context) => _SheetSurface(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -2219,3 +2207,47 @@ class _ClassroomSearchBarState extends State<_ClassroomSearchBar>
     );
   }
 }
+
+/// The rounded white surface every bottom sheet on this screen sits on.
+///
+/// The transparent Material is load-bearing, not decoration. A ListTile paints
+/// its tileColor and ink splashes onto the nearest Material ANCESTOR — without
+/// one inside this surface, that ancestor sits below the white background,
+/// which then hides both. The sort sheet's selected-option tint and the
+/// student picker's cream tiles were invisible for exactly this reason.
+///
+/// Flutter 3.44 asserts on the shape ("ListTile background color or ink
+/// splashes may be invisible"); 3.41 did not, which is how it went unnoticed.
+/// Extracted so a fourth sheet cannot reintroduce it by copy-paste.
+class _SheetSurface extends StatelessWidget {
+  const _SheetSurface({
+    required this.child,
+    required this.padding,
+    this.height,
+  });
+
+  final Widget child;
+  final EdgeInsets padding;
+  final double? height;
+
+  static const BorderRadius _radius =
+      BorderRadius.vertical(top: Radius.circular(24));
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: height,
+      decoration: const BoxDecoration(
+        color: LumiTokens.paper,
+        borderRadius: _radius,
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        borderRadius: _radius,
+        clipBehavior: Clip.antiAlias,
+        child: Padding(padding: padding, child: child),
+      ),
+    );
+  }
+}
+
