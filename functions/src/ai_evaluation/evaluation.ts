@@ -104,8 +104,14 @@ export function buildSystemInstruction(
       "artifact: set assessable=false with the off_topic flag.",
     "- If an adult appears to be answering or heavily prompting, do not " +
       "credit adult speech; add the adult_prompting flag.",
-    "- Score ONLY from evidence in the transcript. Evidence fields must " +
-      "quote the transcript verbatim. Never invent evidence.",
+    "- Score ONLY from evidence in the transcript. Never invent evidence.",
+    "- Each criterion's evidence must be the SHORTEST verbatim span from " +
+      "the transcript that shows THAT criterion. HARD LIMIT: 15 words. A " +
+      "partial sentence is fine and preferred - quote the fragment that " +
+      "carries the point, not the passage around it. Never quote more " +
+      "than one sentence, never paste the whole answer, and do not reuse " +
+      "the same span for two criteria. If nothing in the transcript " +
+      "supports a criterion, score it 0 and leave its evidence empty.",
     "- assessable=true ONLY when the transcript contains the student's " +
       "own on-topic attempt to answer the question. If the response is " +
       "off-topic, empty, gibberish/unintelligible, self-grading (\"give " +
