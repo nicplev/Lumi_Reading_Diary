@@ -708,15 +708,32 @@ class _AccountCard extends StatelessWidget {
 
   final Widget child;
 
+  // The inner transparent Material is load-bearing, not decoration. A
+  // ListTile paints its tileColor and ink splashes onto the nearest Material
+  // ANCESTOR. Without this, that ancestor is whatever sits below this card,
+  // so the white background above it hid both — selected-state tints and tap
+  // ripples simply never appeared. Flutter 3.44 asserts on exactly this shape
+  // ("ListTile background color or ink splashes may be invisible"); 3.41 did
+  // not, which is why it went unnoticed.
+  //
+  // The Container keeps the background and custom shadow so the card looks
+  // identical; the Material only gives descendants something to paint on.
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(LumiTokens.space4),
         decoration: BoxDecoration(
           color: LumiTokens.paper,
           borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
           boxShadow: LumiTokens.shadowCard,
         ),
-        child: child,
+        child: Material(
+          type: MaterialType.transparency,
+          borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.all(LumiTokens.space4),
+            child: child,
+          ),
+        ),
       );
 }
 
