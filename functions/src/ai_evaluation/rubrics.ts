@@ -5,7 +5,10 @@
 // material changes are allowed at term boundaries only, and report trends
 // segment at version boundaries.
 
-export const RUBRIC_VERSION = 1;
+// v2 (2026-07-20): personal_connection's "relevance" split into "book_link"
+// so it stops sharing evidence with "connection". Report trends segment here,
+// so v1 evals stay comparable among themselves.
+export const RUBRIC_VERSION = 2;
 
 export const QUESTION_CATEGORIES: readonly string[] = [
   "literal_recall",
@@ -98,15 +101,28 @@ export const RUBRICS: Record<string, Rubric> = {
     key: "personal_connection",
     label: "Personal connection",
     criteria: [
+      // These two used to be "connection" (relates the reading to their own
+      // life) and "relevance" (the connection relates to the reading content).
+      // For a typical answer BOTH are carried by the same clause — "she reads
+      // a lot, which is kind of like me" — so the model quoted the identical
+      // span as evidence for each, which tells a teacher nothing. Split by
+      // which SIDE of the connection each looks at: the child, or the book.
       {
         id: "connection",
         label: "Makes a connection",
-        guidance: "Relates the reading to their own life, feelings or experiences.",
+        guidance: "Relates the reading to their own life, feelings or " +
+          "experiences — the part of the answer about THEM.",
       },
       {
-        id: "relevance",
-        label: "Relevance",
-        guidance: "The connection clearly relates to the reading content.",
+        // Renamed from "relevance", which collided with the general rubric's
+        // criterion of the same id: the app maps ids to labels globally, so a
+        // personal-connection eval was displayed to teachers as "Answers the
+        // question" — the general rubric's meaning, not this one's.
+        id: "book_link",
+        label: "Linked to the book",
+        guidance: "Names the specific character, event or idea in the book " +
+          "that the connection is anchored to — the part of the answer " +
+          "about the BOOK.",
       },
       {
         id: "elaboration",
