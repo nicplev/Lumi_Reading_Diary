@@ -200,12 +200,14 @@ costs); VIC PAL "ICT software in schools — risk assessment" (28 Jan 2025).
 
 ---
 
-## Annex — draft pre-assessment enquiry (step 1 of the action list)
+## Annex — pre-assessment enquiry (step 1 of the action list)
 
-Drafted 20 July 2026 for Nic to send via <https://st4s.edu.au/contact-us/>
-(enquiry type "Assessment"). Before sending: replace the phone placeholder.
-Entity details per the ASIC business-name registration (LUMI READING,
-registered 15 July 2026, holder Lumi Education Pty Ltd).
+**STATUS: SENT by Nic on 20 July 2026** via <https://st4s.edu.au/contact-us/>.
+Awaiting the ST4S Team's reply — their answer to question 1 (excluded-list /
+STT-exemption applicability) gates the rest of this plan. Text as sent below
+(phone number redacted in this copy). Entity details per the ASIC
+business-name registration (LUMI READING, registered 15 July 2026, holder
+Lumi Education Pty Ltd).
 
 > **Subject: Pre-assessment guidance request — AI feature in a K-6
 > reading-diary app (Lumi)**
