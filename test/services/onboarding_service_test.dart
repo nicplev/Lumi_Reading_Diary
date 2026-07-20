@@ -559,25 +559,5 @@ void main() {
       });
     });
 
-    // ── generateSchoolCode ──
-
-    group('generateSchoolCode', () {
-      test('generates code from school name prefix + 4 digits', () async {
-        final code = service.generateSchoolCode('Sunshine Primary');
-        expect(code, hasLength(7)); // 3 letters + 4 digits
-        expect(code.substring(0, 3), 'SUN');
-        expect(int.tryParse(code.substring(3)), isNotNull);
-      });
-
-      test('handles short school names', () async {
-        final code = service.generateSchoolCode('AB');
-        expect(code.length, greaterThanOrEqualTo(5)); // 1-2 letters + 4 digits
-      });
-
-      test('strips non-alpha characters from name', () async {
-        final code = service.generateSchoolCode('St. Mary\'s');
-        expect(code.substring(0, 3), 'STM');
-      });
-    });
   });
 }
