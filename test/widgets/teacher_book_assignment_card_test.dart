@@ -8,9 +8,15 @@ Widget _wrap(Widget child) {
   );
 }
 
+// This card used to own a PopupMenuButton (tooltip 'Book actions'). That was
+// replaced by tap-the-whole-card -> modal bottom sheet, and the sheet now
+// lives in the caller (student_detail_screen.dart). The card's only remaining
+// responsibility here is showing the editable affordance, so the old
+// menu-selection test was removed rather than rewritten against a widget that
+// no longer has a menu.
 void main() {
-  group('TeacherBookAssignmentCard action menu', () {
-    testWidgets('shows action menu only when callback is provided',
+  group('TeacherBookAssignmentCard', () {
+    testWidgets('shows the editable affordance only when actions are allowed',
         (tester) async {
       await tester.pumpWidget(
         _wrap(
@@ -24,7 +30,7 @@ void main() {
         ),
       );
 
-      expect(find.byTooltip('Book actions'), findsNothing);
+      expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
 
       await tester.pumpWidget(
         _wrap(
@@ -39,11 +45,12 @@ void main() {
         ),
       );
 
-      expect(find.byTooltip('Book actions'), findsOneWidget);
+      expect(find.byIcon(Icons.chevron_right_rounded), findsOneWidget);
     });
 
-    testWidgets('selecting menu item sends selected action', (tester) async {
-      TeacherBookCardAction? selectedAction;
+    testWidgets('tapping the card is what opens the caller-owned sheet',
+        (tester) async {
+      var taps = 0;
 
       await tester.pumpWidget(
         _wrap(
@@ -53,18 +60,16 @@ void main() {
             coverGradient: const [Colors.green, Colors.green],
             bookType: 'library',
             status: 'new',
-            onActionSelected: (action) => selectedAction = action,
+            onActionSelected: (_) {},
+            onTap: () => taps++,
           ),
         ),
       );
 
-      await tester.tap(find.byTooltip('Book actions'));
+      await tester.tap(find.text('Far Away'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Swap'));
-      await tester.pumpAndSettle();
-
-      expect(selectedAction, TeacherBookCardAction.swap);
+      expect(taps, 1);
     });
   });
 }

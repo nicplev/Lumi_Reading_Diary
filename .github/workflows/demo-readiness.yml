@@ -6,9 +6,8 @@ on:
     paths:
       - 'admin/**'
       - 'functions/**'
-      - 'lib/core/routing/**'
-      - 'lib/data/providers/user_provider.dart'
-      - 'lib/screens/auth/**'
+      - 'lib/**'
+      - 'test/**'
       - 'packages/**'
       - 'school-admin-web/**'
       - 'scripts/demo-readiness-local.sh'
@@ -25,9 +24,8 @@ on:
     paths:
       - 'admin/**'
       - 'functions/**'
-      - 'lib/core/routing/**'
-      - 'lib/data/providers/user_provider.dart'
-      - 'lib/screens/auth/**'
+      - 'lib/**'
+      - 'test/**'
       - 'packages/**'
       - 'school-admin-web/**'
       - 'scripts/demo-readiness-local.sh'
@@ -64,6 +62,20 @@ jobs:
           java-version: '21'
       - uses: subosito/flutter-action@v2
         with:
+          # Pinned deliberately. This was `channel: stable` with no version,
+          # so CI floated to whatever stable was newest while local dev sat on
+          # 3.41.6 — the two disagreed, and a Flutter release could turn main
+          # red overnight with no code change. Widening the gate to the full
+          # suite exposed this immediately: 12 tests pass locally and fail on
+          # CI, because a newer Flutter added a ListTile-in-DecoratedBox
+          # assertion that 3.41.6 does not have.
+          #
+          # NOTE: those 12 failures are real (invisible tap ripples in
+          # account_screen.dart and teacher_classroom_screen.dart) and are
+          # deferred, not fixed. Bumping this pin will surface them again —
+          # that is the intended moment to fix them, as a deliberate upgrade
+          # rather than a surprise.
+          flutter-version: 3.41.6
           channel: stable
           cache: true
       - name: Install workspace dependencies
