@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -98,6 +100,27 @@ class _LogReadingScreenState extends State<LogReadingScreen>
   // Step 4 (or 3): Confirmation
   bool _isLoading = false;
   String? _errorMessage;
+
+  // ---- Submit progress -----------------------------------------------------
+  // A log with a comprehension recording can sit on the save button for a
+  // while on a slow connection, and an indeterminate spinner gives the parent
+  // no idea whether it is nearly done or stuck. Only the Storage upload
+  // reports real bytes; the confirm callable that follows decodes and
+  // transcodes server-side and reports nothing. So the bar reserves its last
+  // stretch for that leg and creeps through it, rather than sitting at 100%
+  // looking frozen — or claiming done before it is.
+  static const double _kSavingEnd = 0.10;
+  static const double _kUploadEnd = 0.85;
+  static const double _kCreepCeiling = 0.97;
+
+  _SubmitPhase _phase = _SubmitPhase.idle;
+  double _progress = 0;
+  Timer? _creepTimer;
+
+  /// Only true when there are bytes to upload. A log without a recording
+  /// finishes in well under a second, where a bar would just flash — those
+  /// keep the plain spinner.
+  bool _useProgressBar = false;
 
   // Soft, non-blocking notice when another guardian already logged today.
   String? _alreadyLoggedNotice;
@@ -353,6 +376,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _creepTimer?.cancel();
     _pageController.dispose();
     _bookTitleController.dispose();
     _notesController.dispose();
@@ -401,11 +425,82 @@ class _LogReadingScreenState extends State<LogReadingScreen>
     return [..._selectedBookTitles, ..._customBookTitles];
   }
 
+  String get _loadingLabel {
+    switch (_phase) {
+      case _SubmitPhase.saving:
+        return 'Saving log';
+      case _SubmitPhase.uploading:
+        return 'Uploading recording';
+      case _SubmitPhase.finishing:
+        return 'Finishing up';
+      case _SubmitPhase.idle:
+        return '';
+    }
+  }
+
+  void _setPhase(_SubmitPhase phase) {
+    if (!mounted) return;
+    setState(() {
+      _phase = phase;
+      switch (phase) {
+        case _SubmitPhase.saving:
+          // Start slightly filled so the bar reads as "started", not stalled.
+          _progress = 0.04;
+          break;
+        case _SubmitPhase.uploading:
+          _progress = _kSavingEnd;
+          break;
+        case _SubmitPhase.finishing:
+          _progress = _kUploadEnd;
+          break;
+        case _SubmitPhase.idle:
+          _progress = 0;
+          break;
+      }
+    });
+    if (phase == _SubmitPhase.finishing) {
+      _startCreep();
+    } else {
+      _creepTimer?.cancel();
+      _creepTimer = null;
+    }
+  }
+
+  /// Eases asymptotically toward [_kCreepCeiling] so the bar keeps moving
+  /// while the server works but never reaches the end before it actually
+  /// finishes.
+  void _startCreep() {
+    _creepTimer?.cancel();
+    _creepTimer = Timer.periodic(const Duration(milliseconds: 120), (_) {
+      if (!mounted) return;
+      setState(() {
+        _progress += (_kCreepCeiling - _progress) * 0.03;
+      });
+    });
+  }
+
+  void _onUploadProgress(double fraction) {
+    if (!mounted) return;
+    final mapped =
+        _kSavingEnd + (_kUploadEnd - _kSavingEnd) * fraction.clamp(0.0, 1.0);
+    // Bytes land often; skip sub-pixel rebuilds.
+    if ((mapped - _progress).abs() < 0.005 && fraction < 1) return;
+    if (fraction >= 0.999) {
+      // Bytes are in — everything left is the opaque server confirm.
+      _setPhase(_SubmitPhase.finishing);
+      return;
+    }
+    setState(() => _progress = mapped);
+  }
+
   Future<void> _saveReadingLog() async {
+    final pendingRecording = _comprehensionRecording;
+    _useProgressBar = pendingRecording != null && !_demoAudioPreviewOnly;
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
+    _setPhase(_SubmitPhase.saving);
 
     try {
       final recording = _comprehensionRecording;
@@ -439,7 +534,11 @@ class _LogReadingScreenState extends State<LogReadingScreen>
       if (previewOnly) {
         await discardComprehensionRecordingPreview(recording);
       } else if (recording != null && storagePath != null) {
+        _setPhase(_SubmitPhase.uploading);
         if (result.savedOffline) {
+          // Queued, not uploaded — there is no transfer to track, so skip
+          // straight to the closing phase rather than pretending to upload.
+          _setPhase(_SubmitPhase.finishing);
           await OfflineService.instance.enqueueComprehensionAudioUpload(
             logId: result.log.id,
             schoolId: result.log.schoolId,
@@ -453,8 +552,12 @@ class _LogReadingScreenState extends State<LogReadingScreen>
             await ReadingLogService.instance.uploadComprehensionAudio(
               log: result.log,
               localFilePath: recording.localPath,
+              onProgress: _onUploadProgress,
             );
           } catch (e, st) {
+            // Falling back to the queue: the bar should stop advancing on
+            // bytes that are no longer being sent.
+            _setPhase(_SubmitPhase.finishing);
             debugPrint(
                 '[CompAudioSync] step=direct_upload failed logId=${result.log.id} '
                 'type=${e.runtimeType} err=$e\n$st');
@@ -469,6 +572,12 @@ class _LogReadingScreenState extends State<LogReadingScreen>
           }
         }
       }
+
+      // Everything that can fail has succeeded — snap the bar full before the
+      // success screen takes over.
+      _creepTimer?.cancel();
+      _creepTimer = null;
+      if (mounted) setState(() => _progress = 1);
 
       // Rec 5a: a completed log supersedes any saved draft.
       await OfflineService.instance.clearLogDraft(widget.student.id);
@@ -488,9 +597,13 @@ class _LogReadingScreenState extends State<LogReadingScreen>
         });
       }
     } catch (e) {
+      _creepTimer?.cancel();
+      _creepTimer = null;
       setState(() {
         _errorMessage = 'Failed to save reading log. Please try again.';
         _isLoading = false;
+        _phase = _SubmitPhase.idle;
+        _progress = 0;
       });
     }
   }
@@ -1179,6 +1292,10 @@ class _LogReadingScreenState extends State<LogReadingScreen>
             text: 'Save reading log',
             icon: Icons.check_rounded,
             isLoading: _isLoading,
+            // Determinate only when there is a recording to upload; a
+            // text-only log finishes too fast for a bar to mean anything.
+            progress: _isLoading && _useProgressBar ? _progress : null,
+            loadingLabel: _loadingLabel,
             isFullWidth: true,
             color: LumiTokens.green,
           ),
@@ -1342,3 +1459,8 @@ class _RemovableBookChip extends StatelessWidget {
     );
   }
 }
+
+/// Stages of a reading-log submit, in order. Only [uploading] has real
+/// measurable progress; [finishing] covers the server confirm, which reports
+/// nothing back.
+enum _SubmitPhase { idle, saving, uploading, finishing }
