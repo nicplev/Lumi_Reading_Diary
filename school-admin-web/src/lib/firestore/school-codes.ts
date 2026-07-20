@@ -10,6 +10,13 @@ export interface SchoolCode {
   code: string;
   createdAt: Date;
   usageCount: number;
+  // Both limits are ENFORCED server-side when a teacher submits a code
+  // (functions/src/code_verification.ts checks isActive, expiresAt and
+  // maxUsages), so a code really does stop working. They are surfaced here
+  // so the portal can warn before that happens instead of a teacher
+  // discovering it at signup.
+  expiresAt: Date | null;
+  maxUsages: number | null;
 }
 
 function generateCodeString(): string {
@@ -52,6 +59,8 @@ export async function getActiveSchoolCode(schoolId: string): Promise<SchoolCode 
         code: data.code ?? '',
         createdAt: data.createdAt?.toDate() ?? new Date(0),
         usageCount: data.usageCount ?? 0,
+        expiresAt: data.expiresAt?.toDate?.() ?? null,
+        maxUsages: typeof data.maxUsages === 'number' ? data.maxUsages : null,
       };
     })
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -100,5 +109,7 @@ export async function rotateSchoolCode(
     code: data.code,
     createdAt: data.createdAt?.toDate() ?? new Date(),
     usageCount: data.usageCount ?? 0,
+    expiresAt: data.expiresAt?.toDate?.() ?? null,
+    maxUsages: typeof data.maxUsages === 'number' ? data.maxUsages : null,
   };
 }

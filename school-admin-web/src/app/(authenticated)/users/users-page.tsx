@@ -14,7 +14,7 @@ import { ConfirmDialog } from '@/components/lumi/confirm-dialog';
 import { useToast } from '@/components/lumi/toast';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useUsers, useDeactivateUser, useReactivateUser, useResetPassword, useMarkUserForDeletion, useUndoDeleteUser } from '@/lib/hooks/use-users';
-import { useSchoolCode, useRotateSchoolCode } from '@/lib/hooks/use-school-code';
+import { useSchoolCode, useRotateSchoolCode, type SerializedSchoolCode } from '@/lib/hooks/use-school-code';
 import { KebabMenu } from '@/components/lumi/kebab-menu';
 import { CreateUserModal } from './create-user-modal';
 import { BulkImportStaffModal } from './bulk-import-staff-modal';
@@ -297,6 +297,7 @@ export function UsersPage() {
             )}
           </button>
         )}
+        {schoolCode?.code && <SchoolCodeValidity code={schoolCode} />}
         {isAdmin && (
           <button
             onClick={() => setRotateConfirm(true)}
@@ -306,6 +307,10 @@ export function UsersPage() {
           </button>
         )}
       </div>
+
+      {schoolCode?.code && (
+        <SchoolCodeExpiredNotice code={schoolCode} isAdmin={isAdmin} />
+      )}
 
       {isAdmin && (
         <Tabs
@@ -413,6 +418,114 @@ export function UsersPage() {
         variant="warning"
         loading={rotateCode.isPending}
       />
+    </div>
+  );
+}
+
+// ── Staff code validity ───────────────────────────────────────────────
+// The staff code is enforced server-side on three axes when a teacher
+// submits it (functions/src/code_verification.ts): isActive, expiresAt and
+// maxUsages. Until now the portal showed none of that, so a code could
+// lapse silently and the first anyone knew was a teacher failing to sign
+// up. These surface it before that happens.
+
+/**
+ * Whole days until `iso`; negative once past. Floors rather than ceils so a
+ * code lapsing in two hours reads "Expires today", not "Expires in 1 day" —
+ * rounding up would under-warn at exactly the moment warning matters most.
+ */
+function daysUntil(iso: string): number {
+  const ms = new Date(iso).getTime() - Date.now();
+  return Math.floor(ms / (24 * 60 * 60 * 1000));
+}
+
+function SchoolCodeValidity({ code }: { code: SerializedSchoolCode }) {
+  const days = code.expiresAt ? daysUntil(code.expiresAt) : null;
+  const usesLeft =
+    code.maxUsages != null ? code.maxUsages - code.usageCount : null;
+
+  // Whichever limit bites first is the one worth showing.
+  const expired = days != null && days < 0;
+  const usedUp = usesLeft != null && usesLeft <= 0;
+  const urgent = (days != null && days <= 7) || (usesLeft != null && usesLeft <= 5);
+
+  if (expired || usedUp) {
+    // days === -1 covers "lapsed at some point today" (floor puts anything
+    // under 24h past into -1), so say that rather than "1 day ago".
+    const ago = Math.abs(days ?? 0);
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">
+        {expired
+          ? ago <= 1
+            ? 'Expired today'
+            : `Expired ${ago} days ago`
+          : 'Usage limit reached'}
+      </span>
+    );
+  }
+
+  if (days == null && usesLeft == null) return null;
+
+  // Name whichever limit will bite FIRST. Showing "expires in 20 days" while
+  // only 3 signups remain flags the urgency but points at the wrong cause.
+  const usesPressing = usesLeft != null && usesLeft <= 5;
+  const label =
+    usesPressing || days == null
+      ? `${usesLeft} ${usesLeft === 1 ? 'use' : 'uses'} left`
+      : days === 0
+        ? 'Expires today'
+        : `Expires in ${days} ${days === 1 ? 'day' : 'days'}`;
+
+  return (
+    <span
+      className={
+        urgent
+          ? 'inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700'
+          : 'text-xs text-muted'
+      }
+      title={
+        [
+          code.expiresAt
+            ? `Expires ${new Date(code.expiresAt).toLocaleDateString()}`
+            : null,
+          usesLeft != null
+            ? `Used ${code.usageCount} of ${code.maxUsages} times`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' · ') || undefined
+      }
+    >
+      {label}
+    </span>
+  );
+}
+
+function SchoolCodeExpiredNotice({
+  code,
+  isAdmin,
+}: {
+  code: SerializedSchoolCode;
+  isAdmin: boolean;
+}) {
+  const days = code.expiresAt ? daysUntil(code.expiresAt) : null;
+  const usesLeft =
+    code.maxUsages != null ? code.maxUsages - code.usageCount : null;
+  const expired = days != null && days < 0;
+  const usedUp = usesLeft != null && usesLeft <= 0;
+  if (!expired && !usedUp) return null;
+
+  return (
+    <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+      <strong className="font-semibold">
+        This staff code no longer works.
+      </strong>{' '}
+      {expired
+        ? 'It passed its expiry date, so new teachers and admins cannot use it to create an account.'
+        : 'It has been used the maximum number of times, so it cannot be used to create new accounts.'}{' '}
+      {isAdmin
+        ? 'Choose “Change” above to generate a new one — existing staff stay signed in and linked.'
+        : 'Ask a school admin to generate a new one.'}
     </div>
   );
 }
