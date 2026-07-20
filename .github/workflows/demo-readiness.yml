@@ -6,9 +6,8 @@ on:
     paths:
       - 'admin/**'
       - 'functions/**'
-      - 'lib/core/routing/**'
-      - 'lib/data/providers/user_provider.dart'
-      - 'lib/screens/auth/**'
+      - 'lib/**'
+      - 'test/**'
       - 'packages/**'
       - 'school-admin-web/**'
       - 'scripts/demo-readiness-local.sh'
@@ -25,9 +24,8 @@ on:
     paths:
       - 'admin/**'
       - 'functions/**'
-      - 'lib/core/routing/**'
-      - 'lib/data/providers/user_provider.dart'
-      - 'lib/screens/auth/**'
+      - 'lib/**'
+      - 'test/**'
       - 'packages/**'
       - 'school-admin-web/**'
       - 'scripts/demo-readiness-local.sh'

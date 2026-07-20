@@ -36,27 +36,19 @@ step "Firestore tenant and demo-role Rules"
 step "Storage isolation and demo upload Rules"
 (cd functions && npm run test:rules:storage)
 
-step "Flutter login, routing, Terms and recovery UI"
-flutter test \
-  test/core/routing/app_router_test.dart \
-  test/screens/auth/login_screen_policy_test.dart \
-  test/data/providers/user_provider_auth_resolution_test.dart \
-  test/screens/auth/terms_account_load_error_test.dart \
-  test/screens/parent/comprehension_recording_demo_preview_test.dart \
-  test/models/comprehension_recording_settings_test.dart \
-  test/models/user_model_test.dart \
-  test/assets_bundled_test.dart
+# Was a hardcoded list of 8 test files covering the login/routing/Terms
+# boundary. That meant a change to any other Flutter screen, widget or
+# service ran no tests at all — the workflow's path filter didn't even
+# trigger for them. Eight tests had rotted behind intentional UI changes
+# without anyone noticing. Run the whole suite instead: it takes ~15s.
+step "Flutter test suite"
+flutter test
 
-step "Flutter changed demo boundary analysis"
-flutter analyze \
-  lib/core/routing/app_router.dart \
-  lib/screens/auth/login_screen.dart \
-  lib/data/providers/user_provider.dart \
-  lib/screens/auth/terms_acceptance_screen.dart \
-  lib/data/models/comprehension_recording_settings.dart \
-  lib/screens/parent/widgets/comprehension_recording_step.dart \
-  lib/screens/parent/log_reading_screen.dart \
-  lib/screens/parent/reading_success_screen.dart
+# Likewise was 8 named files. --no-fatal-infos keeps the pre-existing
+# deprecation notices (Radio.groupValue, dart:html) non-blocking while still
+# failing the gate on any real error or warning.
+step "Flutter analysis"
+flutter analyze --no-fatal-infos lib/
 
 step "School portal session/read-only security"
 pnpm --filter lumi-school-admin test:security

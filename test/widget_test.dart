@@ -35,7 +35,7 @@ void main() {
     TestWidgetsFlutterBinding.ensureInitialized();
   });
 
-  testWidgets('Splash screen shows Lumi text', (WidgetTester tester) async {
+  testWidgets('Splash screen renders artwork and loading state', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -48,9 +48,13 @@ void main() {
     // perpetual progress indicators/animations to settle.
     await tester.pump(const Duration(seconds: 3));
 
-    // Verify that the app launches (checking for common UI elements)
-    // The splash screen should show the app title
-    expect(find.text('Lumi'), findsOneWidget);
+    // Verify that the app launches. The wordmark is baked into the splash PNG
+    // (ed7c756), so there is no 'Lumi' Text to find. The artwork is not
+    // matchable by AssetImage either — Image.asset with cacheWidth wraps it in
+    // a ResizeImage. Assert the splash rendered its normal, non-error state:
+    // full-bleed artwork plus the loading affordance.
+    expect(find.byType(Image), findsWidgets);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
     // Dispose and advance fake time so pending splash timers are drained.
     await tester.pumpWidget(const SizedBox.shrink());

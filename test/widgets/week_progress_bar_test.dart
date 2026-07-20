@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lumi_reading_tracker/core/widgets/lumi/week_progress_bar.dart';
-import 'package:lumi_reading_tracker/core/theme/app_colors.dart';
+import 'package:lumi_reading_tracker/theme/lumi_tokens.dart';
 
 void main() {
   Widget wrapWidget(Widget child) {
@@ -104,7 +104,7 @@ void main() {
       expect(find.byIcon(Icons.check), findsNothing);
     });
 
-    testWidgets('completed today uses coral fill', (tester) async {
+    testWidgets('completed today uses the tint-green fill', (tester) async {
       await tester.pumpWidget(wrapWidget(
         const WeekProgressBar(
           completedDays: {3},
@@ -112,13 +112,15 @@ void main() {
         ),
       ));
 
-      // Find the Container for today's completed circle (day 3 = Wednesday)
-      // It should have rosePink background
+      // Every completed day — today included — now uses one tint-green fill
+      // (02b8f38 moved this widget off AppColors onto LumiTokens, and a later
+      // pass collapsed the today/past colour distinction into a single
+      // confirmation state).
       final containers = tester.widgetList<Container>(find.byType(Container));
       final todayContainer = containers.where((c) {
         final decoration = c.decoration;
         if (decoration is BoxDecoration) {
-          return decoration.color == AppColors.rosePink &&
+          return decoration.color == LumiTokens.tintGreen &&
               decoration.shape == BoxShape.circle;
         }
         return false;
@@ -126,7 +128,8 @@ void main() {
       expect(todayContainer, isNotEmpty);
     });
 
-    testWidgets('completed past day uses mint fill', (tester) async {
+    testWidgets('completed past day uses the same tint-green fill',
+        (tester) async {
       await tester.pumpWidget(wrapWidget(
         const WeekProgressBar(
           completedDays: {1},
@@ -135,15 +138,15 @@ void main() {
       ));
 
       final containers = tester.widgetList<Container>(find.byType(Container));
-      final mintContainers = containers.where((c) {
+      final completedContainers = containers.where((c) {
         final decoration = c.decoration;
         if (decoration is BoxDecoration) {
-          return decoration.color == AppColors.mintGreen &&
+          return decoration.color == LumiTokens.tintGreen &&
               decoration.shape == BoxShape.circle;
         }
         return false;
       });
-      expect(mintContainers, isNotEmpty);
+      expect(completedContainers, isNotEmpty);
     });
   });
 }

@@ -45,7 +45,9 @@ void main() {
       _log(DateTime(2025, 6, 11), feeling: ReadingFeeling.great),
     ]);
     expect(find.text('Reading Feelings'), findsOneWidget);
-    expect(find.text('This Week at a Glance'), findsOneWidget);
+    // The separate 'This Week at a Glance' sub-heading went away when the two
+    // cards were merged into one (8d666cc); the glance row now sits under a
+    // plain divider inside the Reading Feelings card.
     expect(find.byType(FeelingsGlanceRow), findsOneWidget);
   });
 }

@@ -100,5 +100,10 @@ void main() {
         .collection('schools').doc('s1').collection('students').doc('st2').get();
     expect(st1b.data()?.containsKey('manualAward'), isFalse);
     expect(st2b.data()?['manualAward']?['characterId'], 'special_lumi');
+
+    // Each assignment fires a 2s Lumi toast. pumpAndSettle drains animations
+    // but not a bare Timer, so without this the test tears down with pending
+    // timers and fails despite every assertion above passing.
+    await tester.pump(const Duration(seconds: 3));
   });
 }

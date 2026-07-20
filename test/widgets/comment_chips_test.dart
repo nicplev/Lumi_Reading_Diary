@@ -21,7 +21,11 @@ void main() {
       ));
 
       expect(find.text('How did it go?'), findsOneWidget);
-      expect(find.text('Select any that apply (optional)'), findsOneWidget);
+      // Subtitle is interpolated with maxSelections (kMaxParentCommentChips).
+      expect(
+        find.text('Select up to 3 that apply (optional)'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('displays all category headers', (tester) async {
