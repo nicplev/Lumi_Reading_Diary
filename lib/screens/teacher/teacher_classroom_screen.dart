@@ -1244,128 +1244,131 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
               ),
             ],
           ),
-          child: IntrinsicHeight(
-            child: Row(
-              children: [
-                // Reading-status bar (recency: green / amber / red / grey)
-                Container(
-                  width: 4,
-                  decoration: BoxDecoration(
+          // Clip to the card's own radius so the accent strip's outer edge
+          // traces exactly the same curve as the card. Giving the strip its
+          // own borderRadius cannot work: it is 4px wide, and Flutter scales
+          // an RRect's radii down to fit the shape, so a 14px corner on a 4px
+          // box renders as ~4px and reads as a mismatch against the card.
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+            child: IntrinsicHeight(
+              child: Row(
+                children: [
+                  // Reading-status bar (recency: green / amber / red / grey).
+                  // Square by design — the ClipRRect above rounds it.
+                  Container(
+                    width: 4,
                     color: _recencyColor(student),
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(12),
-                      bottomLeft: Radius.circular(12),
-                    ),
                   ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 14, 14, 14),
-                    child: Row(
-                      children: [
-                        StudentAvatar.fromStudent(student, size: 40),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      fullName,
-                                      style: LumiType.body.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  if (streak > 0) ...[
-                                    const SizedBox(width: 6),
-                                    Icon(
-                                      Icons.local_fire_department_rounded,
-                                      size: 14,
-                                      color: LumiTokens.yellow,
-                                    ),
-                                    const SizedBox(width: 2),
-                                    Text(
-                                      '$streak',
-                                      style: LumiType.caption.copyWith(
-                                        color: LumiTokens.yellow,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              const SizedBox(height: 3),
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      metaParts.join(' · '),
-                                      style: LumiType.caption.copyWith(
-                                        color: LumiTokens.muted,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  if (showGroup) ...[
-                                    Text('  ·  ',
-                                        style: LumiType.caption
-                                            .copyWith(color: LumiTokens.muted)),
-                                    Container(
-                                      width: 6,
-                                      height: 6,
-                                      decoration: BoxDecoration(
-                                        color: groupColor,
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 14, 14, 14),
+                      child: Row(
+                        children: [
+                          StudentAvatar.fromStudent(student, size: 40),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Row(
+                                  children: [
                                     Flexible(
                                       child: Text(
-                                        groupName!,
+                                        fullName,
+                                        style: LumiType.body.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (streak > 0) ...[
+                                      const SizedBox(width: 6),
+                                      Icon(
+                                        Icons.local_fire_department_rounded,
+                                        size: 14,
+                                        color: LumiTokens.yellow,
+                                      ),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        '$streak',
+                                        style: LumiType.caption.copyWith(
+                                          color: LumiTokens.yellow,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        metaParts.join(' · '),
                                         style: LumiType.caption.copyWith(
                                           color: LumiTokens.muted,
                                         ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
+                                    if (showGroup) ...[
+                                      Text('  ·  ',
+                                          style: LumiType.caption
+                                              .copyWith(color: LumiTokens.muted)),
+                                      Container(
+                                        width: 6,
+                                        height: 6,
+                                        decoration: BoxDecoration(
+                                          color: groupColor,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          groupName!,
+                                          style: LumiType.caption.copyWith(
+                                            color: LumiTokens.muted,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
                                   ],
-                                ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Semantics(
+                                label: bookStatusLabel,
+                                child: Icon(
+                                  key: ValueKey(
+                                      'student_book_status_${student.id}'),
+                                  bookStatusIcon,
+                                  size: 18,
+                                  color: bookStatusColor,
+                                  semanticLabel: bookStatusLabel,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                size: 20,
+                                color: LumiTokens.muted.withValues(alpha: 0.4),
                               ),
                             ],
                           ),
-                        ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Semantics(
-                              label: bookStatusLabel,
-                              child: Icon(
-                                key: ValueKey(
-                                    'student_book_status_${student.id}'),
-                                bookStatusIcon,
-                                size: 18,
-                                color: bookStatusColor,
-                                semanticLabel: bookStatusLabel,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Icon(
-                              Icons.chevron_right_rounded,
-                              size: 20,
-                              color: LumiTokens.muted.withValues(alpha: 0.4),
-                            ),
-                          ],
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

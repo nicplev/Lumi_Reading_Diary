@@ -10,6 +10,7 @@ import 'package:lumi_reading_tracker/data/providers/active_child_provider.dart'
 import 'package:lumi_reading_tracker/data/models/class_model.dart';
 import 'package:lumi_reading_tracker/data/models/user_model.dart';
 import 'package:lumi_reading_tracker/screens/teacher/teacher_classroom_screen.dart';
+import 'package:lumi_reading_tracker/theme/lumi_tokens.dart';
 import 'package:lumi_reading_tracker/services/reading_level_service.dart';
 import 'package:lumi_reading_tracker/services/student_reading_level_service.dart';
 
@@ -164,6 +165,58 @@ void main() {
       expect(emmaIcon.semanticLabel, 'Books assigned');
       expect(danielIcon.icon, Icons.menu_book_outlined);
       expect(danielIcon.semanticLabel, 'Needs books');
+    });
+
+    // The accent strip is 4px wide, so it cannot carry the card's radius
+    // itself — Flutter scales an RRect's radii down to fit the shape, which
+    // rendered a ~4px corner against the card's 14px one. It is clipped by
+    // the card instead. Pins the clip radius to the card's token so the two
+    // cannot drift apart again.
+    testWidgets('student card clips its accent strip to the card radius',
+        (tester) async {
+      await _setLargeSurface(tester);
+      await _seedDemoStudents(firestore, classModel);
+
+      await tester.pumpWidget(
+        _wrapClassroom(
+          teacher: teacher,
+          classModel: classModel,
+          firestore: firestore,
+          readingLevelService: readingLevelService,
+          studentReadingLevelService: studentReadingLevelService,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final cardRadius = BorderRadius.circular(LumiTokens.radiusMedium);
+
+      // The Ink that paints the card surface, and the ClipRRect that shapes
+      // its contents, must agree on the radius.
+      final inks = tester
+          .widgetList<Ink>(find.byType(Ink))
+          .where((ink) =>
+              (ink.decoration as BoxDecoration?)?.borderRadius == cardRadius)
+          .toList();
+      expect(inks, isNotEmpty,
+          reason: 'expected student cards painted at the card radius');
+
+      final clips = tester
+          .widgetList<ClipRRect>(find.byType(ClipRRect))
+          .where((clip) => clip.borderRadius == cardRadius)
+          .toList();
+      expect(clips.length, greaterThanOrEqualTo(inks.length),
+          reason: 'every student card should clip its contents to its radius');
+
+      // The strip itself must stay square — a radius on it would be scaled
+      // down by Flutter and reintroduce the mismatch.
+      for (final container in tester.widgetList<Container>(
+        find.byType(Container),
+      )) {
+        if (container.constraints?.maxWidth == 4) {
+          expect(container.decoration, isNull,
+              reason: 'accent strip must be a plain coloured box');
+        }
+      }
     });
 
     testWidgets('whole-class by title allocation marks all students assigned',
