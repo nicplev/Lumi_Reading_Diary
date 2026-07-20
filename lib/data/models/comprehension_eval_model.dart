@@ -250,6 +250,15 @@ class CriterionScore {
         return 'Uses context';
       case 'connection':
         return 'Makes a connection';
+      case 'book_link':
+        return 'Linked to the book';
+      // Ids are mapped globally, so this is whichever rubric produced the
+      // eval. Since rubric v2 only the general rubric uses 'relevance', where
+      // it means "answers the question". Personal-connection evals written
+      // under rubric v1 also carry this id and will read slightly off — they
+      // meant "the connection relates to the reading content" — but there is
+      // no rubric key stored per criterion to disambiguate, and v1 evals age
+      // out with the 730-day retention.
       case 'relevance':
         return 'Answers the question';
       case 'understanding':
