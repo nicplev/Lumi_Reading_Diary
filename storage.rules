@@ -45,13 +45,19 @@ service firebase.storage {
     // school authority, ftyp signature, size, duration and rate limits —
     // then publishes a separate server-produced canonical object. Residue
     // here expires via the pending-cleanup cron.
-    function ownsAudioLog(schoolId, fileName) {
+    // Deliberately does NOT reference `resource` — see the create/update
+    // split below.
+    function validPendingAudio(schoolId, fileName) {
       let logId = request.resource.metadata.logId;
-      return request.auth != null &&
+      return request.resource != null &&
+          request.auth != null &&
+          !isDemoAccount() &&
           request.resource.metadata.schoolId == schoolId &&
           request.resource.metadata.ownerUid == request.auth.uid &&
           logId is string &&
-          fileName == logId + '.m4a';
+          fileName == logId + '.m4a' &&
+          request.resource.size < 2 * 1024 * 1024 &&
+          request.resource.contentType == 'audio/mp4';
     }
 
     // Community book covers: any authenticated user can read.
@@ -75,23 +81,29 @@ service firebase.storage {
       // uploaderUid, so they match nobody and are effectively immutable from
       // the client. That is the intended fail-closed outcome; replacing one
       // needs a backend path with Admin credentials.
-      // Split create/update deliberately rather than using `write` with a
-      // `resource == null` test: the create path then never references
-      // `resource` at all, so it is provable in the Rules test harness (which
-      // cannot model an absent existing object and errors on any reference to
-      // it). The pre-2026-07-15 rule was shaped this way too.
-      allow create: if validCoverUpload();
-
+      // MUST be a single `write` rule with an explicit `resource == null`
+      // test. Do NOT split this into allow create / allow update: Storage
+      // evaluates an overwrite of an existing object as CREATE, so an
+      // `allow update` clause is dead code and the create clause alone
+      // decides every upload. PR #481 shipped exactly that split, which
+      // silently left every cover overwritable by any authenticated user
+      // until 2026-07-20. Verified with a rules-harness probe: with
+      // `allow update: if false`, a second upload to the same path still
+      // succeeds; with `resource == null`, it is correctly denied.
+      //
       // Overwrites are restricted to the original contributor, so someone can
       // fix their own blurry photo without anyone being able to replace
       // another school's work in a catalog shared by everyone. Legacy covers
       // predate custom metadata, carry no uploaderUid, match nobody and are
       // therefore immutable from the client by design — replacing one needs a
       // backend path with Admin credentials.
-      allow update: if validCoverUpload()
-                    && resource.metadata != null
-                    && resource.metadata.get('uploaderUid', '')
-                       == request.auth.uid;
+      //
+      // Delete is covered by `write` and denied for free: validCoverUpload()
+      // requires request.resource != null, which is null on a delete.
+      allow write: if validCoverUpload()
+                   && (resource == null
+                       || resource.metadata.get('uploaderUid', '')
+                          == request.auth.uid);
     }
 
     // Client holding area for untrusted comprehension recordings. The parent
@@ -100,14 +112,34 @@ service firebase.storage {
     // playback object with Admin credentials, then deletes this pending copy.
     match /comprehension_audio_uploads/{schoolId}/{fileName} {
       allow read: if false;
-      // The kill switch and school authority are enforced app-side before the
-      // upload is attempted, and again server-side in the confirm callable
-      // (the actual boundary). They are NOT checked here — see ownsAudioLog.
-      allow write: if request.resource != null
-                   && !isDemoAccount()
-                   && ownsAudioLog(schoolId, fileName)
-                   && request.resource.size < 2 * 1024 * 1024
-                   && request.resource.contentType == 'audio/mp4';
+
+      // The kill switch, school authority, retention evidence and log
+      // ownership are NOT checked here — they all require reading Firestore,
+      // which these rules cannot do. They are enforced app-side before the
+      // upload is attempted and, authoritatively, server-side in
+      // confirmComprehensionAudioUpload before anything is promoted out of
+      // this holding area (see functions/src/comprehension_retention.ts and
+      // functions/src/audio_authority.ts, covered by
+      // functions/test/comprehension_audio.integration.test.js).
+      // Single `write` rule with an explicit `resource == null` test — see
+      // the community-cover block above for why splitting create/update does
+      // not work here.
+      //
+      // Overwrite is restricted to whoever staged the pending object, so a
+      // parent can retry their own recording but nobody else can clobber it
+      // in the window before the server collects it. Rules cannot tell whose
+      // reading log a logId belongs to, so a first write to an unused logId
+      // is not attributable here — the confirm callable rejects it. This at
+      // least stops an authenticated outsider replacing bytes already staged
+      // by their rightful owner.
+      //
+      // Delete is denied for free: validPendingAudio() requires
+      // request.resource != null, which is null on a delete. The server
+      // removes collected pending objects with Admin credentials.
+      allow write: if validPendingAudio(schoolId, fileName)
+                   && (resource == null
+                       || resource.metadata.get('ownerUid', '')
+                          == request.auth.uid);
     }
 
     // Trusted, server-produced playback objects. No client may create,

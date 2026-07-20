@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -14,7 +15,11 @@ interface SchoolAiConfig {
   capPerDay: number;
   plan: string;
   notes: string;
-  termsVersionAccepted: string;
+  authorityVersion: string;
+  currentAuthorityVersion: string;
+  authorityCurrent: boolean;
+  authorityConfirmedAt: string | null;
+  authorityConfirmedByEmail?: string;
   updatedAt: string | null;
   updatedByEmail?: string;
   usageMonth?: string;
@@ -40,7 +45,11 @@ export function AiEvaluationCard({
   const [capPerDay, setCapPerDay] = useState(initialConfig.capPerDay);
   const [plan, setPlan] = useState(initialConfig.plan);
   const [notes, setNotes] = useState(initialConfig.notes);
-  const [terms, setTerms] = useState(initialConfig.termsVersionAccepted);
+  // Attestation, not free text: ticking this records the CURRENT authority
+  // version plus a server timestamp. It starts unticked whenever the stored
+  // evidence isn't current, so superseded terms must be re-confirmed rather
+  // than carried forward.
+  const [attested, setAttested] = useState(initialConfig.authorityCurrent);
 
   const suggestedCap = Math.max(1, Math.ceil(studentCount * 1.5));
 
@@ -55,7 +64,9 @@ export function AiEvaluationCard({
           capPerDay,
           plan,
           notes,
-          termsVersionAccepted: terms,
+          authorityVersion: attested
+            ? config.currentAuthorityVersion
+            : "",
         }),
       });
       if (!res.ok) {
@@ -68,7 +79,7 @@ export function AiEvaluationCard({
       setCapPerDay(updated.capPerDay);
       setPlan(updated.plan);
       setNotes(updated.notes);
-      setTerms(updated.termsVersionAccepted);
+      setAttested(updated.authorityCurrent);
       toast.success("AI evaluation settings saved");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to save");
@@ -126,14 +137,54 @@ export function AiEvaluationCard({
             />
           </div>
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="ai-terms">Terms version accepted</Label>
-          <Input
-            id="ai-terms"
-            value={terms}
-            onChange={(e) => setTerms(e.target.value)}
-            placeholder="e.g. ai-eval-terms-v1 (required to enable)"
-          />
+        {config.enabled && !config.authorityCurrent && (
+          <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
+            <p className="font-medium">
+              Switched on, but not actually running
+            </p>
+            <p className="text-muted-foreground">
+              {config.authorityVersion
+                ? `This school was confirmed against ${config.authorityVersion}, which has been superseded.`
+                : "This school has no recorded agreement."}{" "}
+              Evaluation stays off until the confirmation below is ticked and
+              saved.
+            </p>
+          </div>
+        )}
+        <div className="space-y-2 rounded-md border p-3">
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="ai-authority"
+              checked={attested}
+              onCheckedChange={(v) => setAttested(v === true)}
+              disabled={saving}
+            />
+            <div className="space-y-1">
+              <Label htmlFor="ai-authority" className="font-medium">
+                I confirm this school has agreed to AI comprehension
+                evaluation
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Their privacy notice covers AI evaluation of recordings, the
+                family opt-out is available, and the agreement is on file.
+                Required to enable. Recorded against{" "}
+                <code>{config.currentAuthorityVersion}</code> with your name
+                and the time you save.
+              </p>
+            </div>
+          </div>
+          {config.authorityConfirmedAt && (
+            <p className="text-xs text-muted-foreground">
+              Confirmed{" "}
+              {new Date(config.authorityConfirmedAt).toLocaleString()}
+              {config.authorityConfirmedByEmail
+                ? ` by ${config.authorityConfirmedByEmail}`
+                : ""}
+              {config.authorityVersion
+                ? ` against ${config.authorityVersion}`
+                : ""}
+            </p>
+          )}
         </div>
         <div className="space-y-1">
           <Label htmlFor="ai-notes">Internal notes</Label>
