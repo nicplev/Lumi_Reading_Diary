@@ -1063,17 +1063,23 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       String? coverUrl;
       String? coverPath;
       if (_coverImage != null && !demoSchoolLocalOnly) {
-        coverUrl = await _communityService.uploadCoverImage(
+        final coverResult = await _communityService.uploadCoverImage(
           isbn: _scannedIsbn!,
           imageFile: _coverImage!,
           contributorId: widget.teacher.id,
           contributorSchoolId: widget.teacher.schoolId ?? '',
         );
+        coverUrl = coverResult.url;
         if (coverUrl != null) {
           coverPath = _communityService.coverStoragePath(_scannedIsbn!);
-        } else if (_bookAlreadyExists && mounted) {
+        } else if (mounted) {
+          // Surface the actual reason rather than a fixed line — the book's
+          // other details still saved, so say that too.
           showLumiToast(
-            message: 'Cover image could not be updated. Metadata was saved.',
+            message: coverResult.failureMessage == null
+                ? 'Cover image could not be updated. Book details were saved.'
+                : '${coverResult.failureMessage} '
+                    'The book details were still saved.',
             type: LumiToastType.warning,
           );
         }

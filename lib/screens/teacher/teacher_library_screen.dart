@@ -2273,7 +2273,7 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
 
     try {
       final communityService = CommunityBookService();
-      final url = await communityService.uploadCoverImage(
+      final result = await communityService.uploadCoverImage(
         isbn: isbn,
         imageFile: imageFile,
         contributorId: widget.teacher.id,
@@ -2282,10 +2282,15 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
 
       if (!mounted) return;
 
+      final url = result.url;
       if (url == null) {
         setState(() => _isUploadingCover = false);
+        // Always say WHY. A denied overwrite previously showed a generic
+        // "Failed to upload" (or nothing), which reads as the app silently
+        // ignoring the tap.
         showLumiToast(
-          message: 'Failed to upload cover image',
+          message: result.failureMessage ??
+              "Couldn't upload the cover. Please try again.",
           type: LumiToastType.error,
         );
         return;
