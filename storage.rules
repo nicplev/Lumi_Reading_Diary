@@ -1,6 +1,20 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // Shared conditions for a community book cover write. Deliberately does
+    // NOT reference `resource` — see the create/update split below.
+    function validCoverUpload() {
+      return request.resource != null
+          && request.auth != null
+          && !isDemoAccount()
+          // .get() rather than direct access: a client that omits the key
+          // should evaluate to false, not raise a rules error.
+          && request.resource.metadata.get('schoolId', '') != ''
+          && request.resource.metadata.get('uploaderUid', '') == request.auth.uid
+          && request.resource.size < 2 * 1024 * 1024
+          && request.resource.contentType == 'image/jpeg';
+    }
+
     function isDemoAccount() {
       return request.auth != null
           && request.auth.token.get('demoAccount', false) == true;
@@ -49,20 +63,35 @@ service firebase.storage {
       // Only a verified teacher/admin may create a cover. Client overwrites are
       // denied; replacing a shared catalog asset must go through an audited
       // backend path rather than last-writer-wins Storage access.
-      allow write: if request.resource != null
-                   && resource == null
-                   && request.auth != null
-                   && !isDemoAccount()
-                   && request.resource.metadata.schoolId is string
-                   && request.resource.metadata.uploaderUid == request.auth.uid
-                   // Staff-only was enforced via isStaffAtSchool(), which used
-                   // the broken cross-service lookup and blocked ALL cover
-                   // uploads from 2026-07-15. Any authenticated non-demo user
-                   // may now create a cover: accounts are invite-only, and the
-                   // `resource == null` guard above keeps this create-only, so
-                   // an existing cover can never be overwritten.
-                   && request.resource.size < 2 * 1024 * 1024
-                   && request.resource.contentType == 'image/jpeg';
+      // Staff-only was enforced via isStaffAtSchool(), which used the broken
+      // cross-service lookup and blocked ALL cover uploads from 2026-07-15.
+      // Any authenticated non-demo user may now CREATE a cover (accounts are
+      // invite-only), but an existing cover may only be replaced by the
+      // person who uploaded it — so a contributor can fix their own blurry
+      // photo without anyone being able to overwrite someone else's work on
+      // a catalog shared by every school.
+      //
+      // Legacy covers uploaded before custom metadata existed carry no
+      // uploaderUid, so they match nobody and are effectively immutable from
+      // the client. That is the intended fail-closed outcome; replacing one
+      // needs a backend path with Admin credentials.
+      // Split create/update deliberately rather than using `write` with a
+      // `resource == null` test: the create path then never references
+      // `resource` at all, so it is provable in the Rules test harness (which
+      // cannot model an absent existing object and errors on any reference to
+      // it). The pre-2026-07-15 rule was shaped this way too.
+      allow create: if validCoverUpload();
+
+      // Overwrites are restricted to the original contributor, so someone can
+      // fix their own blurry photo without anyone being able to replace
+      // another school's work in a catalog shared by everyone. Legacy covers
+      // predate custom metadata, carry no uploaderUid, match nobody and are
+      // therefore immutable from the client by design — replacing one needs a
+      // backend path with Admin credentials.
+      allow update: if validCoverUpload()
+                    && resource.metadata != null
+                    && resource.metadata.get('uploaderUid', '')
+                       == request.auth.uid;
     }
 
     // Client holding area for untrusted comprehension recordings. The parent
