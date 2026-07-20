@@ -197,3 +197,83 @@ Primary sources (all accessed 2026-07-20): ST4S Supplier Guide 2025.1
 Badge Program Usage Guidelines v2 (Mar 2025); st4s.edu.au pages (readiness
 check, excluded/high-risk list, catalogue, badge program, responsible-ai,
 costs); VIC PAL "ICT software in schools — risk assessment" (28 Jan 2025).
+
+---
+
+## Annex — draft pre-assessment enquiry (step 1 of the action list)
+
+Drafted 20 July 2026 for Nic to send via <https://st4s.edu.au/contact-us/>
+(enquiry type "Assessment"). Before sending: add phone number and ABN under
+the signature.
+
+> **Subject: Pre-assessment guidance request — AI feature in a K-6
+> reading-diary app (Lumi)**
+>
+> Dear ST4S Team,
+>
+> I hope you're well. My name is Nicholas Plevritis and I'm the director of
+> **Lumi**, a small Australian edtech company. Lumi is a reading-diary app
+> for primary schools: parents and carers log their child's home reading,
+> teachers see class reading progress, and the two can message about a
+> child's reading. All student data is hosted on Google Cloud/Firebase in
+> the Sydney (`australia-southeast1`) region.
+>
+> We're preparing to complete the ST4S Readiness Check and would very much
+> appreciate your guidance on one point beforehand, as the Supplier Guide
+> kindly invites pre-assessment discussion.
+>
+> **The feature in question.** Lumi has an optional, off-by-default
+> comprehension feature (enabled per school, with recorded school
+> authority): a child records a short spoken answer to a teacher-set
+> question about their book, and the teacher can listen to it. We have
+> built — but not enabled anywhere — an AI extension of this feature:
+>
+> 1. the recording is transcribed by Google Cloud Speech-to-Text at the
+>    Sydney regional endpoint;
+> 2. the transcript and the teacher's question are evaluated by Gemini on
+>    Vertex AI, also at the Sydney regional endpoint, against a simple
+>    comprehension rubric; and
+> 3. the output is a short, qualitative, **teacher-only** summary (evidence
+>    quotes from the transcript, a level such as "developing", and review
+>    flags). There are no marks or scores, students and parents never see
+>    AI output, and the summary is decision support only — teachers are
+>    explicitly directed to listen to the recording and use their
+>    professional judgement.
+>
+> Key safeguards: explicit per-family **opt-in** consent (no consent = no
+> AI processing ever, while ordinary teacher listening continues); the
+> student's registered name is redacted before the model and no student
+> identifiers are attached to requests, though spoken content may
+> incidentally contain personal information; no voice-prints or biometric
+> templates are created — the speech stage is transcription only; the model
+> does not train on the content; the rubric assesses comprehension of the
+> specific text, never ability, disability or learning difficulties (the
+> output schema contains no such fields); retention is limited (transcript
+> 90 days, evaluation 730 days); and the feature sits behind a fail-closed
+> kill switch.
+>
+> **Our questions:**
+>
+> 1. Given the Excluded and High-Risk list — in particular the
+>    de-identification expectation for AI inputs, and the voice/biometrics
+>    entry with its exemption for speech-to-text transcription "subject to
+>    review" — is a feature of this design assessable under ST4S, and how
+>    would the exemption review apply to it?
+> 2. If that determination is case-by-case, what information or
+>    documentation would you need from us to make it?
+> 3. We intend to declare this AI feature in our initial Readiness Check
+>    and any subsequent full assessment, even though it is not yet enabled
+>    for any school — is that the correct approach?
+> 4. Separately, could you let us know the current status of the
+>    Responsible AI evaluation pilot and whether registrations of interest
+>    are open?
+>
+> We'd be very happy to provide architecture documentation, our privacy
+> impact assessment, data-flow register, or a demonstration account if
+> helpful. Thank you very much for your time and for the work behind ST4S —
+> the published guides have been genuinely helpful to us as a small vendor.
+>
+> Kind regards,
+> Nicholas Plevritis
+> Director, Lumi
+> support@lumi-reading.com
