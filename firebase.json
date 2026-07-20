@@ -1,6 +1,9 @@
 {
   "storage": {
-    "rules": "storage.rules"
+    "rules": "storage.rules",
+    "predeploy": [
+      "./scripts/check-storage-rules.sh"
+    ]
   },
   "firestore": {
     "rules": "firestore.rules",
