@@ -203,8 +203,9 @@ costs); VIC PAL "ICT software in schools — risk assessment" (28 Jan 2025).
 ## Annex — draft pre-assessment enquiry (step 1 of the action list)
 
 Drafted 20 July 2026 for Nic to send via <https://st4s.edu.au/contact-us/>
-(enquiry type "Assessment"). Before sending: add phone number and ABN under
-the signature.
+(enquiry type "Assessment"). Before sending: replace the phone placeholder.
+Entity details per the ASIC business-name registration (LUMI READING,
+registered 15 July 2026, holder Lumi Education Pty Ltd).
 
 > **Subject: Pre-assessment guidance request — AI feature in a K-6
 > reading-diary app (Lumi)**
@@ -212,7 +213,8 @@ the signature.
 > Dear ST4S Team,
 >
 > I hope you're well. My name is Nicholas Plevritis and I'm the director of
-> **Lumi**, a small Australian edtech company. Lumi is a reading-diary app
+> **Lumi Education Pty Ltd** (trading as Lumi Reading), a small Australian
+> edtech company. Lumi is a reading-diary app
 > for primary schools: parents and carers log their child's home reading,
 > teachers see class reading progress, and the two can message about a
 > child's reading. All student data is hosted on Google Cloud/Firebase in
@@ -275,5 +277,7 @@ the signature.
 >
 > Kind regards,
 > Nicholas Plevritis
-> Director, Lumi
+> Director, Lumi Education Pty Ltd (trading as Lumi Reading)
+> ABN 45 700 349 015
 > support@lumi-reading.com
+> [PHONE NUMBER]
