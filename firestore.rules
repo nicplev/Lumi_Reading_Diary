@@ -373,8 +373,9 @@ service cloud.firestore {
             isTeacher(schoolId) ||
             isDevImpersonatingSchool(schoolId);
 
+        // Listing the staff directory is school-admin only. Teachers keep
+        // `get` (incl. their own doc); no teacher feature lists all users.
         allow list: if isSchoolAdmin(schoolId) ||
-            isTeacher(schoolId) ||
             isDevImpersonatingSchool(schoolId);
 
         // Teacher self-create was REMOVED (1.3). The legitimate teacher signup
@@ -438,8 +439,9 @@ service cloud.firestore {
             isTeacher(schoolId) ||
             isDevImpersonatingSchool(schoolId);
 
+        // Listing the parent directory is school-admin only. Teachers keep
+        // `get`; no teacher feature lists all parents.
         allow list: if isSchoolAdmin(schoolId) ||
-            isTeacher(schoolId) ||
             isDevImpersonatingSchool(schoolId);
 
         // Membership creation is server-only. Parent signup/linking callables
