@@ -12,6 +12,19 @@ import '../data/models/book_model.dart';
 /// This database is shared across all schools — any teacher or admin can
 /// contribute books by scanning covers and ISBNs. Documents are keyed by
 /// normalized ISBN-13 for O(1) lookups.
+/// Outcome of a cover upload. Carries a teacher-facing reason on failure so
+/// the UI never has to guess why nothing happened — a denied overwrite used
+/// to return a bare null, which looked like the button doing nothing.
+class CoverUploadResult {
+  final String? url;
+  final String? failureMessage;
+
+  const CoverUploadResult.success(String this.url) : failureMessage = null;
+  const CoverUploadResult.failure(String this.failureMessage) : url = null;
+
+  bool get isSuccess => url != null;
+}
+
 class CommunityBookService {
   CommunityBookService({
     FirebaseFirestore? firestore,
@@ -188,8 +201,12 @@ class CommunityBookService {
   // ── Cover Image Upload ────────────────────────────────────────────
 
   /// Resize, compress, and upload a cover image to Firebase Storage.
-  /// Returns the download URL on success, null on failure.
-  Future<String?> uploadCoverImage({
+  ///
+  /// Returns the download URL on success, or a plain-language reason on
+  /// failure. Callers MUST surface [CoverUploadResult.failureMessage] — this
+  /// previously returned a bare null, so a denied overwrite looked to the
+  /// teacher like the button simply did nothing.
+  Future<CoverUploadResult> uploadCoverImage({
     required String isbn,
     required File imageFile,
     required String contributorId,
@@ -198,7 +215,11 @@ class CommunityBookService {
     try {
       final bytes = await imageFile.readAsBytes();
       final processed = await compute(_processImage, bytes);
-      if (processed == null) return null;
+      if (processed == null) {
+        return const CoverUploadResult.failure(
+          "That image couldn't be read. Try taking the photo again.",
+        );
+      }
 
       final storagePath = '$_coverStoragePath/$isbn.jpg';
       final ref = _storage.ref(storagePath);
@@ -214,10 +235,27 @@ class CommunityBookService {
         ),
       );
 
-      return await ref.getDownloadURL();
+      return CoverUploadResult.success(await ref.getDownloadURL());
+    } on FirebaseException catch (e) {
+      debugPrint(
+          'CommunityBookService.uploadCoverImage failed: ${e.code} ${e.message}');
+      // Storage rules allow a cover to be replaced only by whoever uploaded
+      // it, so this is the expected outcome when someone else owns it — or
+      // when the stored object predates cover ownership being recorded.
+      if (e.code.contains('unauthorized')) {
+        return const CoverUploadResult.failure(
+          'This cover was added by someone else, so it can only be changed '
+          'by them. Contact Lumi if it needs replacing.',
+        );
+      }
+      return const CoverUploadResult.failure(
+        "Couldn't upload the cover. Check your connection and try again.",
+      );
     } catch (e) {
       debugPrint('CommunityBookService.uploadCoverImage failed: $e');
-      return null;
+      return const CoverUploadResult.failure(
+        "Couldn't upload the cover. Please try again.",
+      );
     }
   }
 
