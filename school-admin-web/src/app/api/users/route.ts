@@ -16,6 +16,11 @@ function serializeUser(u: Record<string, unknown>) {
 export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Staff/parent directory is school-admin only (mirrors /api/parents and the
+  // admin-only /users page). Teachers have no directory-listing feature.
+  if (session.role !== 'schoolAdmin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const { searchParams } = new URL(request.url);
   const role = searchParams.get('role') as 'teacher' | 'schoolAdmin' | 'parent' | null;
