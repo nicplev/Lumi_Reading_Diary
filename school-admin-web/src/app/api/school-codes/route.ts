@@ -10,6 +10,8 @@ function serialize(code: SchoolCode | null) {
     code: code.code,
     createdAt: code.createdAt.toISOString(),
     usageCount: code.usageCount,
+    expiresAt: code.expiresAt ? code.expiresAt.toISOString() : null,
+    maxUsages: code.maxUsages,
   };
 }
 
