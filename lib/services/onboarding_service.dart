@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -392,13 +391,13 @@ class OnboardingService {
             .toList());
   }
 
-  // Generate unique school code for easy identification
-  String generateSchoolCode(String schoolName) {
-    final cleanName = schoolName
-        .toUpperCase()
-        .replaceAll(RegExp(r'[^A-Z]'), '')
-        .substring(0, min(3, schoolName.length));
-    final random = Random.secure().nextInt(100000).toString().padLeft(5, '0');
-    return '$cleanName$random';
-  }
+  // NOTE: generateSchoolCode() was removed 2026-07-20. It was unreachable
+  // (no callers anywhere) and superseded by the super-admin portal, which
+  // mints codes in admin/src/lib/firestore/school-codes.ts: 10 characters
+  // from an unambiguous alphabet (no I/O/0/1) with a uniqueness retry loop.
+  //
+  // It also carried a latent crash: it bounded .substring() by the ORIGINAL
+  // name length while applying it to the letters-only string, so any name
+  // with >=3 characters but <3 letters threw a RangeError — 'A-B' and
+  // 'X 1 2' both crashed. Reproduced before removal.
 }
