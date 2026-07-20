@@ -21,7 +21,6 @@ interface ParsedRow {
   firstName: string;
   lastName: string;
   className: string;
-  dateOfBirth?: string;
   parentEmail?: string;
   readingLevel?: string;
   error?: string;
@@ -77,7 +76,6 @@ export function CSVImportDialog({ open, onClose, embedded }: CSVImportDialogProp
           firstName: obj.firstName ?? '',
           lastName: obj.lastName ?? '',
           className: obj.className ?? '',
-          dateOfBirth: obj.dateOfBirth || undefined,
           parentEmail: obj.parentEmail || undefined,
           readingLevel: obj.readingLevel || undefined,
         };

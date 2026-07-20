@@ -72,7 +72,6 @@ export interface Student {
   readingLevelUpdatedBy?: string;
   readingLevelSource?: string;
   parentIds: string[];
-  dateOfBirth?: Date;
   profileImageUrl?: string;
   /** Chosen Lumi character id (Firestore field + PNG stem); see lib/characters.ts. */
   characterId?: string;

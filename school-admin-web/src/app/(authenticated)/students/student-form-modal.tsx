@@ -15,7 +15,6 @@ const studentFormSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   classId: z.string().min(1, 'Class is required'),
-  dateOfBirth: z.string().optional(),
   currentReadingLevel: z.string().optional(),
   parentEmail: z
     .string()
@@ -65,7 +64,6 @@ export function StudentFormModal({
       firstName: initialData?.firstName ?? '',
       lastName: initialData?.lastName ?? '',
       classId: initialData?.classId ?? '',
-      dateOfBirth: initialData?.dateOfBirth ?? '',
       currentReadingLevel: initialData?.currentReadingLevel ?? '',
       parentEmail: initialData?.parentEmail ?? '',
     },
@@ -78,7 +76,6 @@ export function StudentFormModal({
         firstName: initialData?.firstName ?? '',
         lastName: initialData?.lastName ?? '',
         classId: initialData?.classId ?? '',
-        dateOfBirth: initialData?.dateOfBirth ?? '',
         currentReadingLevel: initialData?.currentReadingLevel ?? '',
         parentEmail: initialData?.parentEmail ?? '',
       });
@@ -124,11 +121,6 @@ export function StudentFormModal({
         onChange={(v) => setValue('classId', v)}
         placeholder="Select class"
         error={errors.classId?.message}
-      />
-      <Input
-        label="Date of Birth (optional)"
-        type="date"
-        {...register('dateOfBirth')}
       />
       <Input
         label="Parent/Guardian Email (optional)"

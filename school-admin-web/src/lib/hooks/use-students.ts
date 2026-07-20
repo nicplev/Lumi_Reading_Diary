@@ -4,9 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Student, ReadingLevelEvent, EnrollmentStatus } from '@/lib/types';
 import type { ImportResult } from '@/lib/firestore/students';
 
-type SerializedStudent = Omit<Student, 'createdAt' | 'dateOfBirth' | 'enrolledAt' | 'readingLevelUpdatedAt' | 'archivedAt' | 'access' | 'levelHistory' | 'stats'> & {
+type SerializedStudent = Omit<Student, 'createdAt' | 'enrolledAt' | 'readingLevelUpdatedAt' | 'archivedAt' | 'access' | 'levelHistory' | 'stats'> & {
   createdAt: string;
-  dateOfBirth: string | null;
   enrolledAt: string | null;
   readingLevelUpdatedAt: string | null;
   archivedAt: string | null;
@@ -52,7 +51,7 @@ export function useStudent(studentId: string) {
 export function useCreateStudent() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { studentId?: string; firstName: string; lastName: string; classId: string; dateOfBirth?: string; currentReadingLevel?: string; parentEmail?: string }) => {
+    mutationFn: async (data: { studentId?: string; firstName: string; lastName: string; classId: string; currentReadingLevel?: string; parentEmail?: string }) => {
       const res = await fetch('/api/students', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

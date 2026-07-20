@@ -492,7 +492,6 @@ export async function commitRollover(
             lastName: r.a.lastName,
             classId,
             schoolId,
-            dateOfBirth: null,
             currentReadingLevel: r.a.readingLevel?.trim() || null,
             parentEmail: r.a.parentEmail?.trim() || null,
             enrollmentStatus: 'not_enrolled',

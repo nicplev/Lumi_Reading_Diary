@@ -13,7 +13,6 @@ class StudentModel {
   final String? readingLevelUpdatedBy;
   final String? readingLevelSource;
   final List<String> parentIds;
-  final DateTime? dateOfBirth;
   final String? profileImageUrl;
   final String? characterId;
 
@@ -83,7 +82,6 @@ class StudentModel {
     this.readingLevelUpdatedBy,
     this.readingLevelSource,
     this.parentIds = const [],
-    this.dateOfBirth,
     this.profileImageUrl,
     this.characterId,
     this.autoAward,
@@ -153,9 +151,6 @@ class StudentModel {
       readingLevelUpdatedBy: data['readingLevelUpdatedBy'],
       readingLevelSource: data['readingLevelSource'],
       parentIds: List<String>.from(data['parentIds'] ?? []),
-      dateOfBirth: data['dateOfBirth'] != null
-          ? (data['dateOfBirth'] as Timestamp).toDate()
-          : null,
       profileImageUrl: data['profileImageUrl'],
       characterId: data['characterId'] as String?,
       autoAward: data['autoAward'] != null
@@ -230,8 +225,6 @@ class StudentModel {
       'readingLevelUpdatedBy': readingLevelUpdatedBy,
       'readingLevelSource': readingLevelSource,
       'parentIds': parentIds,
-      'dateOfBirth':
-          dateOfBirth != null ? Timestamp.fromDate(dateOfBirth!) : null,
       'profileImageUrl': profileImageUrl,
       if (characterId != null) 'characterId': characterId,
       // Awards round-trip on a full-document write; their authoritative writers
@@ -269,7 +262,6 @@ class StudentModel {
     String? readingLevelUpdatedBy,
     String? readingLevelSource,
     List<String>? parentIds,
-    DateTime? dateOfBirth,
     String? profileImageUrl,
     String? characterId,
     StudentAward? autoAward,
@@ -302,7 +294,6 @@ class StudentModel {
           readingLevelUpdatedBy ?? this.readingLevelUpdatedBy,
       readingLevelSource: readingLevelSource ?? this.readingLevelSource,
       parentIds: parentIds ?? this.parentIds,
-      dateOfBirth: dateOfBirth ?? this.dateOfBirth,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       characterId: characterId ?? this.characterId,
       autoAward: autoAward ?? this.autoAward,

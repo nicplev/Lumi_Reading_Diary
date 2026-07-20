@@ -30,7 +30,6 @@ export interface Student {
   readingLevelUpdatedBy?: string;
   readingLevelSource?: string;
   parentIds: string[];
-  dateOfBirth?: FirestoreTimestamp;
   profileImageUrl?: string;
   isActive: boolean;
   createdAt: FirestoreTimestamp;

@@ -59,7 +59,6 @@ export interface StudentDetail extends StudentListItem {
   readingLevelUpdatedBy?: string;
   readingLevelSource?: string;
   parentIds: string[];
-  dateOfBirth?: string;
   profileImageUrl?: string;
   enrolledAt?: string;
   stats?: {
@@ -147,7 +146,6 @@ export async function getStudent(
     readingLevelSource: data.readingLevelSource,
     parentIds: data.parentIds ?? [],
     parentLinked: ((data.parentIds as string[]) ?? []).length > 0,
-    dateOfBirth: toISO(data.dateOfBirth) || undefined,
     profileImageUrl: data.profileImageUrl,
     isActive: data.isActive ?? true,
     createdAt: toISO(data.createdAt),
