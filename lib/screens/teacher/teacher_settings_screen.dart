@@ -618,9 +618,9 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen>
                       label: 'Replay app tour',
                       onTap: widget.onReplayTour,
                     ),
-                  // The app-icon pack is still in testing — visible only to
-                  // dev-access accounts until it ships publicly. iOS-only.
-                  if (hasDevAccess() && AppIconService.isSupportedPlatform)
+                  // iOS-only: alternate app icons have no Android
+                  // implementation (no activity-alias entries in the manifest).
+                  if (AppIconService.isSupportedPlatform)
                     TeacherSettingsItem(
                       icon: Icons.apps,
                       iconBgColor: LumiTokens.muted,

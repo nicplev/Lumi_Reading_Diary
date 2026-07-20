@@ -4,9 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/sign_out_flow.dart';
-import '../../core/config/dev_access.dart';
 import '../../core/services/app_icon_service.dart';
-import '../../core/services/dev_access_service.dart';
 import '../../core/tour/lumi_app_tour.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../theme/lumi_tokens.dart';
@@ -53,10 +51,9 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen>
   final FirebaseService _firebaseService = FirebaseService.instance;
   final MfaSettingsService _mfaSettingsService = MfaSettingsService();
 
-  /// Dev-access flag — gates surfaces still in development (see the teacher
-  /// settings screen for the same pattern). Source of truth is the
-  /// `devAccessEmails` allowlist managed in the super-admin portal.
-  final DevAccessService _devAccess = DevAccessService.instance;
+  // No dev-gated surfaces remain on this screen — the app-icon picker was
+  // released to all iOS users 2026-07-20. The teacher settings screen still
+  // subscribes to DevAccessService for the surfaces it gates.
 
   bool _notificationsEnabled = true;
   TimeOfDay _reminderTime = const TimeOfDay(hour: 19, minute: 0);
@@ -84,15 +81,11 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen>
         ref.read(parentChildrenProvider).value ?? const <StudentModel>[];
     _loadPreferences();
     _loadMfaStatus();
-    // Rebuild if dev-access flips (e.g. the server lookup resolves after a
-    // session resume, or a super-admin grants/revokes access).
-    _devAccess.addListener(_onDevAccessChanged);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _devAccess.removeListener(_onDevAccessChanged);
     super.dispose();
   }
 
@@ -102,10 +95,6 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen>
     // enrol/disable flow bounces through Safari (reCAPTCHA), so the On/Off
     // badge can otherwise lag behind the real state until a cold start.
     if (state == AppLifecycleState.resumed) _loadMfaStatus();
-  }
-
-  void _onDevAccessChanged() {
-    if (mounted) setState(() {});
   }
 
   Future<void> _loadMfaStatus() async {
@@ -797,9 +786,9 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen>
             title: 'About Lumi',
             onTap: _showAboutDialog,
           ),
-          // The app-icon pack is still in testing — visible only to
-          // dev-access accounts until it ships publicly. iOS-only.
-          if (hasDevAccess() && AppIconService.isSupportedPlatform)
+          // iOS-only: alternate app icons have no Android implementation
+          // (no activity-alias entries in the manifest).
+          if (AppIconService.isSupportedPlatform)
             _SettingsRow(
               icon: Icons.apps,
               title: 'App icon',
