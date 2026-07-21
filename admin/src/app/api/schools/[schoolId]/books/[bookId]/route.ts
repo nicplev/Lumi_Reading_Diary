@@ -49,9 +49,9 @@ export async function DELETE(
 
   try {
     const { schoolId, bookId } = await params;
-    await deleteBook(schoolId, bookId);
+    const { allocationsUpdated } = await deleteBook(schoolId, bookId, session.uid);
 
-    logAuditEvent({ action: "book.delete", performedBy: session.uid, performedByEmail: session.email ?? undefined, targetType: "book", targetId: bookId, schoolId }).catch(console.error);
+    logAuditEvent({ action: "book.delete", performedBy: session.uid, performedByEmail: session.email ?? undefined, targetType: "book", targetId: bookId, schoolId, after: { allocationsUpdated } }).catch(console.error);
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -1,6 +1,10 @@
 import "server-only";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import {
+  cascadeBookRemovalForSchool,
+  normalizeIsbn,
+} from "@lumi/server-ops";
 
 function toISO(ts: unknown): string {
   if (!ts || typeof ts !== "object") return "";
@@ -178,16 +182,48 @@ export async function updateBook(
     .update(data);
 }
 
+/**
+ * Deletes a school-library book and retires it from that school's allocations.
+ *
+ * Without the cascade the book document disappears while students keep an
+ * assignment pointing at it — a title with no library entry. Allocations may
+ * reference the book by ISBN or by this document id, so both are matched.
+ *
+ * Returns the number of allocations updated so the caller can record it.
+ */
 export async function deleteBook(
   schoolId: string,
-  bookId: string
-): Promise<void> {
-  await getAdminDb()
+  bookId: string,
+  actorUid: string
+): Promise<{ allocationsUpdated: number }> {
+  const db = getAdminDb();
+  const bookRef = db
     .collection("schools")
     .doc(schoolId)
     .collection("books")
-    .doc(bookId)
-    .delete();
+    .doc(bookId);
+
+  // Read the ISBN before deleting — afterwards it is unrecoverable.
+  const snapshot = await bookRef.get();
+  const isbn = normalizeIsbn(
+    (snapshot.data()?.isbn as unknown) ??
+      (bookId.startsWith("isbn_") ? bookId.slice("isbn_".length) : null)
+  );
+
+  await bookRef.delete();
+
+  const allocationsUpdated = await cascadeBookRemovalForSchool(
+    db,
+    schoolId,
+    { isbn, bookId },
+    {
+      removedAt: new Date(),
+      removedBy: actorUid,
+      reason: "school_library_book_deleted",
+    }
+  );
+
+  return { allocationsUpdated };
 }
 
 export async function getBookCount(schoolId: string): Promise<number> {

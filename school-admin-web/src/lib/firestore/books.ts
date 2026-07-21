@@ -4,6 +4,10 @@ import type { Book } from '@/lib/types';
 // ISBN-13 normalizer (community_books is keyed by validated ISBN-13; the local
 // normalizeIsbn below only strips separators).
 import { normalizeIsbn as toIsbn13 } from './isbn-assignment';
+import {
+  buildAllocationCascade,
+  normalizeCascadeIsbn,
+} from './allocation-cascade';
 
 // External book APIs (Google Books US, Open Library US) routinely take 3–6s
 // from AU before the first byte; 12s matches the Flutter client's budget so the
@@ -165,13 +169,78 @@ export async function updateBook(
     .update(update);
 }
 
-export async function deleteBook(schoolId: string, bookId: string): Promise<void> {
-  await adminDb
+/**
+ * Deletes a school-library book and retires it from that school's allocations.
+ *
+ * Without the cascade the book document disappears while students keep an
+ * assignment pointing at it — a title with no library entry. Allocations may
+ * reference the book by ISBN or by this document id, so both are matched.
+ *
+ * Allocations cannot be queried by either (the reference lives inside an array
+ * of maps), so the school's allocations are scanned and filtered in memory.
+ * Book deletion is a rare, human-initiated action.
+ *
+ * Returns the number of allocations updated so the caller can record it.
+ */
+export async function deleteBook(
+  schoolId: string,
+  bookId: string,
+  actorUid: string,
+): Promise<{ allocationsUpdated: number }> {
+  const bookRef = adminDb
     .collection('schools')
     .doc(schoolId)
     .collection('books')
-    .doc(bookId)
-    .delete();
+    .doc(bookId);
+
+  // Read the ISBN before deleting — afterwards it is unrecoverable.
+  const snapshot = await bookRef.get();
+  const isbn = normalizeCascadeIsbn(
+    (snapshot.data()?.isbn as unknown) ??
+      (bookId.startsWith('isbn_') ? bookId.slice('isbn_'.length) : null),
+  );
+
+  await bookRef.delete();
+
+  const target = { isbn, bookId };
+  const stamp = {
+    removedAt: new Date(),
+    removedBy: actorUid,
+    reason: 'school_library_book_deleted',
+  };
+
+  const allocationsSnap = await adminDb
+    .collection('schools')
+    .doc(schoolId)
+    .collection('allocations')
+    .get();
+
+  const pending = allocationsSnap.docs
+    .map((doc) => ({
+      ref: doc.ref,
+      update: buildAllocationCascade(
+        doc.data() as Record<string, unknown>,
+        target,
+        stamp,
+      ),
+    }))
+    .filter(
+      (entry): entry is { ref: (typeof entry)['ref']; update: Record<string, unknown> } =>
+        entry.update !== null,
+    );
+
+  // Firestore rejects batches over 500 writes; stay under it with headroom.
+  const BATCH_LIMIT = 400;
+  for (let i = 0; i < pending.length; i += BATCH_LIMIT) {
+    const chunk = pending.slice(i, i + BATCH_LIMIT);
+    const batch = adminDb.batch();
+    for (const entry of chunk) {
+      batch.update(entry.ref, entry.update);
+    }
+    await batch.commit();
+  }
+
+  return { allocationsUpdated: pending.length };
 }
 
 export async function lookupBookByIsbn(
