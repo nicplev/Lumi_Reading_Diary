@@ -620,7 +620,15 @@ class _LoginScreenState extends State<LoginScreen> {
             // The character deliberately extends past the bottom edge. This
             // standalone high-resolution asset stays crisp at the large,
             // peeking-up size used here.
-            final mascotWidth = constraints.maxWidth;
+            // On tablets constraints.maxWidth is much larger than a phone's,
+            // so scaling the mascot 1:1 with it blows the character up past
+            // the screen height (it's sized off width, not height). Cap it
+            // to a phone-like width on tablets so it still peeks up from the
+            // bottom instead of covering the buttons.
+            final isTablet = MediaQuery.of(context).size.shortestSide >= 600;
+            final mascotWidth = isTablet && constraints.maxWidth > 430
+                ? 430.0
+                : constraints.maxWidth;
             final mascotHeight = mascotWidth * (623 / 457);
             // Keep Lumi's mouth above the device home indicator while the
             // character still peeks from the bottom edge.
@@ -699,29 +707,31 @@ class _LoginScreenState extends State<LoginScreen> {
                   left: 0,
                   right: 0,
                   bottom: mascotBottom,
-                  child: RawGestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    gestures: <Type, GestureRecognizerFactory>{
-                      LongPressGestureRecognizer:
-                          GestureRecognizerFactoryWithHandlers<
-                              LongPressGestureRecognizer>(
-                        () => LongPressGestureRecognizer(
-                          duration: const Duration(seconds: 5),
+                  child: Center(
+                    child: RawGestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      gestures: <Type, GestureRecognizerFactory>{
+                        LongPressGestureRecognizer:
+                            GestureRecognizerFactoryWithHandlers<
+                                LongPressGestureRecognizer>(
+                          () => LongPressGestureRecognizer(
+                            duration: const Duration(seconds: 5),
+                          ),
+                          (LongPressGestureRecognizer instance) {
+                            instance.onLongPress = _handleDevAccessGesture;
+                          },
                         ),
-                        (LongPressGestureRecognizer instance) {
-                          instance.onLongPress = _handleDevAccessGesture;
-                        },
-                      ),
-                    },
-                    child: IgnorePointer(
-                      child: ExcludeSemantics(
-                        child: Image.asset(
-                          'assets/UI Lumi/Red_Lumi_Default_EyesUp.png',
-                          width: mascotWidth,
-                          height: mascotHeight,
-                          cacheWidth: decodeCacheSize(context, mascotWidth),
-                          fit: BoxFit.fill,
-                          filterQuality: FilterQuality.high,
+                      },
+                      child: IgnorePointer(
+                        child: ExcludeSemantics(
+                          child: Image.asset(
+                            'assets/UI Lumi/Red_Lumi_Default_EyesUp.png',
+                            width: mascotWidth,
+                            height: mascotHeight,
+                            cacheWidth: decodeCacheSize(context, mascotWidth),
+                            fit: BoxFit.fill,
+                            filterQuality: FilterQuality.high,
+                          ),
                         ),
                       ),
                     ),
