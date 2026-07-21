@@ -156,6 +156,11 @@ async function issuePortalSession(
       : undefined,
     demoGenerationId,
     demoAllocationMutations: isReadOnlyDemoAdmin ? true : undefined,
+    // Pins the session to this sign-in. getSession() compares it against the
+    // account's tokensValidAfterTime, so revoking tokens (or a password reset)
+    // ends the portal session instead of leaving the cookie valid for days.
+    authTime:
+      typeof decodedToken.auth_time === 'number' ? decodedToken.auth_time : undefined,
   };
   await createSessionCookie(verifiedSession);
   return NextResponse.json(verifiedSession);
