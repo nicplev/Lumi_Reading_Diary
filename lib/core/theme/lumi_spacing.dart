@@ -133,13 +133,6 @@ class LumiSpacing {
   /// Returns a multiple of the base grid unit (8pt)
   /// Example: gridUnits(3) returns 24pt
   static double gridUnits(double units) => units * xs;
-
-  /// Returns responsive spacing based on screen width
-  /// Returns larger spacing on tablets/desktop
-  static double responsive(double phoneValue, double tabletValue, double width) {
-    const tabletBreakpoint = 600.0;
-    return width >= tabletBreakpoint ? tabletValue : phoneValue;
-  }
 }
 
 /// EdgeInsets presets using Lumi spacing values

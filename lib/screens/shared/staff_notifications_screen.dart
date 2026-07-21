@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
+import '../../core/utils/responsive.dart';
 import '../../core/widgets/lumi/teacher_filter_chip.dart';
 import '../../core/widgets/lumi/teacher_settings_item.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
@@ -1379,10 +1380,18 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
         top: false,
         child: Column(
           children: [
-            // Pill tab bar
+            // Pill tab bar. Capped and centered on tablets so it doesn't
+            // stretch to half the iPad's width per segment.
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-              child: _buildAnimatedTabPill(),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: isTablet(context) ? 420.0 : double.infinity,
+                  ),
+                  child: _buildAnimatedTabPill(),
+                ),
+              ),
             ),
 
             // Tab body

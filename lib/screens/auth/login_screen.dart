@@ -14,6 +14,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/config/dev_access.dart';
 import '../../core/services/dev_access_service.dart';
 import '../../core/services/functions_instance.dart';
+import '../../core/utils/responsive.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
@@ -625,8 +626,7 @@ class _LoginScreenState extends State<LoginScreen> {
             // the screen height (it's sized off width, not height). Cap it
             // to a phone-like width on tablets so it still peeks up from the
             // bottom instead of covering the buttons.
-            final isTablet = MediaQuery.of(context).size.shortestSide >= 600;
-            final mascotWidth = isTablet && constraints.maxWidth > 430
+            final mascotWidth = isTablet(context) && constraints.maxWidth > 430
                 ? 430.0
                 : constraints.maxWidth;
             final mascotHeight = mascotWidth * (623 / 457);

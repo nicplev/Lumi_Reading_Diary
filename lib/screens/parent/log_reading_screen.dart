@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../theme/lumi_tokens.dart';
 import '../../core/theme/lumi_text_styles.dart';
+import '../../core/utils/responsive.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/blob_selector.dart';
 import '../../core/widgets/lumi/comment_chips.dart';
@@ -1330,30 +1331,39 @@ class _LogReadingScreenState extends State<LogReadingScreen>
   }
 
   Widget _buildNavigationButtons() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          if (_currentStep > 0)
-            Expanded(
-              child: LumiSecondaryButton(
-                onPressed: _previousStep,
-                text: 'Back',
-                icon: Icons.arrow_back,
-                color: LumiTokens.red,
-              ),
-            ),
-          if (_currentStep > 0) const SizedBox(width: 12),
-          if (_currentStep < _totalSteps - 1)
-            Expanded(
-              child: LumiPrimaryButton(
-                onPressed: _nextStep,
-                text: _currentStep == _totalSteps - 2 ? 'Review' : 'Next',
-                isFullWidth: true,
-                color: LumiTokens.red,
-              ),
-            ),
-        ],
+    // Capped and centered on tablets so these wizard buttons don't stretch
+    // edge-to-edge on iPad, matching the auth screens' width cap.
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: isTablet(context) ? 480.0 : double.infinity,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              if (_currentStep > 0)
+                Expanded(
+                  child: LumiSecondaryButton(
+                    onPressed: _previousStep,
+                    text: 'Back',
+                    icon: Icons.arrow_back,
+                    color: LumiTokens.red,
+                  ),
+                ),
+              if (_currentStep > 0) const SizedBox(width: 12),
+              if (_currentStep < _totalSteps - 1)
+                Expanded(
+                  child: LumiPrimaryButton(
+                    onPressed: _nextStep,
+                    text: _currentStep == _totalSteps - 2 ? 'Review' : 'Next',
+                    isFullWidth: true,
+                    color: LumiTokens.red,
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../theme/section_theme.dart';
+import '../../core/utils/responsive.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../data/providers/school_settings_provider.dart';
 import '../../services/book_lookup_service.dart';
@@ -290,13 +291,21 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
         children: [
           Text('Reading', style: LumiType.heading),
           const SizedBox(height: LumiTokens.space3),
-          _SegmentedTabs(
-            selectedIndex: _tab.index,
-            labels: const ['Activity', 'Bookshelf'],
-            onChanged: (i) {
-              setState(() => _tab = _LibraryTab.values[i]);
-              if (_tab == _LibraryTab.books) _showPagedHistory();
-            },
+          // Capped on tablets so the segments don't stretch across the full
+          // iPad width; the Column's start alignment keeps it left-aligned
+          // under the heading either way.
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isTablet(context) ? 420.0 : double.infinity,
+            ),
+            child: _SegmentedTabs(
+              selectedIndex: _tab.index,
+              labels: const ['Activity', 'Bookshelf'],
+              onChanged: (i) {
+                setState(() => _tab = _LibraryTab.values[i]);
+                if (_tab == _LibraryTab.books) _showPagedHistory();
+              },
+            ),
           ),
         ],
       ),

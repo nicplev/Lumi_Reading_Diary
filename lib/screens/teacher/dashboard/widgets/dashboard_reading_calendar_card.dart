@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../theme/lumi_tokens.dart';
 import '../../../../theme/lumi_typography.dart';
+import '../../../../core/utils/responsive.dart';
 import '../../../../data/models/class_model.dart';
 import '../../../../data/models/student_model.dart';
 import '../../../../services/class_daily_reading_service.dart';
@@ -121,13 +122,20 @@ class _DashboardReadingCalendarCardState
       builder: (context, constraints) {
         const gap = 3.0;
         const targetCell = 18.0;
+        // On tablets constraints.maxWidth is card-width, not screen-width,
+        // but still wide enough to push cells past their target size once
+        // perRow hits its ceiling below. Cap the width the grid math uses
+        // so cells stay close to targetCell instead of growing oversized.
+        final gridWidth = isTablet(context) && constraints.maxWidth > 480
+            ? 480.0
+            : constraints.maxWidth;
         // Fixed-size square cells. Days flow left→right, top→bottom and wrap
         // onto as many rows as needed to fill the width. So fewer weeks means
         // fewer rows (a shorter card) rather than bigger cells or empty space.
-        final perRow = ((constraints.maxWidth + gap) / (targetCell + gap))
+        final perRow = ((gridWidth + gap) / (targetCell + gap))
             .floor()
             .clamp(7, 28);
-        final cell = (constraints.maxWidth - gap * (perRow - 1)) / perRow;
+        final cell = (gridWidth - gap * (perRow - 1)) / perRow;
         final totalDays = _weeks * 7;
         final rows = (totalDays / perRow).ceil();
 

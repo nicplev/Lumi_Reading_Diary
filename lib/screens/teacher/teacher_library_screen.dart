@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../core/tour/lumi_app_tour.dart';
+import '../../core/utils/responsive.dart';
 import 'cover_crop_screen.dart';
 import '../../core/widgets/lumi/lumi_skeleton.dart';
 import '../../core/widgets/lumi/lumi_toast.dart';
@@ -313,8 +314,7 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
           }
 
           // iPad-only grid density. Phones always use 3 columns.
-          final isTablet = MediaQuery.of(context).size.shortestSide >= 600;
-          final gridColumns = isTablet ? _tabletColumns : 3;
+          final gridColumns = isTablet(context) ? _tabletColumns : 3;
 
           return StreamBuilder<LibraryAssignmentSnapshot>(
             stream: _assignmentService.summaryStream(schoolId),
@@ -417,7 +417,7 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
                                         ),
                                       ),
                                       // iPad-only: choose how many books per row.
-                                      if (isTablet)
+                                      if (isTablet(context))
                                         Padding(
                                           padding: const EdgeInsets.only(
                                               left: 8, right: 16),
