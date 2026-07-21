@@ -3,7 +3,6 @@ import 'package:intl/intl.dart';
 
 import '../../../../theme/lumi_tokens.dart';
 import '../../../../theme/lumi_typography.dart';
-import '../../../../core/utils/responsive.dart';
 import '../../../../data/models/class_model.dart';
 import '../../../../data/models/student_model.dart';
 import '../../../../services/class_daily_reading_service.dart';
@@ -120,22 +119,18 @@ class _DashboardReadingCalendarCardState
   ) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        const gap = 3.0;
-        const targetCell = 18.0;
-        // On tablets constraints.maxWidth is card-width, not screen-width,
-        // but still wide enough to push cells past their target size once
-        // perRow hits its ceiling below. Cap the width the grid math uses
-        // so cells stay close to targetCell instead of growing oversized.
-        final gridWidth = isTablet(context) && constraints.maxWidth > 480
-            ? 480.0
-            : constraints.maxWidth;
-        // Fixed-size square cells. Days flow left→right, top→bottom and wrap
-        // onto as many rows as needed to fill the width. So fewer weeks means
-        // fewer rows (a shorter card) rather than bigger cells or empty space.
-        final perRow = ((gridWidth + gap) / (targetCell + gap))
+        const cell = 18.0;
+        const targetGap = 3.0;
+        // Fixed-size square cells regardless of card width. Days flow
+        // left→right, top→bottom and wrap onto as many rows as needed. On
+        // wide cards (e.g. iPad) the extra room goes into wider gaps between
+        // cells — not bigger cells (illegible density signal) or dead space.
+        final perRow = ((constraints.maxWidth + targetGap) / (cell + targetGap))
             .floor()
             .clamp(7, 28);
-        final cell = (gridWidth - gap * (perRow - 1)) / perRow;
+        final gap = perRow > 1
+            ? (constraints.maxWidth - cell * perRow) / (perRow - 1)
+            : 0.0;
         final totalDays = _weeks * 7;
         final rows = (totalDays / perRow).ceil();
 
@@ -148,7 +143,7 @@ class _DashboardReadingCalendarCardState
             final day = startDay.add(Duration(days: i));
             final count = byDay[day] ?? 0;
             final selected = _selectedDay == day;
-            if (c > 0) cells.add(const SizedBox(width: gap));
+            if (c > 0) cells.add(SizedBox(width: gap));
             cells.add(GestureDetector(
               onTap: () => setState(() => _selectedDay = day),
               child: Container(
