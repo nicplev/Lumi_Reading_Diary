@@ -23,6 +23,7 @@ import '../../data/models/book_model.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../data/models/user_model.dart';
+import '../../services/book_cover_ocr_service.dart';
 import '../../services/book_lookup_service.dart';
 import '../../services/community_book_service.dart';
 import '../../services/isbn_assignment_service.dart';
@@ -127,7 +128,7 @@ String? bookMetadataLookupNotice({
   required bool lookupUnavailable,
 }) {
   if (bookResolved || !lookupUnavailable) return null;
-  return 'Book databases could not be reached. Enter the details manually '
+  return 'Book databases could not be reached. Check the details below '
       'and Lumi can save this book.';
 }
 
@@ -139,11 +140,56 @@ String unresolvedBookPromptMessage({
   if (catalogUnavailable) {
     return 'Lumi could not reach the book databases for ISBN $isbn. '
         'You can still add it to the Lumi library by scanning the front cover '
-        'and entering the book details.';
+        'and checking the book details.';
   }
   return 'ISBN $isbn was not found in the book databases. You can add it to '
-      'the Lumi library by scanning the front cover and entering the book '
+      'the Lumi library by scanning the front cover and checking the book '
       'details.';
+}
+
+/// Minimum per-field confidence before an OCR suggestion is written into a
+/// form field.
+///
+/// Contributions go straight into the globally-shared `community_books`
+/// catalog with no moderation queue, so the cost of a wrong auto-fill a
+/// teacher doesn't notice is borne by every other school. A blank field the
+/// teacher fills in is cheap; a confident-looking wrong author is not.
+@visibleForTesting
+const double kOcrConfidenceThreshold = 0.7;
+
+/// Decides what a cover-OCR suggestion should put into the title/author
+/// fields, given what is already there.
+///
+/// Two rules, both load-bearing:
+/// - A field is only filled when the model clears [kOcrConfidenceThreshold].
+///   Titles are large display text and usually clear it; author names are
+///   small and stylised and often don't. Filling one and not the other is the
+///   expected outcome, not a failure.
+/// - A non-empty existing value always wins. Catalog data is authoritative,
+///   and in standalone mode the lookup has already run by the time the cover
+///   is captured, while inline mode runs it afterwards. Guarding on "is the
+///   field empty" makes the result identical either way, so neither ordering
+///   needs special-casing.
+@visibleForTesting
+({String? title, String? author}) ocrFieldUpdates({
+  required String ocrTitle,
+  required double titleConfidence,
+  required String ocrAuthor,
+  required double authorConfidence,
+  required String currentTitle,
+  required String currentAuthor,
+}) {
+  final title = currentTitle.trim().isEmpty &&
+          ocrTitle.trim().isNotEmpty &&
+          titleConfidence >= kOcrConfidenceThreshold
+      ? ocrTitle.trim()
+      : null;
+  final author = currentAuthor.trim().isEmpty &&
+          ocrAuthor.trim().isNotEmpty &&
+          authorConfidence >= kOcrConfidenceThreshold
+      ? ocrAuthor.trim()
+      : null;
+  return (title: title, author: author);
 }
 
 /// Multi-step screen for contributing books to the Community Book Database.
@@ -222,6 +268,7 @@ class _BookMetadataLookupOutcome {
 class _CoverScannerScreenState extends State<CoverScannerScreen> {
   final CommunityBookService _communityService = CommunityBookService();
   final BookLookupService _lookupService = BookLookupService();
+  final BookCoverOcrService _coverOcrService = BookCoverOcrService();
   final ImagePicker _imagePicker = ImagePicker();
   MobileScannerController? _scannerController;
 
@@ -257,6 +304,44 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
   GradingSchemaDefinition? _selectedSchemaDef;
   GradingLevel? _selectedLevel;
   final _customLevelController = TextEditingController();
+
+  // Cover-OCR state. `_titleFromOcr`/`_authorFromOcr` drive the auto-filled
+  // badge only — they are cleared the moment the teacher edits the field, so
+  // the badge always describes what is actually in the box.
+  bool _isReadingCover = false;
+  bool _titleFromOcr = false;
+  bool _authorFromOcr = false;
+  String _ocrModel = '';
+
+  /// Provenance for the saved catalog entry.
+  ///
+  /// `ocr` means auto-filled AND left untouched — the badge flags are cleared
+  /// on the first keystroke. `catalog` likewise means the value is still
+  /// verbatim what the lookup returned. Anything the teacher typed or edited
+  /// is `manual`, which is what makes this worth storing: it is the only way
+  /// to measure later how often a suggestion was accepted as-is.
+  String get _titleSourceLabel => _sourceLabel(
+        fromOcr: _titleFromOcr,
+        current: _titleController.text,
+        catalogValue: _resolvedLookupBook?.title,
+      );
+
+  String get _authorSourceLabel => _sourceLabel(
+        fromOcr: _authorFromOcr,
+        current: _authorController.text,
+        catalogValue: _resolvedLookupBook?.author,
+      );
+
+  String _sourceLabel({
+    required bool fromOcr,
+    required String current,
+    String? catalogValue,
+  }) {
+    if (fromOcr) return 'ocr';
+    final catalog = catalogValue?.trim() ?? '';
+    if (catalog.isNotEmpty && catalog == current.trim()) return 'catalog';
+    return 'manual';
+  }
 
   // Save state
   bool _isSaving = false;
@@ -591,11 +676,76 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       if (_isInlineMode && _scannedIsbn != null) {
         _loadMetadata(_scannedIsbn!);
       }
+
+      // Read the cover for a title/author suggestion. Deliberately not
+      // awaited: it races the catalog lookup above, and `_applyOcrSuggestion`
+      // only writes into fields that are still empty, so whichever finishes
+      // first, catalog data wins.
+      //
+      // Only worth doing when the ISBN is already known and we are therefore
+      // heading straight to the metadata form. On the cover-before-ISBN path
+      // the next step is the barcode scanner, and the _loadMetadata that
+      // follows it clears both controllers — so a suggestion here would be
+      // discarded unseen, having spent a provider call to produce it.
+      if (_scannedIsbn != null) {
+        unawaited(_readCoverForMetadata(croppedBytes));
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _isCropProcessing = false);
       _showError('Failed to process cropped image. Please try again.');
     }
+  }
+
+  /// Asks the OCR service for a title/author suggestion off the cropped cover.
+  ///
+  /// Purely additive: any failure leaves the fields exactly as they were, so
+  /// the teacher gets today's manual entry with no error to dismiss.
+  Future<void> _readCoverForMetadata(Uint8List coverBytes) async {
+    final schoolId = widget.teacher.schoolId ?? '';
+    if (schoolId.isEmpty) return;
+
+    setState(() => _isReadingCover = true);
+    try {
+      final suggestion = await _coverOcrService.readCover(
+        coverBytes: coverBytes,
+        schoolId: schoolId,
+      );
+      if (!mounted) return;
+      _applyOcrSuggestion(suggestion);
+    } catch (e) {
+      // This runs unawaited, so an escaping exception has no handler above it
+      // and would surface as a zone error. The service already swallows its
+      // own failures; this is the backstop that keeps the "never interrupts
+      // the teacher" contract true even if setState throws on teardown.
+      debugPrint('Cover OCR failed: $e');
+    } finally {
+      if (mounted) setState(() => _isReadingCover = false);
+    }
+  }
+
+  void _applyOcrSuggestion(CoverOcrSuggestion suggestion) {
+    final updates = ocrFieldUpdates(
+      ocrTitle: suggestion.title,
+      titleConfidence: suggestion.titleConfidence,
+      ocrAuthor: suggestion.author,
+      authorConfidence: suggestion.authorConfidence,
+      currentTitle: _titleController.text,
+      currentAuthor: _authorController.text,
+    );
+    if (updates.title == null && updates.author == null) return;
+
+    setState(() {
+      _ocrModel = suggestion.model;
+      if (updates.title != null) {
+        _titleController.text = updates.title!;
+        _titleFromOcr = true;
+      }
+      if (updates.author != null) {
+        _authorController.text = updates.author!;
+        _authorFromOcr = true;
+      }
+    });
   }
 
   void _retakeCover() {
@@ -608,6 +758,20 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       _coverCropStatus = null;
       _coverEditorRevision++;
       _currentStep = _ScanStep.coverCapture;
+      // Drop values that came off the OLD cover, or the empty-field guard in
+      // `ocrFieldUpdates` would reject the fresh read and leave the stale
+      // suggestion in place — defeating the whole point of retaking. Only
+      // OCR-sourced values are cleared; anything the teacher typed is theirs
+      // and survives the retake.
+      if (_titleFromOcr) {
+        _titleController.clear();
+        _titleFromOcr = false;
+      }
+      if (_authorFromOcr) {
+        _authorController.clear();
+        _authorFromOcr = false;
+      }
+      _ocrModel = '';
     });
     _startCoverCapture();
   }
@@ -851,11 +1015,18 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       _titleController.clear();
       _authorController.clear();
       _readingLevelController.clear();
+      _titleFromOcr = false;
+      _authorFromOcr = false;
+      _ocrModel = '';
+      _isReadingCover = false;
       _currentStep = _ScanStep.isbnScan;
     });
   }
 
   Future<_BookMetadataLookupOutcome> _loadMetadata(String isbn) async {
+    // NOTE: this first setState runs synchronously (before any await), so in
+    // inline mode — where _loadMetadata and the OCR read are kicked off
+    // together — the clear below always lands before OCR can fill anything.
     setState(() {
       _isLoadingMetadata = true;
       _currentStep = _ScanStep.metadataReview;
@@ -865,6 +1036,9 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       _titleController.clear();
       _authorController.clear();
       _readingLevelController.clear();
+      _titleFromOcr = false;
+      _authorFromOcr = false;
+      _ocrModel = '';
     });
 
     // Check if already in community database.
@@ -894,6 +1068,12 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
         _titleController.text = resolvedExisting.title;
         _authorController.text = resolvedExisting.author ?? '';
         _readingLevelController.text = resolvedExisting.readingLevel ?? '';
+        // Catalog data is authoritative and may land after an OCR fill —
+        // drop the badge so it never mislabels a catalog value as read
+        // off the cover.
+        _titleFromOcr = false;
+        _authorFromOcr = false;
+        _ocrModel = '';
         _isLoadingMetadata = false;
         _isProcessingBarcode = false;
       });
@@ -928,6 +1108,9 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
         _titleController.text = result.title;
         _authorController.text = result.author ?? '';
         _readingLevelController.text = result.readingLevel ?? '';
+        _titleFromOcr = false;
+        _authorFromOcr = false;
+        _ocrModel = '';
       }
       _isLoadingMetadata = false;
       _isProcessingBarcode = false;
@@ -1136,6 +1319,15 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
             'hasCameraScannedCover': coverUrl != null,
             'coverWasManuallyCropped': _coverWasManuallyCropped,
             'coverWasRotated': _rotationQuarterTurns > 0,
+            // Provenance: community_books is shared across every school with
+            // no moderation queue, so record where each field came from —
+            // it is the only way to audit catalog quality by source later.
+            // Flags survive to save only if the teacher left the value
+            // untouched, so 'ocr' means "auto-filled AND not edited".
+            'titleSource': _titleSourceLabel,
+            'authorSource': _authorSourceLabel,
+            if ((_titleFromOcr || _authorFromOcr) && _ocrModel.isNotEmpty)
+              'ocrModel': _ocrModel,
             if (_isDecodableBook) 'isDecodable': true,
             if (_isDecodableBook &&
                 _applyGrade &&
@@ -1251,6 +1443,10 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       _titleController.clear();
       _authorController.clear();
       _readingLevelController.clear();
+      _titleFromOcr = false;
+      _authorFromOcr = false;
+      _ocrModel = '';
+      _isReadingCover = false;
       _isLoadingMetadata = false;
       _bookAlreadyExists = false;
       _resolvedLookupBook = null;
@@ -1310,6 +1506,10 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                 _titleController.clear();
                 _authorController.clear();
                 _readingLevelController.clear();
+                _titleFromOcr = false;
+                _authorFromOcr = false;
+                _ocrModel = '';
+                _isReadingCover = false;
               });
             }
           case _ScanStep.saving:
@@ -1827,17 +2027,39 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
               ),
             )
           else ...[
+            // Deliberately a slim banner rather than replacing the form: the
+            // teacher can start typing immediately instead of being locked
+            // out while the cover is read.
+            if (_isReadingCover) ...[
+              _buildReadingCoverBanner(),
+              const SizedBox(height: 12),
+            ]
+            // One banner rather than per-field helper text: a helper line that
+            // appears and disappears with the badge would shift every field
+            // below it on the teacher's first keystroke.
+            else if (_titleFromOcr || _authorFromOcr) ...[
+              _buildOcrFilledBanner(),
+              const SizedBox(height: 12),
+            ],
             // Form fields
             _buildTextField(
               label: 'Title *',
               controller: _titleController,
               icon: Icons.menu_book_rounded,
+              autoFilled: _titleFromOcr,
+              onEdited: () {
+                if (_titleFromOcr) setState(() => _titleFromOcr = false);
+              },
             ),
             const SizedBox(height: 16),
             _buildTextField(
               label: 'Author',
               controller: _authorController,
               icon: Icons.person_outline,
+              autoFilled: _authorFromOcr,
+              onEdited: () {
+                if (_authorFromOcr) setState(() => _authorFromOcr = false);
+              },
             ),
             const SizedBox(height: 16),
             _buildBookTypeToggle(),
@@ -2143,26 +2365,100 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
     );
   }
 
+  /// Shown while the cover is being read. Never blocks the form — if OCR is
+  /// slow or fails, the teacher is already typing and simply never sees a
+  /// suggestion arrive.
+  Widget _buildReadingCoverBanner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: LumiTokens.tintYellow,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: LumiTokens.yellow,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Reading the cover…',
+              style: LumiType.caption.copyWith(color: LumiTokens.ink),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Shown once a suggestion has landed. The sparkle + amber border on each
+  /// field say WHICH values came off the cover; this says what to do about it.
+  Widget _buildOcrFilledBanner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: LumiTokens.tintYellow,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.auto_awesome_rounded,
+            color: LumiTokens.yellow,
+            size: 16,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Read from the cover — check the details are right.',
+              style: LumiType.caption.copyWith(color: LumiTokens.ink),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTextField({
     required String label,
     required TextEditingController controller,
     required IconData icon,
     String? hint,
+    bool autoFilled = false,
+    VoidCallback? onEdited,
   }) {
     return TextField(
       controller: controller,
       cursorColor: LumiTokens.ink,
+      // Once the teacher types, the value is theirs — drop the badge so it
+      // never claims an edited field came off the cover.
+      onChanged: onEdited == null ? null : (_) => onEdited(),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
         prefixIcon: Icon(icon, color: LumiTokens.muted, size: 20),
+        suffixIcon: autoFilled
+            ? const Icon(
+                Icons.auto_awesome_rounded,
+                color: LumiTokens.yellow,
+                size: 20,
+              )
+            : null,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
           borderSide: BorderSide(color: LumiTokens.rule),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
-          borderSide: BorderSide(color: LumiTokens.rule),
+          borderSide: BorderSide(
+            color: autoFilled ? LumiTokens.yellow : LumiTokens.rule,
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),

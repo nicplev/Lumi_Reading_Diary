@@ -235,6 +235,12 @@ export {processAiEvalJob, sweepAiEvalJobs} from "./ai_evaluation/worker";
 export {aiEvalRetention} from "./ai_evaluation/retention";
 export {generateStudentReportNarrative} from "./ai_evaluation/report";
 
+// Book-cover OCR for new community-catalog contributions. Reuses the AU
+// Vertex transport but is gated ONLY by platformConfig/coverOcr (fail-OPEN):
+// covers carry no student data, so the fail-closed per-school AI-evaluation
+// entitlement deliberately does not apply. See book_cover_ocr.ts.
+export {extractBookCoverMetadata} from "./book_cover_ocr";
+
 // Idempotent account/student deletion jobs. All destructive work runs through
 // server-owned callables/the retry scheduler; clients can only request and
 // read their own sanitized job status.
