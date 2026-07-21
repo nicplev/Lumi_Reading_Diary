@@ -26,7 +26,8 @@
         "maxInstances": 10,
         "serviceAccount": "lumi-super-admin-runtime@lumi-ninc-au.iam.gserviceaccount.com",
         "secrets": [
-          "ADMIN_SESSION_SECRET_AU"
+          "ADMIN_SESSION_SECRET_AU",
+          "ADMIN_MFA_ENC_KEY_AU"
         ]
       }
     },

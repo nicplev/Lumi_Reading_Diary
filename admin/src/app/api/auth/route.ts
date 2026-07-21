@@ -1,36 +1,32 @@
 import { NextResponse } from "next/server";
-import { getAdminAuth } from "@/lib/firebase-admin";
-import { isSuperAdminViaFirestore } from "@/lib/auth-firestore";
+import { verifyFreshSuperAdmin } from "@/lib/admin-auth-guard";
+import { hasMfa, verifyLogin } from "@/lib/mfa/store";
 import { createSession, destroySession } from "@/lib/auth";
 
+// Login. A session cookie is minted ONLY after the TOTP second factor is
+// satisfied, so the cookie's existence implies MFA passed. A super-admin with
+// no factor yet is told to enrol first (the login page shows the QR flow).
 export async function POST(request: Request) {
   try {
-    const { idToken } = await request.json();
-    if (!idToken) {
-      return NextResponse.json(
-        { error: "Missing ID token" },
-        { status: 400 }
-      );
+    const { idToken, code } = await request.json();
+
+    const guard = await verifyFreshSuperAdmin(idToken);
+    if (!guard.ok) {
+      return NextResponse.json({ error: guard.error }, { status: guard.status });
     }
 
-    // Verify the ID token
-    const decoded = await getAdminAuth().verifyIdToken(idToken);
-
-    // Gate on /superAdmins membership — same source of truth as Cloud Functions
-    if (!(await isSuperAdminViaFirestore(decoded.uid))) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      );
+    if (!(await hasMfa(guard.uid))) {
+      // No second factor enrolled — the client routes to enrollment.
+      return NextResponse.json({ status: "enrollment_required" }, { status: 401 });
     }
 
-    // Check auth_time freshness (must be within 5 minutes)
-    const authTime = decoded.auth_time;
-    const fiveMinutesAgo = Math.floor(Date.now() / 1000) - 5 * 60;
-    if (authTime < fiveMinutesAgo) {
+    if (!code || typeof code !== "string") {
+      return NextResponse.json({ status: "mfa_required" }, { status: 401 });
+    }
+    if (!(await verifyLogin(guard.uid, code, Date.now()))) {
       return NextResponse.json(
-        { error: "Session too old. Please sign in again." },
-        { status: 401 }
+        { status: "mfa_required", error: "Invalid or expired code" },
+        { status: 401 },
       );
     }
 
@@ -38,10 +34,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ status: "success" });
   } catch (error) {
     console.error("Auth error:", error);
-    return NextResponse.json(
-      { error: "Authentication failed" },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: "Authentication failed" }, { status: 401 });
   }
 }
 
