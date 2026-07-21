@@ -4034,3 +4034,17 @@ test('users/parents: teacher directory list denied; admin allowed; teacher get r
   await assertSucceeds(users(adminDb).get());
   await assertSucceeds(parents(adminDb).get());
 });
+
+test('adminMfa: all client reads and writes are denied (server-only)', async () => {
+  await seedData(async (db) => {
+    await db.collection('adminMfa').doc('super_1').set({
+      secret: { ciphertext: 'x', iv: 'y', tag: 'z' },
+    });
+  });
+  // Even a client authenticated as the doc's own uid cannot read or write it —
+  // the encrypted TOTP secret is only ever touched by the Admin SDK.
+  const owner = authDb('super_1');
+  await assertFails(owner.collection('adminMfa').doc('super_1').get());
+  await assertFails(owner.collection('adminMfa').doc('super_1').set({ secret: {} }));
+  await assertFails(unauthDb().collection('adminMfa').doc('super_1').get());
+});
