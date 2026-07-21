@@ -1,6 +1,10 @@
 # Reviewed 2026-07-15. These fingerprints are historical false positives:
 # Firebase client configuration keys (public by design, console restrictions
 # still required), CocoaPods checksums, and synthetic test/example values.
+# Reviewed 2026-07-21: published RFC 4226 test vector and an explicitly
+# synthetic MFA encryption unit-test value from merged PR #501.
+b70d38ad998d9d21f5619788c2fcc2ba7de3b2ef:admin/src/lib/mfa/crypto.test.ts:generic-api-key:9
+b70d38ad998d9d21f5619788c2fcc2ba7de3b2ef:admin/src/lib/mfa/totp.test.ts:generic-api-key:20
 03a60c5a619ccacfd0178945c25496a8402824ce:ios/Podfile.lock:generic-api-key:1691
 03a60c5a619ccacfd0178945c25496a8402824ce:ios/Podfile.lock:generic-api-key:1701
 03a60c5a619ccacfd0178945c25496a8402824ce:ios/Podfile.lock:generic-api-key:1732

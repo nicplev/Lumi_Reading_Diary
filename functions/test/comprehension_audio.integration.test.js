@@ -107,6 +107,9 @@ async function seedLog({
       comprehensionAudioDurationSec: 12,
       comprehensionAudioValidationVersion: 'ffmpeg-aac-mono-v1',
       comprehensionAudioObjectGeneration: 'test-generation',
+      comprehensionAudioReviewStatus: 'reviewed',
+      comprehensionAudioReviewedAt: admin.firestore.Timestamp.now(),
+      comprehensionAudioReviewedGeneration: 'test-generation',
     } : {}),
   });
   return ref;
@@ -185,6 +188,9 @@ test('upload confirmation decodes pending media and writes a canonical server ob
   );
   assert.equal(data.comprehensionAudioDurationSec, 1);
   assert.equal(data.comprehensionAudioUploaded, true);
+  assert.equal(data.comprehensionAudioReviewStatus, 'pending');
+  assert.equal(data.comprehensionAudioReviewedAt, undefined);
+  assert.equal(data.comprehensionAudioReviewedGeneration, undefined);
   assert.equal(data.comprehensionAudioValidationVersion, 'ffmpeg-aac-mono-v1');
   assert.match(data.comprehensionAudioSha256, /^[a-f0-9]{64}$/);
   assert.ok(data.comprehensionAudioUploadedAt);
@@ -353,6 +359,9 @@ test('manual deletion follows the canonical path and never an injected stored pa
   const data = (await log.get()).data();
   assert.equal(data.comprehensionAudioUploaded, false);
   assert.equal(data.comprehensionAudioPath, undefined);
+  assert.equal(data.comprehensionAudioReviewStatus, undefined);
+  assert.equal(data.comprehensionAudioReviewedAt, undefined);
+  assert.equal(data.comprehensionAudioReviewedGeneration, undefined);
   const audits = await admin.firestore().collection('adminAuditLog')
     .where('action', '==', 'comprehensionAudio.manualDelete').get();
   assert.equal(audits.size, 1);

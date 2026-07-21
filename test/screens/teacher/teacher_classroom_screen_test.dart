@@ -13,6 +13,7 @@ import 'package:lumi_reading_tracker/screens/teacher/teacher_classroom_screen.da
 import 'package:lumi_reading_tracker/theme/lumi_tokens.dart';
 import 'package:lumi_reading_tracker/services/reading_level_service.dart';
 import 'package:lumi_reading_tracker/services/student_reading_level_service.dart';
+import 'package:lumi_reading_tracker/services/platform_config_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -396,6 +397,50 @@ void main() {
 
       expect(find.text('No students in this class yet'), findsOneWidget);
       expect(find.text('Refresh'), findsOneWidget);
+    });
+
+    testWidgets('audio-enabled class shows compact numeric recordings badge',
+        (tester) async {
+      await _setLargeSurface(tester);
+      PlatformConfigService.debugResetCache();
+      await firestore
+          .collection('platformConfig')
+          .doc('comprehensionRecording')
+          .set({'enabled': true});
+      await firestore.collection('schools').doc(teacher.schoolId!).update({
+        'settings.comprehensionRecording': {
+          'enabled': true,
+          'retentionDays': 90,
+        },
+      });
+      await firestore
+          .collection('schools')
+          .doc(teacher.schoolId!)
+          .collection('readingLogs')
+          .doc('recording_log')
+          .set({
+        'schoolId': teacher.schoolId,
+        'classId': classModel.id,
+        'studentId': 'student_1',
+        'parentId': 'parent_1',
+        'comprehensionAudioUploaded': true,
+        'comprehensionAudioReviewStatus': 'pending',
+      });
+
+      await tester.pumpWidget(
+        _wrapClassroom(
+          teacher: teacher,
+          classModel: classModel,
+          firestore: firestore,
+          readingLevelService: readingLevelService,
+          studentReadingLevelService: studentReadingLevelService,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Comprehension recordings'), findsOneWidget);
+      expect(find.text('1'), findsOneWidget);
+      expect(find.textContaining('recording to review'), findsNothing);
     });
   });
 }

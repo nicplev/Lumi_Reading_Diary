@@ -1108,6 +1108,12 @@ class OfflineService with WidgetsBindingObserver {
             createData.remove('comprehensionAudioPath');
             createData.remove('comprehensionAudioDurationSec');
             createData.remove('comprehensionAudioUploaded');
+            createData.remove('comprehensionAudioUploadedAt');
+            createData.remove('comprehensionAudioObjectGeneration');
+            createData.remove('comprehensionQuestionText');
+            createData.remove('comprehensionAudioReviewStatus');
+            createData.remove('comprehensionAudioReviewedAt');
+            createData.remove('comprehensionAudioReviewedGeneration');
             createData.remove('teacherComment');
             createData.remove('commentedAt');
             createData.remove('commentedBy');

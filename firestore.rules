@@ -752,6 +752,38 @@ service cloud.firestore {
             );
         }
 
+        // Shared recording-inbox workflow state. This is deliberately a
+        // separate update surface from reading-log content: only an assigned
+        // teacher may mark the current, still-uploaded object generation as
+        // reviewed, and every audit value is pinned by rules. Replacements
+        // receive a new generation server-side and therefore become pending
+        // again automatically.
+        function comprehensionReviewUpdateIsValid() {
+          let changed = request.resource.data.diff(resource.data).affectedKeys();
+          let data = request.resource.data;
+          let generation = resource.data.get(
+            'comprehensionAudioObjectGeneration', ''
+          );
+          return changed.hasOnly([
+              'comprehensionAudioReviewStatus',
+              'comprehensionAudioReviewedAt',
+              'comprehensionAudioReviewedGeneration'
+            ]) &&
+            data.comprehensionAudioUploaded == true &&
+            generation is string && generation.size() > 0 &&
+            data.comprehensionAudioObjectGeneration == generation &&
+            data.comprehensionAudioReviewStatus == 'reviewed' &&
+            data.comprehensionAudioReviewedAt == request.time &&
+            data.comprehensionAudioReviewedGeneration == generation &&
+            !(
+              resource.data.get('comprehensionAudioReviewStatus', '') ==
+                'reviewed' &&
+              resource.data.get(
+                'comprehensionAudioReviewedGeneration', ''
+              ) == generation
+            );
+        }
+
         allow get, list: if isSchoolAdmin(schoolId) ||
             isDevImpersonatingSchool(schoolId);
 
@@ -819,6 +851,11 @@ service cloud.firestore {
         allow update: if writeAllowedForSchoolContent(schoolId) &&
             isSignedIn() &&
             threadPreviewUpdateIsValid();
+
+        allow update: if writeAllowedForSchoolContent(schoolId) &&
+            isTeacher(schoolId) &&
+            teacherTeachesClass(schoolId, resource.data.classId) &&
+            comprehensionReviewUpdateIsValid();
 
         // A linked parent who didn't create the log (a co-carer, or someone
         // viewing a teacher-proxy log for their child) may still clear their

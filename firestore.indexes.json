@@ -759,6 +759,64 @@
       ]
     },
     {
+      "collectionGroup": "readingLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "classId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "comprehensionAudioUploaded",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "comprehensionAudioUploadedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "readingLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "classId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "comprehensionAudioUploaded",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "comprehensionAudioReviewStatus",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "readingLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "classId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "comprehensionAudioUploaded",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "comprehensionAudioReviewStatus",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "comprehensionAudioUploadedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "notificationCampaigns",
       "queryScope": "COLLECTION",
       "fields": [

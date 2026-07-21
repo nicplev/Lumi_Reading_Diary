@@ -111,7 +111,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     if (oldWidget.student.schoolId != widget.student.schoolId) {
       _loadReadingLevelOptions(forceRefresh: true);
     }
-
   }
 
   Future<void> _loadReadingLevelOptions({bool forceRefresh = false}) async {
@@ -951,6 +950,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       ),
     );
   }
+
   /// denormalized comment state the [CommentThread] needs to read and post.
   ReadingLogModel _toReadingLogModel(ReadingLogSnapshot snap) {
     return ReadingLogModel(
@@ -1266,7 +1266,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               onViewAll: widget.classModel == null
                   ? null
                   : () => context.push(
-                        '/teacher/comprehension-review',
+                        '/teacher/comprehension-recordings',
                         extra: {
                           'teacher': widget.teacher,
                           'classModel': widget.classModel,
@@ -1355,7 +1355,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       },
     );
   }
-
 }
 
 enum _AssignmentEditScope {

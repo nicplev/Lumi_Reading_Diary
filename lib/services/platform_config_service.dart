@@ -3,12 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// Reads platform-wide feature flags written by the Lumi super-admin portal
 /// to `platformConfig/{flagId}`.
 ///
-/// A missing doc or a failed read counts as "enabled": the per-school
-/// `settings.comprehensionRecording` toggle already defaults to off, so
-/// failing open here can never force-enable the feature for a school that
-/// didn't opt in. The Storage rules read the same doc server-side, so even a
-/// client holding a stale "enabled" answer cannot upload audio while the
-/// kill switch is off.
+/// A missing doc or failed read counts as disabled. Child voice recordings are
+/// privacy-sensitive, so the UI should agree with the callable's fail-closed
+/// platform gate instead of exposing an affordance it cannot safely fulfil.
 class PlatformConfigService {
   PlatformConfigService({FirebaseFirestore? firestore})
       : _firestore = firestore ?? FirebaseFirestore.instance;
@@ -31,12 +28,12 @@ class PlatformConfigService {
           .collection('platformConfig')
           .doc('comprehensionRecording')
           .get();
-      final enabled = (doc.data()?['enabled'] as bool?) ?? true;
+      final enabled = doc.data()?['enabled'] == true;
       _cachedComprehensionEnabled = enabled;
       _cachedAt = DateTime.now();
       return enabled;
     } catch (_) {
-      return _cachedComprehensionEnabled ?? true;
+      return _cachedComprehensionEnabled ?? false;
     }
   }
 

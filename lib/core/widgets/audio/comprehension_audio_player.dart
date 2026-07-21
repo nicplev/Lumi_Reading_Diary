@@ -9,21 +9,26 @@ import '../../theme/app_colors.dart';
 import '../../theme/lumi_text_styles.dart';
 import '../lumi/lumi_toast.dart';
 
-/// A cached signed URL and the moment it stops being valid.
-class _CachedUrl {
-  final String url;
-  final DateTime expiresAt;
-  const _CachedUrl(this.url, this.expiresAt);
-}
-
 /// Compact inline player for a child's comprehension recording, shown on the
-/// teacher's per-log row. Resolves the Storage download URL on demand and
-/// caches it in-process to avoid re-fetching as the teacher scrolls.
+/// teacher's per-log row. Resolves the Storage download URL only after an
+/// explicit play gesture; signed URLs are deliberately not cached between
+/// widget instances or account sessions.
 ///
 /// Designed to be lightweight: a play/pause button, a progress bar, and a
 /// duration label. The existing comment thread under each log handles any
 /// reply the teacher wants to leave about the recording.
 class ComprehensionAudioPlayer extends StatefulWidget {
+  static const double reviewThreshold = 0.8;
+
+  @visibleForTesting
+  static bool hasReachedReviewThreshold({
+    required Duration position,
+    required Duration total,
+  }) {
+    return total > Duration.zero &&
+        position.inMilliseconds >= total.inMilliseconds * reviewThreshold;
+  }
+
   /// Firebase Storage object path, e.g.
   /// `schools/{schoolId}/comprehension_audio/{logId}.m4a`. Used only as the
   /// per-log cache key — the object is not client-readable (see [schoolId]).
@@ -43,6 +48,11 @@ class ComprehensionAudioPlayer extends StatefulWidget {
   final String logId;
   final VoidCallback? onDeleted;
 
+  /// Called once when at least 80% of the recording has played (or playback
+  /// completes). The recording inbox uses this to mark the current generation
+  /// reviewed for all co-teachers.
+  final VoidCallback? onMostlyPlayed;
+
   /// Injectable boundary for focused widget tests.
   @visibleForTesting
   final ComprehensionAudioService? audioService;
@@ -58,6 +68,7 @@ class ComprehensionAudioPlayer extends StatefulWidget {
     required this.logId,
     this.durationSec,
     this.onDeleted,
+    this.onMostlyPlayed,
     this.audioService,
     this.debugSkipPlayerInitialization = false,
   });
@@ -67,42 +78,42 @@ class ComprehensionAudioPlayer extends StatefulWidget {
       _ComprehensionAudioPlayerState();
 }
 
-class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
-  // Signed-URL cache keyed by storage path, shared across instances so a
-  // teacher scrolling a long list doesn't re-mint a URL on every rebuild.
-  // Entries carry their expiry — signed URLs are short-lived (~15 min), so a
-  // stale entry is dropped and re-fetched rather than served (which would fail
-  // playback mid-session).
-  static final Map<String, _CachedUrl> _urlCache = {};
-
+class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer>
+    with WidgetsBindingObserver {
   AudioPlayer? _player;
   StreamSubscription<PlayerState>? _stateSub;
   StreamSubscription<Duration>? _positionSub;
 
-  bool _loading = true;
+  bool _loading = false;
   bool _failed = false;
   bool _isPlaying = false;
   bool _deleting = false;
   bool _deleted = false;
+  bool _mostlyPlayedNotified = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _duration = Duration(seconds: widget.durationSec ?? 0);
-    if (widget.debugSkipPlayerInitialization) {
-      _loading = false;
-    } else {
-      _initPlayer();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) {
+      unawaited(_player?.pause());
     }
   }
 
-  Future<void> _initPlayer() async {
+  Future<void> _initPlayer({bool playWhenReady = false}) async {
+    AudioPlayer? candidate;
     try {
       final url = await _resolveUrl();
 
       final player = AudioPlayer();
+      candidate = player;
       final dur = await player.setUrl(url);
       if (!mounted) {
         await player.dispose();
@@ -116,6 +127,7 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
           _isPlaying =
               s.playing && s.processingState != ProcessingState.completed;
           if (s.processingState == ProcessingState.completed) {
+            _notifyMostlyPlayed();
             _position = Duration.zero;
             player.pause();
             player.seek(Duration.zero);
@@ -124,10 +136,20 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
       });
       _positionSub = player.positionStream.listen((pos) {
         if (!mounted) return;
+        _maybeNotifyMostlyPlayed(pos);
         setState(() => _position = pos);
       });
       setState(() => _loading = false);
+      if (playWhenReady) await player.play();
     } catch (_) {
+      await candidate?.dispose();
+      if (identical(_player, candidate)) {
+        _player = null;
+        await _stateSub?.cancel();
+        await _positionSub?.cancel();
+        _stateSub = null;
+        _positionSub = null;
+      }
       if (!mounted) return;
       setState(() {
         _loading = false;
@@ -136,35 +158,53 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
     }
   }
 
-  /// Returns a playable signed URL, using the shared cache when the entry is
-  /// still comfortably valid, otherwise minting a fresh one via the callable.
+  /// Returns a freshly authorized, short-lived signed URL. Keeping it only in
+  /// this widget's player instance avoids one account reusing another
+  /// account's in-process cache after sign-out/sign-in.
   Future<String> _resolveUrl() async {
-    final now = DateTime.now();
-    final cached = _urlCache[widget.storagePath];
-    if (cached != null &&
-        cached.expiresAt.isAfter(now.add(const Duration(seconds: 30)))) {
-      return cached.url;
-    }
     final result =
         await (widget.audioService ?? ComprehensionAudioService()).getAudioUrl(
       schoolId: widget.schoolId,
       logId: widget.logId,
     );
-    _urlCache[widget.storagePath] = _CachedUrl(
-      result.url,
-      now.add(Duration(seconds: result.expiresInSec)),
-    );
     return result.url;
   }
 
-  void _toggle() {
+  Future<void> _toggle() async {
     final p = _player;
-    if (p == null) return;
-    if (_isPlaying) {
-      p.pause();
-    } else {
-      p.play();
+    if (p == null) {
+      if (widget.debugSkipPlayerInitialization) return;
+      setState(() {
+        _loading = true;
+        _failed = false;
+      });
+      await _initPlayer(playWhenReady: true);
+      return;
     }
+    if (_isPlaying) {
+      await p.pause();
+    } else {
+      await p.play();
+    }
+  }
+
+  void _maybeNotifyMostlyPlayed(Duration position) {
+    final total = _duration > Duration.zero
+        ? _duration
+        : Duration(seconds: widget.durationSec ?? 0);
+    if (total <= Duration.zero) return;
+    if (ComprehensionAudioPlayer.hasReachedReviewThreshold(
+      position: position,
+      total: total,
+    )) {
+      _notifyMostlyPlayed();
+    }
+  }
+
+  void _notifyMostlyPlayed() {
+    if (_mostlyPlayedNotified) return;
+    _mostlyPlayedNotified = true;
+    widget.onMostlyPlayed?.call();
   }
 
   Future<void> _retry() async {
@@ -172,8 +212,13 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
       _loading = true;
       _failed = false;
     });
-    _urlCache.remove(widget.storagePath);
-    await _initPlayer();
+    await _stateSub?.cancel();
+    await _positionSub?.cancel();
+    await _player?.dispose();
+    _stateSub = null;
+    _positionSub = null;
+    _player = null;
+    await _initPlayer(playWhenReady: true);
   }
 
   bool get _canDelete => !_deleting;
@@ -209,7 +254,6 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
         schoolId: widget.schoolId,
         logId: widget.logId,
       );
-      _urlCache.remove(widget.storagePath);
       if (!mounted) return;
       setState(() {
         _deleting = false;
@@ -235,6 +279,7 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _stateSub?.cancel();
     _positionSub?.cancel();
     _player?.dispose();
@@ -328,18 +373,35 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
                 minHeight: 4,
               ),
               const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Comprehension recap',
-                    style: LumiTextStyles.bodySmall(color: AppColors.charcoal),
-                  ),
-                  Text(
-                    '${_format(pos)} / ${_format(total)}',
-                    style: LumiTextStyles.bodySmall(color: AppColors.charcoal),
-                  ),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final time = '${_format(pos)} / ${_format(total)}';
+                  final style =
+                      LumiTextStyles.bodySmall(color: AppColors.charcoal);
+                  if (constraints.maxWidth < 180) {
+                    return Align(
+                      alignment: Alignment.centerRight,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(time, style: style),
+                      ),
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Comprehension recap',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: style,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(time, style: style),
+                    ],
+                  );
+                },
               ),
             ],
           ),

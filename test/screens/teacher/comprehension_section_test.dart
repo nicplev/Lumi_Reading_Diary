@@ -54,7 +54,11 @@ Future<void> seedGatesOn(FakeFirebaseFirestore firestore) async {
     'name': 'Test School',
     'createdAt': Timestamp.fromDate(DateTime(2025, 1, 1)),
     'settings': {
-      'aiEvaluation': {'enabled': true},
+      'aiEvaluation': {
+        'enabled': true,
+        'authorityVersion': 'school-ai-eval-v1-2026-07-20',
+        'authorityConfirmedAt': Timestamp.fromDate(DateTime(2026, 7, 20)),
+      },
     },
   });
 }
@@ -137,8 +141,8 @@ void main() {
       expect(model.status, 'failed');
       expect(model.assessable, isFalse);
       expect(model.isScored, isFalse);
-      expect(ComprehensionEvalModel.levelLabel(model.overallLevel),
-          'No result');
+      expect(
+          ComprehensionEvalModel.levelLabel(model.overallLevel), 'No result');
     });
 
     test('audioReplacedSince compares upload stamps', () {
@@ -154,17 +158,27 @@ void main() {
 
     test('flag labels are teacher-facing for every pipeline flag', () {
       for (final flag in [
-        'too_short', 'inaudible', 'off_topic', 'non_english',
-        'low_stt_confidence', 'question_mismatch', 'concerning_content',
-        'audio_unavailable', 'system_error', 'prompt_injection',
-        'adult_prompting', 'recitation_blocked', 'empty_response',
-        'unsupported_self_assessment', 'incidental_personal_info',
+        'too_short',
+        'inaudible',
+        'off_topic',
+        'non_english',
+        'low_stt_confidence',
+        'question_mismatch',
+        'concerning_content',
+        'audio_unavailable',
+        'system_error',
+        'prompt_injection',
+        'adult_prompting',
+        'recitation_blocked',
+        'empty_response',
+        'unsupported_self_assessment',
+        'incidental_personal_info',
       ]) {
         expect(ComprehensionEvalModel.flagLabel(flag), isNot(contains('_')));
       }
       // Unknown future flags humanise instead of crashing.
-      expect(ComprehensionEvalModel.flagLabel('brand_new_flag'),
-          'brand new flag');
+      expect(
+          ComprehensionEvalModel.flagLabel('brand_new_flag'), 'brand new flag');
     });
   });
 
@@ -175,7 +189,11 @@ void main() {
       final firestore = FakeFirebaseFirestore();
       await firestore.collection('schools').doc('school1').set({
         'settings': {
-          'aiEvaluation': {'enabled': true},
+          'aiEvaluation': {
+            'enabled': true,
+            'authorityVersion': 'school-ai-eval-v1-2026-07-20',
+            'authorityConfirmedAt': Timestamp.fromDate(DateTime(2026, 7, 20)),
+          },
         },
       });
       await seedEval(firestore);
@@ -220,12 +238,10 @@ void main() {
       final firestore = FakeFirebaseFirestore();
       await seedGatesOn(firestore);
       await pumpSection(tester, firestore);
-      expect(
-          find.text('No comprehension evaluations yet'), findsOneWidget);
+      expect(find.text('No comprehension evaluations yet'), findsOneWidget);
     });
 
-    testWidgets('flagged eval shows teacher-facing flag chips',
-        (tester) async {
+    testWidgets('flagged eval shows teacher-facing flag chips', (tester) async {
       enableDevAccess();
       final firestore = FakeFirebaseFirestore();
       await seedGatesOn(firestore);

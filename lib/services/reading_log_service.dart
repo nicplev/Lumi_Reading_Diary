@@ -325,6 +325,12 @@ class ReadingLogService {
       logData.remove('comprehensionAudioPath');
       logData.remove('comprehensionAudioDurationSec');
       logData.remove('comprehensionAudioUploaded');
+      logData.remove('comprehensionAudioUploadedAt');
+      logData.remove('comprehensionAudioObjectGeneration');
+      logData.remove('comprehensionQuestionText');
+      logData.remove('comprehensionAudioReviewStatus');
+      logData.remove('comprehensionAudioReviewedAt');
+      logData.remove('comprehensionAudioReviewedGeneration');
       logData.remove('teacherComment');
       logData.remove('commentedAt');
       logData.remove('commentedBy');

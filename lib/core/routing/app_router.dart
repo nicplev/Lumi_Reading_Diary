@@ -48,7 +48,7 @@ import '../../screens/teacher/allocation/allocation_screen.dart';
 import '../../screens/teacher/reading_groups_screen.dart';
 import '../../screens/teacher/awards_screen.dart';
 import '../../screens/teacher/class_report_screen.dart';
-import '../../screens/teacher/comprehension_review_screen.dart';
+import '../../screens/teacher/comprehension_recordings_screen.dart';
 import '../../screens/teacher/teacher_profile_screen.dart';
 import '../../screens/teacher/student_detail_screen.dart';
 import '../../screens/teacher/teacher_student_reading_history_screen.dart';
@@ -661,9 +661,41 @@ class AppRouter {
           );
         },
       ),
-      // AI comprehension review — pilot feature; entry points are dev-gated
-      // and the screen itself renders nothing unless the school's
-      // aiEvaluation entitlement + platform switch are on (fail-closed).
+      // Standard class recording inbox. The screen resolves the child-audio
+      // gates before creating any recording query; AI remains an optional,
+      // separately gated disclosure within a recording.
+      GoRoute(
+        path: '/teacher/comprehension-recordings',
+        name: 'comprehension-recordings',
+        builder: (context, state) {
+          final params = state.extra is Map<String, dynamic>
+              ? state.extra as Map<String, dynamic>
+              : null;
+          final classModel = params?['classModel'] as ClassModel?;
+          if (classModel == null) {
+            return const _ResourceNotFoundScaffold(
+              message: 'Pick a class first',
+            );
+          }
+          return _userScopedRoute(
+            extra: state.extra,
+            child: (user) {
+              if (classModel.schoolId != user.schoolId ||
+                  !classModel.teacherIds.contains(user.id)) {
+                return const _ResourceNotFoundScaffold(
+                  message: 'This class is no longer assigned to you',
+                );
+              }
+              return ComprehensionRecordingsScreen(
+                teacher: user,
+                classModel: classModel,
+              );
+            },
+          );
+        },
+      ),
+      // Backwards-compatible route for old notifications/deep links and any
+      // persisted navigation state from the AI-only pilot screen.
       GoRoute(
         path: '/teacher/comprehension-review',
         name: 'comprehension-review',
@@ -679,10 +711,18 @@ class AppRouter {
           }
           return _userScopedRoute(
             extra: state.extra,
-            child: (user) => ComprehensionReviewScreen(
-              teacher: user,
-              classModel: classModel,
-            ),
+            child: (user) {
+              if (classModel.schoolId != user.schoolId ||
+                  !classModel.teacherIds.contains(user.id)) {
+                return const _ResourceNotFoundScaffold(
+                  message: 'This class is no longer assigned to you',
+                );
+              }
+              return ComprehensionRecordingsScreen(
+                teacher: user,
+                classModel: classModel,
+              );
+            },
           );
         },
       ),

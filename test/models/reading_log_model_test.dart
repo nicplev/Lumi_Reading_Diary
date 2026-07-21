@@ -694,5 +694,57 @@ void main() {
         );
       });
     });
+
+    group('shared comprehension review state', () {
+      test('is reviewed only for the current audio generation', () async {
+        final firestore = TestHelpers.createFakeFirestore();
+        testData.addAll({
+          'comprehensionAudioUploaded': true,
+          'comprehensionAudioPath':
+              'schools/school-1/comprehension_audio/log-1.m4a',
+          'comprehensionAudioObjectGeneration': 'generation-2',
+          'comprehensionAudioReviewStatus': 'reviewed',
+          'comprehensionAudioReviewedGeneration': 'generation-2',
+        });
+        await firestore.collection('readingLogs').doc('log-1').set(testData);
+        final doc =
+            await firestore.collection('readingLogs').doc('log-1').get();
+
+        expect(
+          ReadingLogModel.fromFirestore(doc).isComprehensionAudioReviewed,
+          isTrue,
+        );
+
+        await doc.reference.update({
+          'comprehensionAudioObjectGeneration': 'generation-3',
+        });
+        final replaced = await doc.reference.get();
+        expect(
+          ReadingLogModel.fromFirestore(replaced).isComprehensionAudioReviewed,
+          isFalse,
+        );
+      });
+
+      test('legacy recording without review fields remains pending', () async {
+        final firestore = TestHelpers.createFakeFirestore();
+        testData.addAll({
+          'comprehensionAudioUploaded': true,
+          'comprehensionAudioPath':
+              'schools/school-1/comprehension_audio/log-legacy.m4a',
+          'comprehensionAudioObjectGeneration': 'generation-1',
+        });
+        await firestore
+            .collection('readingLogs')
+            .doc('log-legacy')
+            .set(testData);
+        final doc =
+            await firestore.collection('readingLogs').doc('log-legacy').get();
+
+        expect(
+          ReadingLogModel.fromFirestore(doc).isComprehensionAudioReviewed,
+          isFalse,
+        );
+      });
+    });
   });
 }

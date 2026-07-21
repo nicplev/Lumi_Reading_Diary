@@ -14,10 +14,12 @@ import '../../core/widgets/lumi/teacher_settings_item.dart';
 import '../../core/widgets/lumi/legal_links_row.dart';
 import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../data/models/class_model.dart';
+import '../../data/models/school_model.dart';
 import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
 import '../../services/mfa_settings_service.dart';
 import '../../services/offline_service.dart';
+import '../../services/platform_config_service.dart';
 import '../../services/reading_level_service.dart';
 import '../settings/mfa_settings_sheet.dart';
 
@@ -53,6 +55,7 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen>
   List<ClassModel> _classes = [];
   bool _loadingClasses = true;
   bool _levelsEnabled = false;
+  bool _comprehensionEnabled = false;
   MfaStatus? _mfaStatus;
   bool _mfaStatusLoading = true;
 
@@ -62,6 +65,7 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen>
     WidgetsBinding.instance.addObserver(this);
     _loadClasses();
     _loadReadingLevelOptions();
+    _loadComprehensionFlag();
     _loadMfaStatus();
     // Rebuild if dev-access flips (e.g. the server lookup resolves after a
     // session resume, or a super-admin grants/revokes access).
@@ -119,6 +123,30 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen>
       if (!mounted) return;
       setState(() => _levelsEnabled = options.isNotEmpty);
     } catch (_) {}
+  }
+
+  Future<void> _loadComprehensionFlag() async {
+    final schoolId = widget.user.schoolId;
+    if (schoolId == null || schoolId.isEmpty) return;
+    try {
+      final platformFuture =
+          PlatformConfigService().isComprehensionRecordingEnabled();
+      final schoolDoc = await FirebaseService.instance.firestore
+          .collection('schools')
+          .doc(schoolId)
+          .get();
+      final platformEnabled = await platformFuture;
+      if (!mounted || !schoolDoc.exists) return;
+      final school = SchoolModel.fromFirestore(schoolDoc);
+      final audioSettings = school.comprehensionRecordingSettings;
+      setState(() {
+        _comprehensionEnabled = platformEnabled &&
+            audioSettings.enabled &&
+            !audioSettings.previewOnly;
+      });
+    } catch (_) {
+      // Fail closed; the standard entry remains hidden.
+    }
   }
 
   Future<void> _loadClasses() async {
@@ -499,15 +527,13 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen>
                       label: 'Class Reports',
                       onTap: () => _navigateWithClass('/teacher/class-report'),
                     ),
-                  // AI comprehension review — pilot feature, dev-gated until
-                  // the pilot un-gates it (entitlement check remains).
-                  if (hasDevAccess())
+                  if (_comprehensionEnabled)
                     TeacherSettingsItem(
                       icon: Icons.graphic_eq,
                       iconBgColor: LumiTokens.muted,
-                      label: 'Comprehension Review',
-                      onTap: () =>
-                          _navigateWithClass('/teacher/comprehension-review'),
+                      label: 'Comprehension recordings',
+                      onTap: () => _navigateWithClass(
+                          '/teacher/comprehension-recordings'),
                     ),
                 ],
               )
