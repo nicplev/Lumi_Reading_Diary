@@ -771,27 +771,16 @@ async function authorizeStudentDeletion(
   if (!student.exists) {
     throw new HttpsError("not-found", "Student not found.");
   }
+  // Student data deletion is restricted to school admins. Teachers were
+  // previously allowed for students in an assigned class, but the destructive
+  // scope (profile, reading logs, comments, audio, allocations, links,
+  // notifications) is broader than class assignment should confer, and the
+  // action is irreversible. Teachers must now escalate to a school admin.
   const role = staff.data()?.role;
-  if (role === "schoolAdmin") return student;
-  if (role !== "teacher") {
+  if (role !== "schoolAdmin") {
     throw new HttpsError(
       "permission-denied",
-      "Only school staff can delete student data."
-    );
-  }
-  const classId = student.data()?.classId;
-  if (typeof classId !== "string" || classId.length === 0) {
-    throw new HttpsError("failed-precondition", "Student has no class.");
-  }
-  const classDoc = await db.doc(`schools/${schoolId}/classes/${classId}`).get();
-  const assigned = classDoc.exists &&
-    (classDoc.data()?.teacherId === uid ||
-      (Array.isArray(classDoc.data()?.teacherIds) &&
-        classDoc.data()?.teacherIds.includes(uid)));
-  if (!assigned) {
-    throw new HttpsError(
-      "permission-denied",
-      "Teachers may delete data only for students in an assigned class."
+      "Only school admins can delete student data."
     );
   }
   return student;

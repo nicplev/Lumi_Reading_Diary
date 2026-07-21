@@ -178,9 +178,17 @@ void main() {
         findsOneWidget);
   });
 
-  testWidgets('teacher sees both account and student deletion controls',
+  testWidgets('teacher sees account deletion but not student deletion',
       (tester) async {
     await pumpAccount(tester, UserRole.teacher);
+
+    expect(find.byKey(const Key('delete-account-button')), findsOneWidget);
+    expect(find.byKey(const Key('delete-student-button')), findsNothing);
+  });
+
+  testWidgets('school admin sees both account and student deletion controls',
+      (tester) async {
+    await pumpAccount(tester, UserRole.schoolAdmin);
 
     expect(find.byKey(const Key('delete-account-button')), findsOneWidget);
     expect(find.byKey(const Key('delete-student-button')), findsOneWidget);
