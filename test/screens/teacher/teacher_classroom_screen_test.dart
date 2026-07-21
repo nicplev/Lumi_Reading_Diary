@@ -425,6 +425,23 @@ void main() {
         'parentId': 'parent_1',
         'comprehensionAudioUploaded': true,
         'comprehensionAudioReviewStatus': 'pending',
+        'comprehensionAudioPath':
+            'schools/school_1/comprehension_audio/recording_log.m4a',
+      });
+      // A stale upload marker is not playable and is not shown in the inbox.
+      // It must not inflate the compact badge either.
+      await firestore
+          .collection('schools')
+          .doc(teacher.schoolId!)
+          .collection('readingLogs')
+          .doc('incomplete_recording_log')
+          .set({
+        'schoolId': teacher.schoolId,
+        'classId': classModel.id,
+        'studentId': 'student_1',
+        'parentId': 'parent_1',
+        'comprehensionAudioUploaded': true,
+        'comprehensionAudioReviewStatus': 'pending',
       });
 
       await tester.pumpWidget(

@@ -148,6 +148,11 @@ class _EnabledRecordingsInbox extends ConsumerStatefulWidget {
 class _EnabledRecordingsInboxState
     extends ConsumerState<_EnabledRecordingsInbox> {
   _RecordingFilter _filter = _RecordingFilter.toReview;
+  bool _selectionMode = false;
+  bool _isUpdatingReviewStatus = false;
+  final Set<String> _selectedRecordingIds = <String>{};
+  final ComprehensionRecordingReviewService _reviewService =
+      ComprehensionRecordingReviewService();
 
   String get _schoolId => widget.teacher.schoolId ?? '';
 
@@ -215,6 +220,15 @@ class _EnabledRecordingsInboxState
           _RecordingFilter.recent => recordings,
           _RecordingFilter.reviewed => reviewedRows,
         };
+        final selectedVisible = visible
+            .where((recording) => _selectedRecordingIds.contains(recording.id))
+            .toList(growable: false);
+        final selectedToReviewCount = selectedVisible
+            .where((recording) => !recording.isComprehensionAudioReviewed)
+            .length;
+        final selectedReviewedCount = selectedVisible
+            .where((recording) => recording.isComprehensionAudioReviewed)
+            .length;
 
         return RefreshIndicator(
           onRefresh: () async {
@@ -237,7 +251,28 @@ class _EnabledRecordingsInboxState
                   reviewed: reviewedRows.length,
                 ),
               ),
-              SliverToBoxAdapter(child: _buildFilters()),
+              SliverToBoxAdapter(
+                child: _buildFilters(canSelect: visible.isNotEmpty),
+              ),
+              if (_selectionMode)
+                SliverToBoxAdapter(
+                  child: _SelectionToolbar(
+                    selectedCount: selectedVisible.length,
+                    visibleCount: visible.length,
+                    selectedToReviewCount: selectedToReviewCount,
+                    selectedReviewedCount: selectedReviewedCount,
+                    isUpdating: _isUpdatingReviewStatus,
+                    onToggleAll: () => _toggleAllVisible(visible),
+                    onMarkReviewed: () => _updateSelectedReviewStatus(
+                      visible: visible,
+                      reviewed: true,
+                    ),
+                    onMarkToReview: () => _updateSelectedReviewStatus(
+                      visible: visible,
+                      reviewed: false,
+                    ),
+                  ),
+                ),
               if (visible.isEmpty)
                 SliverFillRemaining(
                   hasScrollBody: false,
@@ -262,12 +297,17 @@ class _EnabledRecordingsInboxState
                       return _RecordingRow(
                         recording: recording,
                         studentName: studentName,
-                        onTap: () => _openRecording(
-                          recordings: visible,
-                          initialIndex: index,
-                          names: names,
-                          aiEnabled: aiEnabled,
-                        ),
+                        selectionMode: _selectionMode,
+                        isSelected:
+                            _selectedRecordingIds.contains(recording.id),
+                        onTap: _selectionMode
+                            ? () => _toggleRecording(recording.id)
+                            : () => _openRecording(
+                                  recordings: visible,
+                                  initialIndex: index,
+                                  names: names,
+                                  aiEnabled: aiEnabled,
+                                ),
                       );
                     },
                   ),
@@ -279,37 +319,176 @@ class _EnabledRecordingsInboxState
     );
   }
 
-  Widget _buildFilters() {
+  Widget _buildFilters({required bool canSelect}) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            TeacherFilterChip(
-              label: 'To review',
-              isActive: _filter == _RecordingFilter.toReview,
-              activeColor: LumiTokens.red,
-              onTap: () => setState(() => _filter = _RecordingFilter.toReview),
+      child: Row(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  TeacherFilterChip(
+                    label: 'To review',
+                    isActive: _filter == _RecordingFilter.toReview,
+                    activeColor: LumiTokens.red,
+                    onTap: _isUpdatingReviewStatus
+                        ? null
+                        : () => _setFilter(_RecordingFilter.toReview),
+                  ),
+                  const SizedBox(width: 6),
+                  TeacherFilterChip(
+                    label: 'Recent',
+                    isActive: _filter == _RecordingFilter.recent,
+                    activeColor: LumiTokens.blue,
+                    onTap: _isUpdatingReviewStatus
+                        ? null
+                        : () => _setFilter(_RecordingFilter.recent),
+                  ),
+                  const SizedBox(width: 6),
+                  TeacherFilterChip(
+                    label: 'Reviewed',
+                    isActive: _filter == _RecordingFilter.reviewed,
+                    activeColor: LumiTokens.green,
+                    onTap: _isUpdatingReviewStatus
+                        ? null
+                        : () => _setFilter(_RecordingFilter.reviewed),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(width: 6),
-            TeacherFilterChip(
-              label: 'Recent',
-              isActive: _filter == _RecordingFilter.recent,
+          ),
+          const SizedBox(width: 6),
+          Semantics(
+            label: _selectionMode
+                ? 'Finish selecting recordings'
+                : 'Select recordings',
+            button: true,
+            child: TeacherFilterChip(
+              label: _selectionMode ? 'Done' : 'Select',
+              icon: _selectionMode
+                  ? Icons.check_rounded
+                  : Icons.checklist_rounded,
+              isActive: _selectionMode,
               activeColor: LumiTokens.blue,
-              onTap: () => setState(() => _filter = _RecordingFilter.recent),
+              activeForegroundColor: LumiTokens.ink,
+              onTap: _isUpdatingReviewStatus || (!canSelect && !_selectionMode)
+                  ? null
+                  : _toggleSelectionMode,
             ),
-            const SizedBox(width: 6),
-            TeacherFilterChip(
-              label: 'Reviewed',
-              isActive: _filter == _RecordingFilter.reviewed,
-              activeColor: LumiTokens.green,
-              onTap: () => setState(() => _filter = _RecordingFilter.reviewed),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
+  }
+
+  void _setFilter(_RecordingFilter filter) {
+    setState(() {
+      _filter = filter;
+      // Selection belongs to the current view. Clearing it when switching
+      // filters prevents an accidental mixed-status bulk action.
+      _selectedRecordingIds.clear();
+    });
+  }
+
+  void _toggleSelectionMode() {
+    setState(() {
+      _selectionMode = !_selectionMode;
+      _selectedRecordingIds.clear();
+    });
+  }
+
+  void _toggleRecording(String recordingId) {
+    if (_isUpdatingReviewStatus) return;
+    setState(() {
+      if (!_selectedRecordingIds.add(recordingId)) {
+        _selectedRecordingIds.remove(recordingId);
+      }
+    });
+  }
+
+  void _toggleAllVisible(List<ReadingLogModel> visible) {
+    if (_isUpdatingReviewStatus || visible.isEmpty) return;
+    final visibleIds = visible.map((recording) => recording.id).toSet();
+    final allSelected = visibleIds.every(_selectedRecordingIds.contains);
+    setState(() {
+      if (allSelected) {
+        _selectedRecordingIds.removeAll(visibleIds);
+      } else {
+        _selectedRecordingIds.addAll(visibleIds);
+      }
+    });
+  }
+
+  Future<void> _updateSelectedReviewStatus({
+    required List<ReadingLogModel> visible,
+    required bool reviewed,
+  }) async {
+    if (_isUpdatingReviewStatus) return;
+    final targets = visible
+        .where((recording) => _selectedRecordingIds.contains(recording.id))
+        .where(
+          (recording) => recording.isComprehensionAudioReviewed != reviewed,
+        )
+        .toList(growable: false);
+    if (targets.isEmpty) return;
+
+    setState(() => _isUpdatingReviewStatus = true);
+    final completedIds = <String>{};
+    var failures = 0;
+    // A small window keeps select-all responsive without opening an unbounded
+    // number of Firestore transactions for the 200-row inbox cap.
+    const writesAtOnce = 8;
+    for (var start = 0; start < targets.length; start += writesAtOnce) {
+      final results = await Future.wait(
+        targets.skip(start).take(writesAtOnce).map((recording) async {
+          try {
+            if (reviewed) {
+              await _reviewService.markReviewed(
+                schoolId: recording.schoolId,
+                logId: recording.id,
+              );
+            } else {
+              await _reviewService.markToReview(
+                schoolId: recording.schoolId,
+                logId: recording.id,
+              );
+            }
+            return recording.id;
+          } catch (_) {
+            return null;
+          }
+        }),
+      );
+      for (final id in results) {
+        if (id == null) {
+          failures++;
+        } else {
+          completedIds.add(id);
+        }
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isUpdatingReviewStatus = false;
+      _selectedRecordingIds.removeAll(completedIds);
+    });
+    final action = reviewed ? 'reviewed' : 'back to review';
+    if (failures == 0) {
+      showLumiToast(
+        message:
+            '${completedIds.length} recording${completedIds.length == 1 ? '' : 's'} marked $action.',
+        type: LumiToastType.success,
+      );
+    } else {
+      showLumiToast(
+        message:
+            'Updated ${completedIds.length} of ${targets.length} recordings. Please try the rest again.',
+        type: LumiToastType.warning,
+      );
+    }
   }
 
   void _openRecording({
@@ -351,70 +530,99 @@ class _InboxSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            flex: 3,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: LumiTokens.tintBlue,
-                borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+          Row(
+            children: [
+              const Icon(
+                Icons.groups_rounded,
+                size: 18,
+                color: LumiTokens.muted,
               ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: const BoxDecoration(
-                      color: LumiTokens.paper,
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      toReview >= 200 ? '200+' : '$toReview',
-                      style: LumiType.subhead.copyWith(color: LumiTokens.blue),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('To review', style: LumiType.subhead),
-                        Text(
-                          'Listening status is shared with co-teachers.',
-                          style: LumiType.caption,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  'Review status is shared with co-teachers.',
+                  style: LumiType.caption,
+                ),
               ),
-            ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            flex: 2,
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: LumiTokens.paper,
-                borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
-                border: Border.all(color: LumiTokens.rule),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _InboxMetricTile(
+                  value: toReview >= 200 ? '200+' : '$toReview',
+                  label: 'To review',
+                  icon: Icons.pending_outlined,
+                  backgroundColor: LumiTokens.tintBlue,
+                  accentColor: LumiTokens.blue,
+                ),
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '$reviewed',
-                    style: LumiType.heading.copyWith(color: LumiTokens.green),
-                  ),
-                  Text('Recent reviewed', style: LumiType.caption),
-                ],
+              const SizedBox(width: 8),
+              Expanded(
+                child: _InboxMetricTile(
+                  value: '$reviewed',
+                  label: 'Reviewed',
+                  icon: Icons.check_circle_outline_rounded,
+                  backgroundColor: LumiTokens.tintGreen,
+                  accentColor: LumiTokens.green,
+                ),
               ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InboxMetricTile extends StatelessWidget {
+  final String value;
+  final String label;
+  final IconData icon;
+  final Color backgroundColor;
+  final Color accentColor;
+
+  const _InboxMetricTile({
+    required this.value,
+    required this.label,
+    required this.icon,
+    required this.backgroundColor,
+    required this.accentColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+        border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: const BoxDecoration(
+              color: LumiTokens.paper,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, size: 18, color: accentColor),
+          ),
+          const SizedBox(height: 12),
+          Text(value, style: LumiType.heading.copyWith(color: accentColor)),
+          Text(
+            label,
+            style: LumiType.body.copyWith(
+              color: LumiTokens.ink,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -423,14 +631,170 @@ class _InboxSummary extends StatelessWidget {
   }
 }
 
+class _SelectionToolbar extends StatelessWidget {
+  final int selectedCount;
+  final int visibleCount;
+  final int selectedToReviewCount;
+  final int selectedReviewedCount;
+  final bool isUpdating;
+  final VoidCallback onToggleAll;
+  final VoidCallback onMarkReviewed;
+  final VoidCallback onMarkToReview;
+
+  const _SelectionToolbar({
+    required this.selectedCount,
+    required this.visibleCount,
+    required this.selectedToReviewCount,
+    required this.selectedReviewedCount,
+    required this.isUpdating,
+    required this.onToggleAll,
+    required this.onMarkReviewed,
+    required this.onMarkToReview,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final allSelected = visibleCount > 0 && selectedCount == visibleCount;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: LumiTokens.tintBlue,
+          borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+          border: Border.all(color: LumiTokens.blue.withValues(alpha: 0.45)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: LumiTokens.paper,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    '$selectedCount',
+                    style: LumiType.body.copyWith(color: LumiTokens.blue),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$selectedCount selected',
+                        style: LumiType.body,
+                      ),
+                      Text(
+                        'Update their shared review status.',
+                        style:
+                            LumiType.caption.copyWith(color: LumiTokens.muted),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed:
+                      isUpdating || visibleCount == 0 ? null : onToggleAll,
+                  style: TextButton.styleFrom(
+                    foregroundColor: LumiTokens.ink,
+                    textStyle: LumiType.caption.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  child: Text(allSelected ? 'Clear' : 'Select all'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (isUpdating) ...[
+              const LinearProgressIndicator(color: LumiTokens.blue),
+            ] else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _ReviewStatusAction(
+                    label: 'Mark reviewed',
+                    icon: Icons.check_circle_outline_rounded,
+                    color: LumiTokens.green,
+                    foregroundColor: LumiTokens.paper,
+                    enabled: selectedToReviewCount > 0,
+                    onPressed: onMarkReviewed,
+                  ),
+                  _ReviewStatusAction(
+                    label: 'To review',
+                    icon: Icons.undo_rounded,
+                    color: LumiTokens.tintYellow,
+                    foregroundColor: LumiTokens.ink,
+                    enabled: selectedReviewedCount > 0,
+                    onPressed: onMarkToReview,
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReviewStatusAction extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final Color foregroundColor;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  const _ReviewStatusAction({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.foregroundColor,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.icon(
+      onPressed: enabled ? onPressed : null,
+      icon: Icon(icon, size: 18),
+      label: Text(label),
+      style: FilledButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: foregroundColor,
+        disabledBackgroundColor: LumiTokens.paper.withValues(alpha: 0.72),
+        disabledForegroundColor: LumiTokens.muted.withValues(alpha: 0.58),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+        ),
+        textStyle: LumiType.caption.copyWith(fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+}
+
 class _RecordingRow extends StatelessWidget {
   final ReadingLogModel recording;
   final String studentName;
+  final bool selectionMode;
+  final bool isSelected;
   final VoidCallback onTap;
 
   const _RecordingRow({
     required this.recording,
     required this.studentName,
+    required this.selectionMode,
+    required this.isSelected,
     required this.onTap,
   });
 
@@ -453,7 +817,12 @@ class _RecordingRow extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
             border: Border.all(
-              color: reviewed ? LumiTokens.rule : LumiTokens.tintBlue,
+              color: isSelected
+                  ? LumiTokens.blue
+                  : reviewed
+                      ? LumiTokens.rule
+                      : LumiTokens.tintBlue,
+              width: isSelected ? 1.6 : 1,
             ),
           ),
           child: Row(
@@ -495,18 +864,32 @@ class _RecordingRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  _ReviewChip(reviewed: reviewed),
-                  const SizedBox(height: 5),
-                  Icon(
-                    Icons.play_circle_fill_rounded,
-                    size: 26,
-                    color: reviewed ? LumiTokens.muted : LumiTokens.red,
+              if (selectionMode)
+                Semantics(
+                  label: 'Select $studentName',
+                  selected: isSelected,
+                  child: Checkbox(
+                    value: isSelected,
+                    onChanged: (_) => onTap(),
+                    activeColor: LumiTokens.blue,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5),
+                    ),
                   ),
-                ],
-              ),
+                )
+              else
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    _ReviewChip(reviewed: reviewed),
+                    const SizedBox(height: 5),
+                    Icon(
+                      Icons.play_circle_fill_rounded,
+                      size: 26,
+                      color: reviewed ? LumiTokens.muted : LumiTokens.red,
+                    ),
+                  ],
+                ),
             ],
           ),
         ),
@@ -763,7 +1146,7 @@ class _ComprehensionRecordingSheetState
                         Text(
                           _reviewed
                               ? 'Reviewed for the teaching team.'
-                              : 'Marked reviewed after 80% has played.',
+                              : '80% playback marks this automatically. You can also update it from the inbox.',
                           style: LumiType.caption
                               .copyWith(color: LumiTokens.muted),
                         ),

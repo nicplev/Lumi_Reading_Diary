@@ -4,7 +4,8 @@ import 'package:lumi_reading_tracker/core/widgets/feelings/feelings_tracker_card
 import 'package:lumi_reading_tracker/core/widgets/feelings/feelings_glance_row.dart';
 import 'package:lumi_reading_tracker/data/models/reading_log_model.dart';
 
-ReadingLogModel _log(DateTime date, {ReadingFeeling? feeling}) => ReadingLogModel(
+ReadingLogModel _log(DateTime date, {ReadingFeeling? feeling}) =>
+    ReadingLogModel(
       id: 'id-${date.microsecondsSinceEpoch}',
       studentId: 's1',
       parentId: 'p1',
@@ -34,7 +35,7 @@ void main() {
     await _pump(tester, [
       _log(DateTime(2025, 6, 9)), // quick log, no feeling
     ]);
-    expect(find.text('No reading feelings recorded yet'), findsOneWidget);
+    expect(find.text('No reading feelings this week'), findsOneWidget);
     expect(find.byType(FeelingsGlanceRow), findsNothing);
   });
 

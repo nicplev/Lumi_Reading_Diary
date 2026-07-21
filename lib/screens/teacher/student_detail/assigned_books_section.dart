@@ -16,6 +16,8 @@ import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
 import 'reading_log_snapshot.dart';
 import 'section_info_card.dart';
+import 'student_assignment_presence.dart';
+import 'first_read_bento.dart';
 
 /// True when [cachedCoverUrl] should still be hydrated from the ISBN APIs —
 /// i.e. it is missing or known to be a fallback/placeholder URL.
@@ -257,6 +259,7 @@ class _AssignedBooksSectionState extends ConsumerState<AssignedBooksSection> {
   void _onMetadataUpdated() {
     if (mounted) setState(() {});
   }
+
   void _disposeMetadataResolver() {
     final resolver = _metadataResolverInstance;
     if (resolver == null) return;
@@ -268,6 +271,7 @@ class _AssignedBooksSectionState extends ConsumerState<AssignedBooksSection> {
   void _ensureMetadataResolver() {
     _metadataResolver;
   }
+
   Widget _buildActionHeaderButton({
     required IconData icon,
     required String label,
@@ -356,112 +360,32 @@ class _AssignedBooksSectionState extends ConsumerState<AssignedBooksSection> {
     );
   }
 
-  // Deliberate empty state when no book is assigned: one clear next step.
+  // Students with history but no active allocation continue into this shared
+  // bento; the full first-read experience is owned by the parent gate.
   Widget _buildNoBookCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: LumiTokens.paper,
-        borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
-        border: Border.all(color: LumiTokens.rule),
-        boxShadow: LumiTokens.shadowCard,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: LumiTokens.muted.withValues(alpha: 0.08),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.menu_book_outlined,
-                    size: 18, color: LumiTokens.muted),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'No book currently assigned',
-                  style: LumiType.body.copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Assign a classroom, library or take-home book to start tracking progress.',
-            style: LumiType.caption,
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: _buildActionHeaderButton(
-                  icon: Icons.add,
-                  label: 'Assign a book',
-                  onPressed: widget.onAssignBooks,
-                  primary: true,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildActionHeaderButton(
-                  icon: Icons.qr_code_scanner,
-                  label: 'Scan',
-                  onPressed: widget.onScanIsbn,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-              onPressed: widget.onLogReading,
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: Text(
-                'Log a read without a book',
-                style: LumiType.caption.copyWith(
-                  color: LumiTokens.green,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+    return StudentDetailNextReadBento(
+      onAssignBooks: widget.onAssignBooks,
+      onScanIsbn: widget.onScanIsbn,
+      onLogReading: widget.onLogReading,
     );
   }
+
   List<AssignedBookViewData> _mapAssignedBooks(
     List<AllocationModel> allocations,
     List<ReadingLogSnapshot> logs,
   ) {
-    final now = DateTime.now();
     final seen = <String>{};
     final results = <AssignedBookViewData>[];
 
     for (final allocation in allocations) {
-      final withinWindow = !allocation.startDate.isAfter(now) &&
-          !allocation.endDate.isBefore(now);
-      final appliesToStudent = allocation.isForWholeClass ||
-          allocation.studentIds.contains(widget.lookup.studentId);
-      if (!withinWindow || !appliesToStudent) continue;
+      if (!isCurrentStudentAssignment(allocation, widget.lookup.studentId)) {
+        continue;
+      }
 
       if (allocation.type == AllocationType.byTitle) {
         final type = _inferBookType(allocation);
-        final effectiveItems =
-            allocation.effectiveAssignmentItemsForStudent(widget.lookup.studentId);
+        final effectiveItems = allocation
+            .effectiveAssignmentItemsForStudent(widget.lookup.studentId);
         if (effectiveItems.isNotEmpty) {
           for (final item in effectiveItems) {
             final itemIsbn = _isbnKey(item.resolvedIsbn ?? '');

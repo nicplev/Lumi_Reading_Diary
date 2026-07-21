@@ -11,6 +11,7 @@ import 'package:lumi_reading_tracker/core/widgets/lumi/teacher_book_assignment_c
 import 'package:lumi_reading_tracker/data/models/class_model.dart';
 import 'package:lumi_reading_tracker/data/models/student_model.dart';
 import 'package:lumi_reading_tracker/data/models/user_model.dart';
+import 'package:lumi_reading_tracker/screens/teacher/student_detail/first_read_bento.dart';
 import 'package:lumi_reading_tracker/screens/teacher/student_detail_screen.dart';
 
 /// Characterization tests capturing StudentDetailScreen's current behaviour
@@ -98,10 +99,56 @@ void main() {
   }
 
   group('StudentDetailScreen sections', () {
+    testWidgets('keeps first-read actions usable on a narrow phone screen',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final actions = <String>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: StudentDetailFirstReadBento(
+                studentName: 'Daniel Platt',
+                onAssignBooks: () => actions.add('assign'),
+                onScanIsbn: () => actions.add('scan'),
+                onLogReading: () => actions.add('log'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Assign a book'));
+      await tester.tap(find.text('Scan a book'));
+      await tester.tap(find.text('Log a read'));
+
+      expect(actions, ['assign', 'scan', 'log']);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'shows the first-read bento only when there are no books or logs',
+        (tester) async {
+      await pumpScreen(tester);
+
+      expect(find.text('Ready for Daniel Platt\u2019s first read?'),
+          findsOneWidget);
+      expect(find.text('Assign a book'), findsOneWidget);
+      expect(find.text('Scan a book'), findsOneWidget);
+      expect(find.text('Log a read'), findsOneWidget);
+      expect(find.text('WHAT GROWS NEXT'), findsOneWidget);
+      expect(find.text('Assigned Books'), findsNothing);
+      expect(find.text('Recent Reading'), findsNothing);
+      expect(find.text('No achievements yet'), findsNothing);
+    });
+
     testWidgets('renders stats row values from student stats', (tester) async {
       await pumpScreen(tester);
 
-      expect(find.text('Reading Stats'), findsOneWidget);
+      expect(find.text('Reading Snapshot'), findsOneWidget);
       expect(find.text('Total nights'), findsOneWidget);
       expect(find.text('7'), findsWidgets); // totalReadingDays
       expect(find.text('Day streak'), findsOneWidget);
@@ -183,6 +230,27 @@ void main() {
       expect(find.byType(FeelingsTrackerCard), findsOneWidget);
     });
 
+    testWidgets(
+        'uses compact next-read states when history exists but this week is quiet',
+        (tester) async {
+      await _seedLog(
+        firestore,
+        id: 'last_week_log',
+        date: DateTime.now().subtract(const Duration(days: 8)),
+        minutesRead: 25,
+        bookTitles: const ['The Gruffalo'],
+      );
+      await pumpScreen(tester);
+
+      expect(find.text('Reading Snapshot'), findsOneWidget);
+      expect(find.text('Choose the next read'), findsOneWidget);
+      expect(find.text('No book currently assigned'), findsNothing);
+      expect(find.text('No reading feelings this week'), findsOneWidget);
+      expect(find.text('No parent comments yet'), findsOneWidget);
+      expect(find.text('NEXT MILESTONE'), findsOneWidget);
+      expect(find.text('Recent Reading'), findsOneWidget);
+    });
+
     testWidgets('renders latest parent comment with chips and parent name',
         (tester) async {
       await firestore
@@ -234,6 +302,13 @@ void main() {
           _dayKey(DateTime.now()): {'good': 2, 'great': 1},
         },
       });
+      await _seedLog(
+        firestore,
+        id: 'log_for_normal_detail',
+        date: DateTime.now(),
+        minutesRead: 10,
+        bookTitles: const ['A first read'],
+      );
       await pumpScreen(tester);
 
       expect(find.text('Latest Parent Comment'), findsOneWidget);
@@ -273,25 +348,32 @@ void main() {
 
     testWidgets('shows achievements empty state when none earned',
         (tester) async {
+      await _seedLog(
+        firestore,
+        id: 'log_for_normal_detail',
+        date: DateTime.now(),
+        minutesRead: 10,
+        bookTitles: const ['A first read'],
+      );
       await pumpScreen(tester);
 
       expect(find.text('Achievements'), findsOneWidget);
-      expect(find.text('No achievements yet'), findsOneWidget);
+      expect(find.text('NEXT MILESTONE'), findsOneWidget);
       // 'View all' only appears once achievements exist.
       final achievementsHeader = find.ancestor(
         of: find.text('Achievements'),
         matching: find.byType(Row),
       );
       expect(
-        find.descendant(of: achievementsHeader, matching: find.text('View all')),
+        find.descendant(
+            of: achievementsHeader, matching: find.text('View all')),
         findsNothing,
       );
     });
   });
 }
 
-String _dayKey(DateTime d) =>
-    '${d.year.toString().padLeft(4, '0')}-'
+String _dayKey(DateTime d) => '${d.year.toString().padLeft(4, '0')}-'
     '${d.month.toString().padLeft(2, '0')}-'
     '${d.day.toString().padLeft(2, '0')}';
 

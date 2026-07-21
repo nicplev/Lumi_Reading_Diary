@@ -7,7 +7,7 @@ const {
   assertSucceeds,
   assertFails,
 } = require('@firebase/rules-unit-testing');
-const { serverTimestamp, documentId } = require('firebase/firestore');
+const { serverTimestamp, documentId, deleteField } = require('firebase/firestore');
 
 const PROJECT_ID = 'lumi-reading-tracker-rules-test';
 const RULES_PATH = path.resolve(__dirname, '../../firestore.rules');
@@ -3060,6 +3060,12 @@ const reviewedAudioPatch = () => ({
   comprehensionAudioReviewedGeneration: 'generation_1',
 });
 
+const pendingAudioPatch = () => ({
+  comprehensionAudioReviewStatus: 'pending',
+  comprehensionAudioReviewedAt: deleteField(),
+  comprehensionAudioReviewedGeneration: deleteField(),
+});
+
 test('comprehension review: assigned teacher can mark current generation reviewed', async () => {
   await seedComprehensionReviewFixture();
   const ref = authDb('teacher_a').collection('schools').doc('school_1')
@@ -3078,6 +3084,19 @@ test('comprehension review: status is shared with an assigned co-teacher', async
       .collection('readingLogs').doc('log_a').get(),
   );
   assert.equal(shared.data().comprehensionAudioReviewStatus, 'reviewed');
+});
+
+test('comprehension review: assigned teacher can return the current recording to review', async () => {
+  await seedComprehensionReviewFixture();
+  const ref = authDb('teacher_a').collection('schools').doc('school_1')
+    .collection('readingLogs').doc('log_a');
+  await assertSucceeds(ref.update(reviewedAudioPatch()));
+  await assertSucceeds(ref.update(pendingAudioPatch()));
+
+  const reset = await assertSucceeds(ref.get());
+  assert.equal(reset.data().comprehensionAudioReviewStatus, 'pending');
+  assert.equal(reset.data().comprehensionAudioReviewedAt, undefined);
+  assert.equal(reset.data().comprehensionAudioReviewedGeneration, undefined);
 });
 
 test('comprehension review: unassigned teacher and parent cannot mark reviewed', async () => {
@@ -3107,6 +3126,25 @@ test('comprehension review: generation, time and changed fields are pinned', asy
   }));
   await assertFails(ref.update({
     ...reviewedAudioPatch(),
+    minutesRead: 999,
+  }));
+});
+
+test('comprehension review: only an assigned teacher can reset a valid current review', async () => {
+  await seedComprehensionReviewFixture({coTeacher: true});
+  const path = (db) => db.collection('schools').doc('school_1')
+    .collection('readingLogs').doc('log_a');
+  await assertSucceeds(path(authDb('teacher_a')).update(reviewedAudioPatch()));
+
+  await assertSucceeds(path(authDb('teacher_b')).update(pendingAudioPatch()));
+  await assertSucceeds(path(authDb('teacher_a')).update(reviewedAudioPatch()));
+  await assertFails(path(authDb('parent_a')).update(pendingAudioPatch()));
+  await assertFails(path(authDb('teacher_a')).update({
+    ...pendingAudioPatch(),
+    comprehensionAudioReviewedAt: new Date(),
+  }));
+  await assertFails(path(authDb('teacher_a')).update({
+    ...pendingAudioPatch(),
     minutesRead: 999,
   }));
 });

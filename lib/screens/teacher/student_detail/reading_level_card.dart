@@ -69,7 +69,6 @@ class _ReadingLevelCardState extends State<ReadingLevelCard> {
         color: LumiTokens.paper,
         borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
         border: Border.all(color: LumiTokens.rule),
-        boxShadow: LumiTokens.shadowCard,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(LumiTokens.radiusXL),

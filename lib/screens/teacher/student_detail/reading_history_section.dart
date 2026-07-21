@@ -80,6 +80,7 @@ class ReadingHistorySection extends ConsumerWidget {
 
             final groups = _groupRecentLogs(logs).take(5).toList();
             return Container(
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: LumiTokens.paper,
                 borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
@@ -87,20 +88,17 @@ class ReadingHistorySection extends ConsumerWidget {
               ),
               child: Column(
                 children: [
-                  for (int i = 0; i < groups.length; i++) ...[
-                    _ReadingGroupRow(
-                      group: groups[i],
-                      schoolId: lookup.schoolId,
-                      onOpenLogComments: onOpenLogComments,
-                    ),
-                    if (i < groups.length - 1)
-                      Divider(
-                        height: 1,
-                        color: LumiTokens.rule,
-                        indent: 14,
-                        endIndent: 14,
+                  for (int i = 0; i < groups.length; i++)
+                    Padding(
+                      padding: EdgeInsets.only(
+                        bottom: i == groups.length - 1 ? 0 : 6,
                       ),
-                  ],
+                      child: _ReadingGroupRow(
+                        group: groups[i],
+                        schoolId: lookup.schoolId,
+                        onOpenLogComments: onOpenLogComments,
+                      ),
+                    ),
                 ],
               ),
             );
@@ -171,76 +169,84 @@ class _ReadingGroupRow extends StatelessWidget {
         l.comprehensionAudioPath == null || !l.comprehensionAudioUploaded);
     final hasUnread = group.any((l) => l.hasUnreadForTeacher(uid));
 
-    return InkWell(
-      onTap: () => onOpenLogComments(rep),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          children: [
-            // Left: title + meta stacked
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          books,
-                          style: LumiType.body,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      // Subtle one-tap marker: books inferred from assignments,
-                      // not parent-confirmed.
-                      if (group.any((l) => l.isQuickLog)) ...[
-                        const SizedBox(width: 6),
-                        Tooltip(
-                          message:
-                              'Quick log — books inferred from assignments, '
-                              'not confirmed by the parent',
-                          triggerMode: TooltipTriggerMode.tap,
-                          child: Icon(
-                            Icons.bolt,
-                            size: 15,
-                            color: LumiTokens.muted.withValues(alpha: 0.8),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => onOpenLogComments(rep),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          decoration: BoxDecoration(
+            color: LumiTokens.cream,
+            borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+          ),
+          child: Row(
+            children: [
+              // Left: title + meta stacked
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            books,
+                            style: LumiType.body,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        // Subtle one-tap marker: books inferred from assignments,
+                        // not parent-confirmed.
+                        if (group.any((l) => l.isQuickLog)) ...[
+                          const SizedBox(width: 6),
+                          Tooltip(
+                            message:
+                                'Quick log — books inferred from assignments, '
+                                'not confirmed by the parent',
+                            triggerMode: TooltipTriggerMode.tap,
+                            child: Icon(
+                              Icons.bolt,
+                              size: 15,
+                              color: LumiTokens.muted.withValues(alpha: 0.8),
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    meta,
-                    style: LumiType.caption.copyWith(color: LumiTokens.muted),
-                  ),
-                ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      meta,
+                      style: LumiType.caption.copyWith(color: LumiTokens.muted),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            // Right: feeling blob + recording + comment indicators
-            if (rep.childFeeling != null)
-              Image.asset(
-                'assets/blobs/blob-${rep.childFeeling}.png',
-                width: 18,
-                cacheWidth: decodeCacheSize(context, 18),
-                height: 18,
-              ),
-            if (hasAudio) ...[
               const SizedBox(width: 8),
-              RecordingAffordance(
+              // Right: feeling blob + recording + comment indicators
+              if (rep.childFeeling != null)
+                Image.asset(
+                  'assets/blobs/blob-${rep.childFeeling}.png',
+                  width: 18,
+                  cacheWidth: decodeCacheSize(context, 18),
+                  height: 18,
+                ),
+              if (hasAudio) ...[
+                const SizedBox(width: 8),
+                RecordingAffordance(
+                  schoolId: schoolId,
+                  pending: audioPending,
+                ),
+              ],
+              const SizedBox(width: 10),
+              CommentAffordance(
+                hasUnread: hasUnread,
                 schoolId: schoolId,
-                pending: audioPending,
               ),
             ],
-            const SizedBox(width: 10),
-            CommentAffordance(
-              hasUnread: hasUnread,
-              schoolId: schoolId,
-            ),
-          ],
+          ),
         ),
       ),
     );

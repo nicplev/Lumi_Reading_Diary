@@ -40,6 +40,7 @@ import 'student_detail/reading_level_card.dart';
 import 'student_detail/reading_level_labels.dart';
 import 'student_detail/reading_log_snapshot.dart';
 import 'student_detail/feelings_section.dart';
+import 'student_detail/first_read_bento.dart';
 import 'student_detail/group_badges_section.dart';
 import 'student_detail/stats_row_section.dart';
 import 'teacher_log_reading_sheet.dart';
@@ -1229,65 +1230,78 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               const SizedBox(height: 20),
             ],
 
-            // Assigned Books section
-            AssignedBooksSection(
-              lookup: _lookup,
-              firestore: _firestore,
-              teacherId: widget.teacher.id,
-              onLogReading: _openTeacherLogSheet,
-              onRenew: _showRenewSheet,
-              onScanIsbn: _openIsbnScannerFlow,
-              onAssignBooks: _openAssignFlow,
-              onBookAction: _handleBookAction,
-              onBookTap: _showBookActionsSheet,
-            ),
-            const SizedBox(height: 20),
-
-            // Reading Feelings tracker
-            FeelingsSection(lookup: _lookup),
-            const SizedBox(height: 20),
-
-            // Reading History
-            ReadingHistorySection(
-              lookup: _lookup,
-              onViewAll: () => context.push(
-                '/teacher/student-reading-history/${widget.student.id}',
-                extra: {'student': _currentStudent},
-              ),
-              onOpenLogComments: _openLogComments,
-            ),
-            const SizedBox(height: 20),
-
-            // AI Comprehension (pilot: entitlement + dev-access gated; the
-            // section renders nothing when either gate is off)
-            ComprehensionSection(
+            StudentDetailFirstReadGate(
               lookup: _lookup,
               studentName: _currentStudent.fullName,
-              onViewAll: widget.classModel == null
-                  ? null
-                  : () => context.push(
-                        '/teacher/comprehension-recordings',
-                        extra: {
-                          'teacher': widget.teacher,
-                          'classModel': widget.classModel,
-                        },
-                      ),
-            ),
+              onAssignBooks: _openAssignFlow,
+              onScanIsbn: _openIsbnScannerFlow,
+              onLogReading: _openTeacherLogSheet,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Assigned Books section
+                  AssignedBooksSection(
+                    lookup: _lookup,
+                    firestore: _firestore,
+                    teacherId: widget.teacher.id,
+                    onLogReading: _openTeacherLogSheet,
+                    onRenew: _showRenewSheet,
+                    onScanIsbn: _openIsbnScannerFlow,
+                    onAssignBooks: _openAssignFlow,
+                    onBookAction: _handleBookAction,
+                    onBookTap: _showBookActionsSheet,
+                  ),
+                  const SizedBox(height: 20),
 
-            // Latest Parent Comment
-            ParentCommentSection(
-              lookup: _lookup,
-              firestore: _firestore,
-              onOpenLogComments: _openLogComments,
-            ),
-            const SizedBox(height: 20),
+                  // Reading Feelings tracker
+                  FeelingsSection(lookup: _lookup),
+                  const SizedBox(height: 20),
 
-            // Achievements
-            AchievementsSection(
-              firestore: _firestore,
-              schoolId: widget.student.schoolId,
-              studentId: widget.student.id,
-              onOpenAchievements: _openAchievements,
+                  // Reading History
+                  ReadingHistorySection(
+                    lookup: _lookup,
+                    onViewAll: () => context.push(
+                      '/teacher/student-reading-history/${widget.student.id}',
+                      extra: {'student': _currentStudent},
+                    ),
+                    onOpenLogComments: _openLogComments,
+                  ),
+                  const SizedBox(height: 20),
+
+                  // AI Comprehension (pilot: entitlement + dev-access gated;
+                  // the section renders nothing when either gate is off)
+                  ComprehensionSection(
+                    lookup: _lookup,
+                    studentName: _currentStudent.fullName,
+                    onViewAll: widget.classModel == null
+                        ? null
+                        : () => context.push(
+                              '/teacher/comprehension-recordings',
+                              extra: {
+                                'teacher': widget.teacher,
+                                'classModel': widget.classModel,
+                              },
+                            ),
+                  ),
+
+                  // Latest Parent Comment
+                  ParentCommentSection(
+                    lookup: _lookup,
+                    firestore: _firestore,
+                    onOpenLogComments: _openLogComments,
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Achievements
+                  AchievementsSection(
+                    firestore: _firestore,
+                    schoolId: widget.student.schoolId,
+                    studentId: widget.student.id,
+                    student: _currentStudent,
+                    onOpenAchievements: _openAchievements,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 20),
           ],

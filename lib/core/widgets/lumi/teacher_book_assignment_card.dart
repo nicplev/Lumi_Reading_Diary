@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/teacher_constants.dart';
+import '../../../theme/lumi_tokens.dart';
+import '../../../theme/lumi_typography.dart';
 import 'persistent_cached_image.dart';
 import 'teacher_book_type_badge.dart';
 
@@ -13,8 +13,8 @@ enum TeacherBookCardAction {
 
 /// Lumi Design System - Teacher Book Assignment Card
 ///
-/// Book cover (50x70) + title + subtitle + type badge + status indicator.
-/// Per spec: 16px radius, card shadow, 16px padding.
+/// Warm, flat bento row for one assigned book. Shared by the student-detail
+/// page so populated book states match its first-read/next-read compartments.
 class TeacherBookAssignmentCard extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -42,23 +42,24 @@ class TeacherBookAssignmentCard extends StatelessWidget {
       case 'completed':
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: const BoxDecoration(
-            color: Color(0xFFE8F5E9),
-            borderRadius: BorderRadius.all(Radius.circular(12)),
+          decoration: BoxDecoration(
+            color: LumiTokens.tintGreen.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
+              const Icon(
                 Icons.check,
                 size: 12,
-                color: Color(0xFF4CAF50),
+                color: LumiTokens.green,
               ),
-              SizedBox(width: 4),
+              const SizedBox(width: 4),
               Text(
                 'Done',
-                style: TeacherTypography.caption.copyWith(
-                  color: Color(0xFF2E7D32),
+                style: LumiType.caption.copyWith(
+                  color: LumiTokens.green,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -68,33 +69,35 @@ class TeacherBookAssignmentCard extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: AppColors.teacherPrimaryLight.withValues(alpha: 0.35),
-            borderRadius: BorderRadius.circular(12),
+            color: LumiTokens.tintBlue.withValues(alpha: 0.58),
+            borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
           ),
           child: Text(
             'In progress',
-            style: TeacherTypography.caption.copyWith(
-              color: AppColors.teacherPrimary,
+            style: LumiType.caption.copyWith(
+              color: LumiTokens.blue,
+              fontWeight: FontWeight.w700,
             ),
           ),
         );
       case 'renewed':
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: const BoxDecoration(
-            color: Color(0xFFE3F2FD),
-            borderRadius: BorderRadius.all(Radius.circular(12)),
+          decoration: BoxDecoration(
+            color: LumiTokens.tintYellow.withValues(alpha: 0.62),
+            borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.autorenew_rounded,
-                  size: 12, color: Color(0xFF1565C0)),
+                  size: 12, color: LumiTokens.orange),
               const SizedBox(width: 4),
               Text(
                 'Renewed',
-                style: TeacherTypography.caption.copyWith(
-                  color: const Color(0xFF1565C0),
+                style: LumiType.caption.copyWith(
+                  color: LumiTokens.orange,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -104,19 +107,20 @@ class TeacherBookAssignmentCard extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: AppColors.background,
-            borderRadius: BorderRadius.circular(12),
+            color: LumiTokens.cream,
+            borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+            border: Border.all(color: LumiTokens.rule),
           ),
           child: Text(
             'New',
-            style: TeacherTypography.caption.copyWith(
-              color: AppColors.textSecondary,
+            style: LumiType.caption.copyWith(
+              color: LumiTokens.muted,
+              fontWeight: FontWeight.w700,
             ),
           ),
         );
     }
   }
-
 
   Widget _buildCover() {
     final hasCover = coverImageUrl != null &&
@@ -124,14 +128,14 @@ class TeacherBookAssignmentCard extends StatelessWidget {
         coverImageUrl!.startsWith('http');
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(6),
+      borderRadius: BorderRadius.circular(LumiTokens.radiusSmall),
       child: Container(
-        width: 50,
-        height: 70,
+        width: 54,
+        height: 74,
         decoration: BoxDecoration(
           color: coverGradient.isNotEmpty
               ? coverGradient.first
-              : AppColors.teacherPrimaryLight,
+              : LumiTokens.tintBlue,
         ),
         child: hasCover
             ? PersistentCachedImage(
@@ -156,71 +160,72 @@ class TeacherBookAssignmentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final canEdit = onActionSelected != null;
     return Material(
-      color: AppColors.white,
-      borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
-        child: Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
-        border: Border.all(color: AppColors.teacherBorder),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildCover(),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+        borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+        child: Ink(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: LumiTokens.paper,
+            borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+            border: Border.all(color: LumiTokens.rule),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildCover(),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TeacherTypography.bodyMedium.copyWith(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: LumiType.body.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
+                        if (canEdit)
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            size: 20,
+                            color: LumiTokens.muted.withValues(alpha: 0.55),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: LumiType.caption.copyWith(
+                        fontSize: 14,
+                        color: LumiTokens.muted,
                       ),
                     ),
-                    if (canEdit)
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        size: 20,
-                        color: AppColors.textSecondary.withValues(alpha: 0.4),
-                      ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        TeacherBookTypeBadge(type: bookType),
+                        _buildStatusBadge(),
+                      ],
+                    ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: TeacherTypography.bodySmall.copyWith(
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    TeacherBookTypeBadge(type: bookType),
-                    _buildStatusBadge(),
-                  ],
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
-    ),
+        ),
       ),
     );
   }

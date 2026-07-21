@@ -802,6 +802,34 @@ service cloud.firestore {
             );
         }
 
+        // An assigned teacher can deliberately put a reviewed recording back
+        // into the shared queue. This does not reopen arbitrary log editing:
+        // the exact current generation must have been reviewed, the audio must
+        // still be retained, and the only permitted result is a clean pending
+        // state with the old review audit fields removed.
+        function comprehensionReviewResetIsValid() {
+          let changed = request.resource.data.diff(resource.data).affectedKeys();
+          let data = request.resource.data;
+          let generation = resource.data.get(
+            'comprehensionAudioObjectGeneration', ''
+          );
+          return changed.hasOnly([
+              'comprehensionAudioReviewStatus',
+              'comprehensionAudioReviewedAt',
+              'comprehensionAudioReviewedGeneration'
+            ]) &&
+            data.comprehensionAudioUploaded == true &&
+            generation is string && generation.size() > 0 &&
+            data.comprehensionAudioObjectGeneration == generation &&
+            resource.data.get('comprehensionAudioReviewStatus', '') ==
+              'reviewed' &&
+            resource.data.get('comprehensionAudioReviewedGeneration', '') ==
+              generation &&
+            data.comprehensionAudioReviewStatus == 'pending' &&
+            data.get('comprehensionAudioReviewedAt', null) == null &&
+            data.get('comprehensionAudioReviewedGeneration', null) == null;
+        }
+
         allow get, list: if isSchoolAdmin(schoolId) ||
             isDevImpersonatingSchool(schoolId);
 
@@ -873,7 +901,8 @@ service cloud.firestore {
         allow update: if writeAllowedForSchoolContent(schoolId) &&
             isTeacher(schoolId) &&
             teacherTeachesClass(schoolId, resource.data.classId) &&
-            comprehensionReviewUpdateIsValid();
+            (comprehensionReviewUpdateIsValid() ||
+              comprehensionReviewResetIsValid());
 
         // A linked parent who didn't create the log (a co-carer, or someone
         // viewing a teacher-proxy log for their child) may still clear their

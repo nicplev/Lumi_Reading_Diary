@@ -55,19 +55,33 @@ class _FeelingsTrackerCardState extends State<FeelingsTrackerCard> {
           _header(),
           const SizedBox(height: 16),
           if (!series.hasAnyFeeling)
-            _emptyState()
+            _emptyState(series.period)
           else ...[
-            FeelingsLineChart(
-              buckets: series.buckets,
-              lineColor: widget.accentColor,
+            Container(
+              padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
+              decoration: BoxDecoration(
+                color: LumiTokens.cream,
+                borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+                border: Border.all(color: LumiTokens.rule),
+              ),
+              child: FeelingsLineChart(
+                buckets: series.buckets,
+                lineColor: widget.accentColor,
+              ),
             ),
             // Per-day feeling blobs live in the same card, under the trend —
             // one card instead of two near-duplicate ones.
             if (series.showGlance) ...[
-              const SizedBox(height: 16),
-              const Divider(height: 1, color: LumiTokens.rule),
-              const SizedBox(height: 16),
-              FeelingsGlanceRow(buckets: series.buckets),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: LumiTokens.cream,
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+                  border: Border.all(color: LumiTokens.rule),
+                ),
+                child: FeelingsGlanceRow(buckets: series.buckets),
+              ),
             ],
           ],
         ],
@@ -119,9 +133,7 @@ class _FeelingsTrackerCardState extends State<FeelingsTrackerCard> {
                     style: LumiType.caption.copyWith(
                       fontWeight:
                           p == _period ? FontWeight.w700 : FontWeight.w500,
-                      color: p == _period
-                          ? LumiTokens.ink
-                          : LumiTokens.muted,
+                      color: p == _period ? LumiTokens.ink : LumiTokens.muted,
                     ),
                   ),
                 ),
@@ -157,25 +169,60 @@ class _FeelingsTrackerCardState extends State<FeelingsTrackerCard> {
     );
   }
 
-  Widget _emptyState() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      child: Center(
-        child: Column(
-          children: [
-            Icon(
+  Widget _emptyState(FeelingPeriod period) {
+    final (label, title) = switch (period) {
+      FeelingPeriod.week => ('QUIET WEEK', 'No reading feelings this week'),
+      FeelingPeriod.month => ('QUIET MONTH', 'No reading feelings this month'),
+      FeelingPeriod.all => ('READING FEELINGS', 'No reading feelings yet'),
+    };
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: LumiTokens.cream,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+        border: Border.all(color: LumiTokens.rule),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              color: LumiTokens.tintBlue,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
               Icons.sentiment_satisfied_alt_rounded,
-              size: 32,
-              color: LumiTokens.muted.withValues(alpha: 0.3),
+              size: 21,
+              color: LumiTokens.ink,
             ),
-            const SizedBox(height: 8),
-            Text(
-              'No reading feelings recorded yet',
-              style: LumiType.caption,
-              textAlign: TextAlign.center,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: LumiType.sectionLabel.copyWith(
+                    color: LumiTokens.blue,
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  title,
+                  style: LumiType.body.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'A check-in will appear here after the next read.',
+                  style: LumiType.caption.copyWith(color: LumiTokens.muted),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -188,7 +235,6 @@ class _FeelingsTrackerCardState extends State<FeelingsTrackerCard> {
         color: LumiTokens.paper,
         borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
         border: Border.all(color: LumiTokens.rule),
-        boxShadow: LumiTokens.shadowCard,
       ),
       child: child,
     );

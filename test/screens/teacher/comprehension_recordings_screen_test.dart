@@ -70,6 +70,33 @@ void main() {
     expect(find.text('View AI summary'), findsNothing);
   });
 
+  testWidgets('selection mode can select all recordings without opening them',
+      (tester) async {
+    await _seedSchool(firestore, audioEnabled: true);
+    await _seedRecording(firestore);
+    await _seedRecording(firestore, logId: 'log_2');
+    await _pumpScreen(tester, firestore, teacher, classModel);
+
+    await tester.tap(find.text('Select'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('0 selected'), findsOneWidget);
+    expect(find.text('Select all'), findsOneWidget);
+    expect(find.byType(Checkbox), findsNWidgets(2));
+
+    await tester.tap(find.text('Select all'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('2 selected'), findsOneWidget);
+    expect(find.text('What was the main problem?'), findsNothing);
+
+    await tester.tap(find.text('Ava Patel').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 selected'), findsOneWidget);
+    expect(find.text('What was the main problem?'), findsNothing);
+  });
+
   testWidgets('detail keeps reply secondary and opens the existing log thread',
       (tester) async {
     await _seedSchool(firestore, audioEnabled: true);
@@ -156,12 +183,15 @@ Future<void> _seedSchool(
   });
 }
 
-Future<void> _seedRecording(FakeFirebaseFirestore firestore) async {
+Future<void> _seedRecording(
+  FakeFirebaseFirestore firestore, {
+  String logId = 'log_1',
+}) async {
   await firestore
       .collection('schools')
       .doc('school_1')
       .collection('readingLogs')
-      .doc('log_1')
+      .doc(logId)
       .set({
     'schoolId': 'school_1',
     'classId': 'class_1',
@@ -176,7 +206,7 @@ Future<void> _seedRecording(FakeFirebaseFirestore firestore) async {
     'comprehensionAudioUploaded': true,
     'comprehensionAudioUploadedAt':
         Timestamp.fromDate(DateTime(2026, 7, 20, 19, 30)),
-    'comprehensionAudioPath': 'schools/school_1/comprehension_audio/log_1.m4a',
+    'comprehensionAudioPath': 'schools/school_1/comprehension_audio/$logId.m4a',
     'comprehensionAudioDurationSec': 42,
     'comprehensionAudioObjectGeneration': 'generation_1',
     'comprehensionAudioReviewStatus': 'pending',

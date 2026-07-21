@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/achievements/achievement_presentation.dart';
 import '../../../data/models/achievement_model.dart';
+import '../../../data/models/student_model.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
 
@@ -14,6 +15,7 @@ class AchievementsSection extends StatefulWidget {
   final FirebaseFirestore firestore;
   final String schoolId;
   final String studentId;
+  final StudentModel student;
   final VoidCallback onOpenAchievements;
 
   const AchievementsSection({
@@ -21,6 +23,7 @@ class AchievementsSection extends StatefulWidget {
     required this.firestore,
     required this.schoolId,
     required this.studentId,
+    required this.student,
     required this.onOpenAchievements,
   });
 
@@ -101,19 +104,9 @@ class _AchievementsSectionState extends State<AchievementsSection> {
             ),
             const SizedBox(height: 8),
             if (achievements.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    const Icon(Icons.emoji_events_outlined,
-                        size: 20, color: LumiTokens.muted),
-                    const SizedBox(width: 8),
-                    Text(
-                      'No achievements yet',
-                      style: LumiType.caption,
-                    ),
-                  ],
-                ),
+              _NextMilestoneCard(
+                student: widget.student,
+                onTap: widget.onOpenAchievements,
               )
             else
               SizedBox(
@@ -125,27 +118,18 @@ class _AchievementsSectionState extends State<AchievementsSection> {
                   itemBuilder: (context, index) {
                     final display = achievements[index];
                     final template = display.template;
+                    final accent = Color(template.effectiveColor);
                     return GestureDetector(
                       onTap: widget.onOpenAchievements,
                       child: Container(
-                        width: 72,
+                        width: 88,
                         decoration: BoxDecoration(
-                          color: LumiTokens.paper,
+                          color: Color.lerp(accent, LumiTokens.paper, 0.88),
                           borderRadius:
                               BorderRadius.circular(LumiTokens.radiusMedium),
                           border: Border.all(
-                            color: Color(template.effectiveColor)
-                                .withValues(alpha: 0.5),
-                            width: 1.5,
+                            color: accent.withValues(alpha: 0.22),
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Color(template.effectiveColor)
-                                  .withValues(alpha: 0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
                         ),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -153,9 +137,7 @@ class _AchievementsSectionState extends State<AchievementsSection> {
                             Icon(
                               achievementIconFor(template),
                               size: 28,
-                              color: achievementCategoryColor(
-                                template.category,
-                              ),
+                              color: accent,
                             ),
                             const SizedBox(height: 4),
                             Padding(
@@ -179,6 +161,144 @@ class _AchievementsSectionState extends State<AchievementsSection> {
           ],
         );
       },
+    );
+  }
+}
+
+class _NextMilestoneCard extends StatelessWidget {
+  final StudentModel student;
+  final VoidCallback onTap;
+
+  const _NextMilestoneCard({required this.student, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final candidate = _nextMilestone(student);
+    final achievement = candidate.achievement;
+    final progress = candidate.current / achievement.requiredValue;
+    final remaining = achievement.requiredValue - candidate.current;
+    final unit = switch (achievement.requirementType) {
+      'books' => 'book${remaining == 1 ? '' : 's'}',
+      'minutes' => 'minute${remaining == 1 ? '' : 's'}',
+      _ => 'reading night${remaining == 1 ? '' : 's'}',
+    };
+
+    return Semantics(
+      button: true,
+      label: 'Next milestone: ${achievement.name}',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+          child: Ink(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: LumiTokens.cream,
+              borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+              border: Border.all(color: LumiTokens.rule),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: const BoxDecoration(
+                    color: LumiTokens.tintYellow,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    achievementIconFor(achievement),
+                    size: 22,
+                    color: LumiTokens.ink,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'NEXT MILESTONE',
+                        style: LumiType.sectionLabel.copyWith(
+                          color: LumiTokens.orange,
+                          fontSize: 11,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        achievement.name,
+                        style: LumiType.body.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$remaining more $unit to go',
+                        style: LumiType.caption.copyWith(
+                          color: LumiTokens.muted,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius:
+                            BorderRadius.circular(LumiTokens.radiusPill),
+                        child: LinearProgressIndicator(
+                          value: progress.clamp(0.0, 1.0),
+                          minHeight: 5,
+                          color: LumiTokens.yellow,
+                          backgroundColor: LumiTokens.rule,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 18,
+                  color: LumiTokens.muted,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  ({AchievementModel achievement, int current}) _nextMilestone(
+      StudentModel student) {
+    final stats = student.stats;
+    final currentForRequirement = <String, int>{
+      'books': stats?.totalBooksRead ?? 0,
+      'minutes': stats?.totalMinutesRead ?? 0,
+      'days': stats?.totalReadingDays ?? 0,
+    };
+    final candidates = AchievementTemplates.defaultTemplates.where((template) {
+      if (template.requirementType != 'days' &&
+          template.requirementType != 'minutes') {
+        return false;
+      }
+      if (student.earnedAchievementIds.contains(template.id)) return false;
+      final current = currentForRequirement[template.requirementType];
+      return current != null && current < template.requiredValue;
+    }).toList();
+    candidates.sort((a, b) {
+      final aProgress =
+          currentForRequirement[a.requirementType]! / a.requiredValue;
+      final bProgress =
+          currentForRequirement[b.requirementType]! / b.requiredValue;
+      return bProgress.compareTo(aProgress);
+    });
+    final next = candidates.isNotEmpty
+        ? candidates.first
+        : AchievementTemplates.defaultTemplates.firstWhere(
+            (template) => template.requirementType == 'days',
+          );
+    return (
+      achievement: next,
+      current: currentForRequirement[next.requirementType] ?? 0,
     );
   }
 }

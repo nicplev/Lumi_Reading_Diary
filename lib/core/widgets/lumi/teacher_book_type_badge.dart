@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../theme/lumi_tokens.dart';
+import '../../../theme/lumi_typography.dart';
+
 /// Lumi Design System - Teacher Book Type Badge
 ///
 /// "Decodable" (blue bg) or "Library" (green bg) pill badge.
@@ -19,16 +22,16 @@ class TeacherBookTypeBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: isDecodable ? const Color(0xFFE3F2FD) : const Color(0xFFE8F5E9),
-        borderRadius: BorderRadius.circular(12),
+        color: isDecodable
+            ? LumiTokens.tintBlue.withValues(alpha: 0.58)
+            : LumiTokens.tintGreen.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
       ),
       child: Text(
         isDecodable ? 'Decodable' : 'Library',
-        style: TextStyle(
-          fontFamily: 'Nunito',
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: isDecodable ? const Color(0xFF1976D2) : const Color(0xFF388E3C),
+        style: LumiType.caption.copyWith(
+          fontWeight: FontWeight.w700,
+          color: isDecodable ? LumiTokens.blue : LumiTokens.green,
         ),
       ),
     );

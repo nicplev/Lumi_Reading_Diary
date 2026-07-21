@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/theme/teacher_constants.dart';
 import '../../../core/utils/image_decode.dart';
 import '../../../data/models/student_model.dart';
 import '../../../data/providers/student_detail_providers.dart';
@@ -53,9 +52,8 @@ class _ParentCommentSectionState extends ConsumerState<ParentCommentSection> {
       return Future.value('Parent');
     }
     return _parentNameFutures.putIfAbsent(parentId, () async {
-      final schoolRef = widget.firestore
-          .collection('schools')
-          .doc(widget.lookup.schoolId);
+      final schoolRef =
+          widget.firestore.collection('schools').doc(widget.lookup.schoolId);
 
       final parentDoc =
           await schoolRef.collection('parents').doc(parentId).get();
@@ -179,31 +177,55 @@ class _NoCommentsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: LumiTokens.paper,
-          borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
-          border: Border.all(color: LumiTokens.rule),
-        ),
-        child: Row(
-          children: [
-            Container(width: 4, height: 48, color: LumiTokens.rule),
-            const SizedBox(width: 12),
-            Icon(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: LumiTokens.cream,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+        border: Border.all(color: LumiTokens.rule),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              color: LumiTokens.tintYellow,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
               Icons.chat_bubble_outline_rounded,
-              size: 16,
-              color: LumiTokens.muted.withValues(alpha: 0.5),
+              size: 19,
+              color: LumiTokens.ink,
             ),
-            const SizedBox(width: 8),
-            Text(
-              'No parent comments yet',
-              style: LumiType.caption,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'HOME CHECK-IN',
+                  style: LumiType.sectionLabel.copyWith(
+                    color: LumiTokens.orange,
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'No parent comments yet',
+                  style: LumiType.body.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'The next home comment will appear here.',
+                  style: LumiType.caption.copyWith(color: LumiTokens.muted),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -232,16 +254,14 @@ class _CommentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+      borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         decoration: BoxDecoration(
-          color: LumiTokens.paper,
+          color: LumiTokens.cream,
           borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
           border: Border.all(color: LumiTokens.rule),
-          // Left accent via a gradient trick won't work with
-          // Border.all, so we overlay it below.
         ),
         child: IntrinsicHeight(
           child: Row(
@@ -270,6 +290,14 @@ class _CommentCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Text(
+                      'LATEST FROM HOME',
+                      style: LumiType.sectionLabel.copyWith(
+                        color: unread ? LumiTokens.green : LumiTokens.orange,
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
                     // Child's feeling — its own line, distinct from
                     // the parent's topic chips below.
                     if (feeling != null) ...[
@@ -307,9 +335,10 @@ class _CommentCard extends StatelessWidget {
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: LumiTokens.muted.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(
-                                  LumiTokens.radiusSmall),
+                              color: LumiTokens.paper,
+                              borderRadius:
+                                  BorderRadius.circular(LumiTokens.radiusSmall),
+                              border: Border.all(color: LumiTokens.rule),
                             ),
                             child: Text(
                               chip,
@@ -353,8 +382,8 @@ class _CommentCard extends StatelessWidget {
                                 horizontal: 7, vertical: 2),
                             decoration: BoxDecoration(
                               color: LumiTokens.tintGreen,
-                              borderRadius: BorderRadius.circular(
-                                  LumiTokens.radiusPill),
+                              borderRadius:
+                                  BorderRadius.circular(LumiTokens.radiusPill),
                             ),
                             child: Text(
                               'New',

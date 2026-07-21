@@ -4,7 +4,7 @@ import '../../../data/models/student_model.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
 
-/// "Reading Stats" card on the teacher student-detail screen. Pure display —
+/// "Reading Snapshot" bento on the teacher student-detail screen. Pure display —
 /// rebuilds only when the parent passes a different [student].
 class StatsRowSection extends StatelessWidget {
   final StudentModel student;
@@ -43,41 +43,52 @@ class StatsRowSection extends StatelessWidget {
         color: LumiTokens.paper,
         borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
         border: Border.all(color: LumiTokens.rule),
-        boxShadow: LumiTokens.shadowCard,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Reading Stats', style: LumiType.subhead),
-          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Reading Snapshot', style: LumiType.subhead),
+              Text(
+                'ALL TIME',
+                style: LumiType.sectionLabel.copyWith(
+                  color: LumiTokens.muted,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
-              // Total nights (cumulative) is the hero metric — shown first.
-              _CompactStat(
-                value: '$totalNights',
-                label: 'Total nights',
-                icon: Icons.nights_stay_outlined,
-                iconColor: LumiTokens.blue,
-                circleColor: LumiTokens.tintBlue,
+              Expanded(
+                flex: 6,
+                child: _SnapshotHeroTile(totalNights: totalNights),
               ),
-              const _CompactDivider(),
-              // Streak is a gentle, secondary signal.
-              _CompactStat(
-                value: '$streak',
-                label: 'Day streak',
-                icon: Icons.local_fire_department_outlined,
-                iconSize: 20,
-                iconColor: LumiTokens.orange,
-                circleColor: LumiTokens.tintOrange,
-              ),
-              const _CompactDivider(),
-              _CompactStat(
-                value: '$totalBooks',
-                label: 'Total books',
-                icon: Icons.menu_book_outlined,
-                iconSize: 16,
-                iconColor: LumiTokens.green,
-                circleColor: LumiTokens.tintGreen,
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 5,
+                child: Column(
+                  children: [
+                    _SnapshotMiniTile(
+                      value: '$totalBooks',
+                      label: 'Total books',
+                      icon: Icons.menu_book_rounded,
+                      color: LumiTokens.green,
+                      background: LumiTokens.tintGreen,
+                    ),
+                    const SizedBox(height: 10),
+                    _SnapshotMiniTile(
+                      value: '$streak',
+                      label: streak == 0 ? 'Ready to restart' : 'Day streak',
+                      icon: Icons.local_fire_department_outlined,
+                      color: LumiTokens.orange,
+                      background: LumiTokens.tintOrange,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -87,53 +98,56 @@ class StatsRowSection extends StatelessWidget {
   }
 }
 
-class _CompactStat extends StatelessWidget {
-  final String value;
-  final String label;
-  final IconData icon;
-  final double iconSize;
-  final Color iconColor;
-  final Color? circleColor;
+class _SnapshotHeroTile extends StatelessWidget {
+  final int totalNights;
 
-  const _CompactStat({
-    required this.value,
-    required this.label,
-    required this.icon,
-    this.iconSize = 18,
-    this.iconColor = LumiTokens.ink,
-    this.circleColor,
-  });
+  const _SnapshotHeroTile({required this.totalNights});
 
   @override
   Widget build(BuildContext context) {
-    final bg = circleColor ?? LumiTokens.muted.withValues(alpha: 0.08);
-    return Expanded(
+    final surface = Color.lerp(LumiTokens.tintBlue, LumiTokens.paper, 0.42)!;
+    return Container(
+      height: 154,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+        border: Border.all(color: LumiTokens.rule),
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-            child: Icon(icon, size: iconSize, color: iconColor),
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: LumiTokens.paper.withValues(alpha: 0.55),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.nights_stay_outlined,
+              size: 18,
+              color: LumiTokens.ink,
+            ),
           ),
-          const SizedBox(height: 6),
+          const Spacer(),
           Text(
-            value,
+            '$totalNights',
             style: const TextStyle(
               fontFamily: 'Nunito',
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
+              fontSize: 38,
+              fontWeight: FontWeight.w800,
               color: LumiTokens.ink,
-              height: 1,
+              height: 0.95,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 3),
           Text(
-            label,
+            'Total nights',
             style: LumiType.caption.copyWith(
-              color: LumiTokens.muted,
+              color: LumiTokens.ink.withValues(alpha: 0.72),
+              fontWeight: FontWeight.w600,
             ),
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -141,15 +155,60 @@ class _CompactStat extends StatelessWidget {
   }
 }
 
-class _CompactDivider extends StatelessWidget {
-  const _CompactDivider();
+class _SnapshotMiniTile extends StatelessWidget {
+  final String value;
+  final String label;
+  final IconData icon;
+  final Color color;
+  final Color background;
+
+  const _SnapshotMiniTile({
+    required this.value,
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.background,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final surface = Color.lerp(background, LumiTokens.paper, 0.42)!;
     return Container(
-      width: 1,
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-      color: LumiTokens.rule,
+      height: 72,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+        border: Border.all(color: LumiTokens.rule),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: color),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: LumiType.body.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: LumiTokens.ink,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: LumiType.caption.copyWith(color: LumiTokens.muted),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

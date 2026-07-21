@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../data/models/reading_log_model.dart';
 import '../../feelings/feeling_aggregator.dart';
 import '../../feelings/feeling_scale.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/teacher_constants.dart';
 import '../../../core/utils/image_decode.dart';
+import '../../../theme/lumi_tokens.dart';
+import '../../../theme/lumi_typography.dart';
 
 /// The "at a glance" row — one tile per day showing the blob character for that
 /// day's feeling. Days with no recorded feeling show a neutral dashed
@@ -19,8 +19,7 @@ class FeelingsGlanceRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        for (final bucket in buckets)
-          Expanded(child: _Tile(bucket: bucket)),
+        for (final bucket in buckets) Expanded(child: _Tile(bucket: bucket)),
       ],
     );
   }
@@ -42,17 +41,15 @@ class _Tile extends StatelessWidget {
         children: [
           Text(
             bucket.label,
-            style: TeacherTypography.caption.copyWith(
-              color: AppColors.textSecondary,
+            style: LumiType.caption.copyWith(
+              color: LumiTokens.muted,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 6),
           AspectRatio(
             aspectRatio: 1,
-            child: feeling == null
-                ? _placeholder()
-                : _blob(context, feeling),
+            child: feeling == null ? _placeholder() : _blob(context, feeling),
           ),
           const SizedBox(height: 6),
           // Feeling word (e.g. "Good") rather than its 1–5 number. scaleDown
@@ -62,11 +59,11 @@ class _Tile extends StatelessWidget {
             fit: BoxFit.scaleDown,
             child: Text(
               feeling?.label ?? '—',
-              style: TeacherTypography.caption.copyWith(
+              style: LumiType.caption.copyWith(
                 fontWeight: FontWeight.w700,
                 color: feeling == null
-                    ? AppColors.textSecondary.withValues(alpha: 0.6)
-                    : AppColors.charcoal,
+                    ? LumiTokens.muted.withValues(alpha: 0.6)
+                    : LumiTokens.ink,
               ),
             ),
           ),
@@ -89,7 +86,7 @@ class _Tile extends StatelessWidget {
         errorBuilder: (_, __, ___) => Center(
           child: Text(
             feeling.label[0],
-            style: TeacherTypography.caption.copyWith(
+            style: LumiType.caption.copyWith(
               fontWeight: FontWeight.w800,
               color: feeling.color,
             ),
@@ -103,9 +100,9 @@ class _Tile extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: AppColors.teacherBorder.withValues(alpha: 0.25),
+        color: LumiTokens.cream,
         border: Border.all(
-          color: AppColors.teacherBorder,
+          color: LumiTokens.rule,
           width: 1,
         ),
       ),
@@ -113,7 +110,7 @@ class _Tile extends StatelessWidget {
         child: Icon(
           Icons.remove_rounded,
           size: 16,
-          color: AppColors.textSecondary.withValues(alpha: 0.5),
+          color: LumiTokens.muted.withValues(alpha: 0.5),
         ),
       ),
     );

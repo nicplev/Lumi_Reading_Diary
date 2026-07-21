@@ -62,12 +62,10 @@ final classComprehensionRecordingsProvider = StreamProvider.autoDispose
 /// Keeps the review workflow moving even when a class has more recordings than
 /// the recent 200-row archive window. Reviewed rows leave this query and are
 /// automatically replaced by the next pending rows.
-final pendingComprehensionRecordingsProvider = StreamProvider.autoDispose
-    .family<List<ReadingLogModel>, ComprehensionRecordingsLookup>(
-        (ref, lookup) {
-  if (lookup.schoolId.isEmpty || lookup.classId.isEmpty) {
-    return Stream.value(const <ReadingLogModel>[]);
-  }
+Stream<List<ReadingLogModel>> _pendingComprehensionRecordings(
+  Ref ref,
+  ComprehensionRecordingsLookup lookup,
+) {
   return _readingLogs(ref, lookup.schoolId)
       .where('classId', isEqualTo: lookup.classId)
       .where('comprehensionAudioUploaded', isEqualTo: true)
@@ -79,26 +77,31 @@ final pendingComprehensionRecordingsProvider = StreamProvider.autoDispose
           .map(ReadingLogModel.fromFirestore)
           .where((log) => log.hasComprehensionAudio)
           .toList(growable: false));
+}
+
+final pendingComprehensionRecordingsProvider = StreamProvider.autoDispose
+    .family<List<ReadingLogModel>, ComprehensionRecordingsLookup>(
+        (ref, lookup) {
+  if (lookup.schoolId.isEmpty || lookup.classId.isEmpty) {
+    return Stream.value(const <ReadingLogModel>[]);
+  }
+  return _pendingComprehensionRecordings(ref, lookup);
 });
 
 /// Live shared to-review count for the compact classroom badge.
 ///
-/// The query is capped at 100 so the UI can render `99+` without opening an
-/// unbounded class subscription. Existing recordings are normalised to
-/// `pending` by the accompanying backfill; new uploads are stamped by the
-/// confirmation callable.
+/// This intentionally derives from the inbox's filtered pending stream rather
+/// than counting raw Firestore documents. Historical/incomplete upload records
+/// can retain a `pending` marker without a playable audio path; the inbox
+/// excludes them, so the badge must too. The value is capped for the `99+`
+/// compact UI.
 final unreviewedComprehensionRecordingCountProvider = StreamProvider.autoDispose
     .family<int, ComprehensionRecordingsLookup>((ref, lookup) {
   if (lookup.schoolId.isEmpty || lookup.classId.isEmpty) {
     return Stream.value(0);
   }
-  return _readingLogs(ref, lookup.schoolId)
-      .where('classId', isEqualTo: lookup.classId)
-      .where('comprehensionAudioUploaded', isEqualTo: true)
-      .where('comprehensionAudioReviewStatus', isEqualTo: 'pending')
-      .limit(100)
-      .snapshots()
-      .map((snapshot) => snapshot.docs.length);
+  return _pendingComprehensionRecordings(ref, lookup)
+      .map((recordings) => recordings.length > 100 ? 100 : recordings.length);
 });
 
 /// Student display names for the recording inbox. This roster subscription is
@@ -186,6 +189,57 @@ class ComprehensionRecordingReviewService {
         'comprehensionAudioReviewStatus': 'reviewed',
         'comprehensionAudioReviewedAt': FieldValue.serverTimestamp(),
         'comprehensionAudioReviewedGeneration': generation,
+      });
+    });
+  }
+
+  /// Returns the current audio generation to the shared to-review queue.
+  ///
+  /// This is deliberately the inverse of [markReviewed], rather than a broad
+  /// reading-log edit. The transaction only clears a review that belongs to
+  /// the same, still-retained audio object. Firestore rules repeat those
+  /// checks and restrict this write to teachers assigned to the class.
+  Future<void> markToReview({
+    required String schoolId,
+    required String logId,
+  }) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null || uid.isEmpty) {
+      throw StateError('A signed-in teacher is required');
+    }
+
+    final ref = _firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('readingLogs')
+        .doc(logId);
+
+    await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(ref);
+      final data = snapshot.data();
+      if (!snapshot.exists || data == null) {
+        throw StateError('Recording log no longer exists');
+      }
+      final generation = data['comprehensionAudioObjectGeneration']?.toString();
+      if (data['comprehensionAudioUploaded'] != true ||
+          generation == null ||
+          generation.isEmpty) {
+        throw StateError('Recording is no longer available');
+      }
+
+      // A missing/stale status is already in the to-review queue. Keeping this
+      // a no-op avoids writing a reset for an audio replacement that another
+      // teacher has just uploaded.
+      if (data['comprehensionAudioReviewStatus'] != 'reviewed' ||
+          data['comprehensionAudioReviewedGeneration']?.toString() !=
+              generation) {
+        return;
+      }
+
+      transaction.update(ref, {
+        'comprehensionAudioReviewStatus': 'pending',
+        'comprehensionAudioReviewedAt': FieldValue.delete(),
+        'comprehensionAudioReviewedGeneration': FieldValue.delete(),
       });
     });
   }
