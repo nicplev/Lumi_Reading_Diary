@@ -4,9 +4,11 @@ import {
   getAiEvaluationPlatformFlag,
   getComprehensionRecordingFlag,
   getComprehensionRetentionConfig,
+  getCoverOcrFlag,
   getStorageAlertsConfig,
 } from "@lumi/server-ops";
 import { AiEvaluationSwitchCard } from "./ai-evaluation-switch-card";
+import { CoverOcrSwitchCard } from "./cover-ocr-switch-card";
 import { FeatureControlsPanel } from "./feature-controls-panel";
 import { RetentionControlsCard } from "./retention-controls-card";
 import {
@@ -50,12 +52,14 @@ export default async function FeatureControlsPage() {
     storageAlerts,
     storageUsage,
     aiEvaluationFlag,
+    coverOcrFlag,
   ] = await Promise.all([
     getComprehensionRecordingFlag(db),
     getComprehensionRetentionConfig(db),
     getStorageAlertsConfig(db),
     getStorageUsageSummary(db),
     getAiEvaluationPlatformFlag(db),
+    getCoverOcrFlag(db),
   ]);
 
   return (
@@ -67,6 +71,7 @@ export default async function FeatureControlsPage() {
       <div className="space-y-6">
         <FeatureControlsPanel initialFlag={comprehensionRecording} />
         <AiEvaluationSwitchCard initialFlag={aiEvaluationFlag} />
+        <CoverOcrSwitchCard initialFlag={coverOcrFlag} />
         <RetentionControlsCard initialConfig={comprehensionRetention} />
         <StorageAlertsCard initialConfig={storageAlerts} usage={storageUsage} />
       </div>
