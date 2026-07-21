@@ -1,93 +1,56 @@
 import 'server-only';
 
-import { createHash } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getSession, type SessionData } from '@/lib/auth/session';
 import { adminDb } from '@/lib/firebase/admin';
+import {
+  assertSameOrigin,
+  clientIp,
+  consumeRateLimit,
+  RequestGuardError,
+  sha256,
+} from '@/lib/http/request-guards';
 import {
   hasDemoAllocationCapability,
   isCurrentDemoAllocationAuthority,
 } from './allocation-policy';
 
-export class DemoAllocationSecurityError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-  ) {
-    super(message);
+/**
+ * Extends the shared guard error so the demo routes' `instanceof
+ * RequestGuardError` checks catch both this and anything thrown by the
+ * shared origin/rate-limit helpers.
+ */
+export class DemoAllocationSecurityError extends RequestGuardError {
+  constructor(message: string, status: number) {
+    super(message, status);
     this.name = 'DemoAllocationSecurityError';
   }
 }
+
+export { assertSameOrigin };
 
 export interface AuthorizedDemoAllocationSession {
   session: SessionData;
   generationId: string;
 }
 
-function sha256(value: string): string {
-  return createHash('sha256').update(value).digest('hex');
-}
-
-/** Reject browser mutations unless their Origin resolves to this host. */
-export function assertSameOrigin(request: Request): void {
-  const origin = request.headers.get('origin');
-  const fetchSite = request.headers.get('sec-fetch-site');
-  const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
-  const expectedHost = forwardedHost || request.headers.get('host') || new URL(request.url).host;
-  const forwardedProtocol = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
-  const expectedProtocol = `${forwardedProtocol || new URL(request.url).protocol.replace(':', '')}:`;
-
-  if (!origin) throw new DemoAllocationSecurityError('Missing request origin.', 403);
-  let parsed: URL;
-  try {
-    parsed = new URL(origin);
-  } catch {
-    throw new DemoAllocationSecurityError('Invalid request origin.', 403);
-  }
-  if (
-    parsed.host !== expectedHost ||
-    parsed.protocol !== expectedProtocol ||
-    (fetchSite && fetchSite !== 'same-origin')
-  ) {
-    throw new DemoAllocationSecurityError('Cross-origin request refused.', 403);
-  }
-}
-
+// Same windows and same `demo_alloc_` document namespace as before, so
+// in-flight counters carry over unchanged.
 async function consumeLimits(
   session: SessionData,
   operation: string,
   request: Request,
 ): Promise<void> {
-  const now = new Date();
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-  const limits = [
-    { key: `${session.uid}:${operation}`, max: 15, windowMs: 60_000 },
-    { key: `${session.schoolId}:all`, max: 120, windowMs: 60 * 60_000 },
-    { key: `${session.schoolId}:${ip}`, max: 60, windowMs: 60 * 60_000 },
-  ];
-  const refs = limits.map((limit) =>
-    adminDb.collection('portalRateLimits').doc(`demo_alloc_${sha256(limit.key)}`),
+  const ip = clientIp(request);
+  await consumeRateLimit(
+    'demo_alloc',
+    [
+      { key: `${session.uid}:${operation}`, max: 15, windowMs: 60_000 },
+      { key: `${session.schoolId}:all`, max: 120, windowMs: 60 * 60_000 },
+      { key: `${session.schoolId}:${ip}`, max: 60, windowMs: 60 * 60_000 },
+    ],
+    'Too many demo changes. Please wait and try again.',
   );
-
-  await adminDb.runTransaction(async (tx) => {
-    const snapshots = await tx.getAll(...refs);
-    for (let index = 0; index < limits.length; index += 1) {
-      const limit = limits[index];
-      const ref = refs[index];
-      const data = snapshots[index].data();
-      const resetAt = data?.resetAt?.toDate?.() as Date | undefined;
-      const withinWindow = resetAt instanceof Date && resetAt > now;
-      const count = withinWindow && typeof data?.count === 'number' ? data.count : 0;
-      if (count >= limit.max) {
-        throw new DemoAllocationSecurityError('Too many demo changes. Please wait and try again.', 429);
-      }
-      tx.set(ref, {
-        count: count + 1,
-        resetAt: withinWindow ? resetAt : new Date(now.getTime() + limit.windowMs),
-        updatedAt: now,
-      });
-    }
-  });
 }
 
 /**

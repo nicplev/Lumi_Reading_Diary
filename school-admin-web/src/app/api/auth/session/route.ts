@@ -7,6 +7,11 @@ import {
   type SessionData,
   verifyAdminMfaEnrollmentToken,
 } from '@/lib/auth/session';
+import {
+  clientIp,
+  consumeRateLimitSoft,
+  RequestGuardError,
+} from '@/lib/http/request-guards';
 
 // Mandatory by default. Setting this to "false" is an emergency rollback only;
 // production should enable TOTP in Firebase Identity Platform before deploy.
@@ -178,8 +183,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid enrollment token' }, { status: 400 });
     }
 
+    // Bound abuse of this endpoint BEFORE the expensive work. A miss on the
+    // custom-claim fast path falls through to a full `schools` collection
+    // scan, so an unbounded caller can be costly. Deliberately generous: a
+    // whole staff room signing in at 9am shares one NAT address.
+    //
+    // NOT origin-checked. `assertSameOrigin` requires an Origin header and
+    // this endpoint has legitimate server-to-server callers with none — the
+    // super-admin portal's demo preflight and the IAM canary. It also gains
+    // little: a valid Firebase ID token is already required, and an attacker
+    // cannot mint one for a victim.
+    await consumeRateLimitSoft(
+      'auth_session',
+      [{ key: `ip:${clientIp(request)}`, max: 60, windowMs: 5 * 60_000 }],
+      'Too many sign-in attempts. Please wait a moment and try again.',
+    );
+
     // Verify signature, issuer, audience, expiry, and revocation.
     const decodedToken = await adminAuth.verifyIdToken(idToken, true);
+
+    await consumeRateLimitSoft(
+      'auth_session',
+      [{ key: `uid:${decodedToken.uid}`, max: 20, windowMs: 5 * 60_000 }],
+      'Too many sign-in attempts. Please wait a moment and try again.',
+    );
     const uid = decodedToken.uid;
     const email = decodedToken.email || '';
     const name = decodedToken.name || '';
@@ -228,6 +255,12 @@ export async function POST(request: NextRequest) {
 
     return issuePortalSession(userData, decodedToken, enrollmentToken);
   } catch (error) {
+    // A 429 must surface as itself: collapsing it into the generic 401 would
+    // tell the client its credentials failed and send it into a retry loop
+    // against the very limit that just tripped.
+    if (error instanceof RequestGuardError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('Session creation error:', error);
     return NextResponse.json({ error: 'Authentication failed' }, { status: 401 });
   }
