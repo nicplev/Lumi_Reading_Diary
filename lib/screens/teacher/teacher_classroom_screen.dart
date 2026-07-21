@@ -1500,6 +1500,20 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
         String pickerFilter = 'all'; // 'all' or 'unassigned'
         Set<String>? assignedStudentIds;
         bool loadingAssigned = false;
+        // Dedicated stream for this modal instance, created once per open.
+        // _studentsStream(classModel) is memoized and shared with the
+        // roster list below, which already has a live subscriber by the
+        // time this sheet opens — as a broadcast stream it won't replay
+        // the query's already-delivered initial snapshot to a late
+        // subscriber, so reusing it here left the picker stuck on its
+        // loading state forever. This stream is independent and gets its
+        // own initial snapshot regardless of subscriber timing.
+        final studentsStream = _firestore
+            .collection('schools')
+            .doc(widget.teacher.schoolId)
+            .collection('students')
+            .where('classId', isEqualTo: classModel.id)
+            .snapshots();
 
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
@@ -1594,8 +1608,19 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                   // Student list
                   Expanded(
                     child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: _studentsStream(classModel),
+                      stream: studentsStream,
                       builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return Center(
+                            child: Text(
+                              "Couldn't load students. Please try again.",
+                              style: LumiType.body.copyWith(
+                                color: LumiTokens.muted,
+                              ),
+                            ),
+                          );
+                        }
+
                         if (!snapshot.hasData) {
                           return const Center(
                               child: CircularProgressIndicator());
