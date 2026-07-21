@@ -3035,6 +3035,82 @@ test('class isolation: teacher cannot update or delete another class records; ad
   await assertSucceeds(adminSchool.collection('readingGroups').doc('group_b').get());
 });
 
+async function seedComprehensionReviewFixture({coTeacher = false} = {}) {
+  await seedClassIsolationSchool();
+  await seedData(async (db) => {
+    const school = db.collection('schools').doc('school_1');
+    if (coTeacher) {
+      await school.collection('classes').doc('class_a').update({
+        teacherIds: ['teacher_a', 'teacher_b'],
+      });
+    }
+    await school.collection('readingLogs').doc('log_a').update({
+      comprehensionAudioUploaded: true,
+      comprehensionAudioPath:
+        'schools/school_1/comprehension_audio/log_a.m4a',
+      comprehensionAudioObjectGeneration: 'generation_1',
+      comprehensionAudioReviewStatus: 'pending',
+    });
+  });
+}
+
+const reviewedAudioPatch = () => ({
+  comprehensionAudioReviewStatus: 'reviewed',
+  comprehensionAudioReviewedAt: serverTimestamp(),
+  comprehensionAudioReviewedGeneration: 'generation_1',
+});
+
+test('comprehension review: assigned teacher can mark current generation reviewed', async () => {
+  await seedComprehensionReviewFixture();
+  const ref = authDb('teacher_a').collection('schools').doc('school_1')
+    .collection('readingLogs').doc('log_a');
+  await assertSucceeds(ref.update(reviewedAudioPatch()));
+});
+
+test('comprehension review: status is shared with an assigned co-teacher', async () => {
+  await seedComprehensionReviewFixture({coTeacher: true});
+  const first = authDb('teacher_a').collection('schools').doc('school_1')
+    .collection('readingLogs').doc('log_a');
+  await assertSucceeds(first.update(reviewedAudioPatch()));
+
+  const shared = await assertSucceeds(
+    authDb('teacher_b').collection('schools').doc('school_1')
+      .collection('readingLogs').doc('log_a').get(),
+  );
+  assert.equal(shared.data().comprehensionAudioReviewStatus, 'reviewed');
+});
+
+test('comprehension review: unassigned teacher and parent cannot mark reviewed', async () => {
+  await seedComprehensionReviewFixture();
+  const path = (db) => db.collection('schools').doc('school_1')
+    .collection('readingLogs').doc('log_a');
+  await assertFails(path(authDb('teacher_b')).update(
+    reviewedAudioPatch(),
+  ));
+  await assertFails(path(authDb('parent_a')).update(
+    reviewedAudioPatch(),
+  ));
+});
+
+test('comprehension review: generation, time and changed fields are pinned', async () => {
+  await seedComprehensionReviewFixture();
+  const ref = authDb('teacher_a').collection('schools').doc('school_1')
+    .collection('readingLogs').doc('log_a');
+
+  await assertFails(ref.update({
+    ...reviewedAudioPatch(),
+    comprehensionAudioReviewedGeneration: 'stale_generation',
+  }));
+  await assertFails(ref.update({
+    ...reviewedAudioPatch(),
+    comprehensionAudioReviewedAt: new Date(0),
+  }));
+  await assertFails(ref.update({
+    ...reviewedAudioPatch(),
+    minutesRead: 999,
+  }));
+});
+
 test('comments: child and parent fields must match the containing reading log', async () => {
   await seedSchoolForComments();
   const parentDb = authDb('parent_1');

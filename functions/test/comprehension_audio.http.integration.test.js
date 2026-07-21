@@ -88,6 +88,9 @@ async function seedLog({schoolId, logId, classId, parentId, uploaded = false}) {
       comprehensionAudioDurationSec: 12,
       comprehensionAudioValidationVersion: 'ffmpeg-aac-mono-v1',
       comprehensionAudioObjectGeneration: 'test-generation',
+      comprehensionAudioReviewStatus: 'reviewed',
+      comprehensionAudioReviewedAt: admin.firestore.Timestamp.now(),
+      comprehensionAudioReviewedGeneration: 'test-generation',
     } : {}),
   });
   return {ref, canonicalPath};
@@ -186,6 +189,9 @@ test('authenticated owner confirms a canonical upload through HTTP', async () =>
   const data = (await ref.get()).data();
   assert.equal(data.comprehensionAudioPath, canonicalPath);
   assert.equal(data.comprehensionAudioUploaded, true);
+  assert.equal(data.comprehensionAudioReviewStatus, 'pending');
+  assert.equal(data.comprehensionAudioReviewedAt, undefined);
+  assert.equal(data.comprehensionAudioReviewedGeneration, undefined);
   assert.equal(data.comprehensionAudioDurationSec, 1);
   assert.equal((await pending.exists())[0], false);
 });
@@ -257,5 +263,8 @@ test('assigned School X teacher deletes only the canonical object through HTTP',
   const data = (await ref.get()).data();
   assert.equal(data.comprehensionAudioUploaded, false);
   assert.equal(data.comprehensionAudioPath, undefined);
+  assert.equal(data.comprehensionAudioReviewStatus, undefined);
+  assert.equal(data.comprehensionAudioReviewedAt, undefined);
+  assert.equal(data.comprehensionAudioReviewedGeneration, undefined);
   assert.equal(canonicalPath.endsWith(`${logId}.m4a`), true);
 });

@@ -34,10 +34,7 @@ void main() {
 
       test('aToZ schema returns A-Z letters', () async {
         final firestore = TestHelpers.createFakeFirestore();
-        await firestore
-            .collection('schools')
-            .doc('s1')
-            .set(baseSchoolData());
+        await firestore.collection('schools').doc('s1').set(baseSchoolData());
         final doc = await firestore.collection('schools').doc('s1').get();
         final school = SchoolModel.fromFirestore(doc);
 
@@ -104,10 +101,7 @@ void main() {
 
       test('returns true for aToZ schema', () async {
         final firestore = TestHelpers.createFakeFirestore();
-        await firestore
-            .collection('schools')
-            .doc('s1')
-            .set(baseSchoolData());
+        await firestore.collection('schools').doc('s1').set(baseSchoolData());
         final doc = await firestore.collection('schools').doc('s1').get();
         final school = SchoolModel.fromFirestore(doc);
 
@@ -123,6 +117,40 @@ void main() {
         final school = SchoolModel.fromFirestore(doc);
 
         expect(school.hasReadingLevels, isTrue);
+      });
+    });
+
+    group('AI evaluation authority gate', () {
+      test('requires enabled, current authority version and confirmation',
+          () async {
+        final firestore = TestHelpers.createFakeFirestore();
+        final data = baseSchoolData();
+        data['settings'] = {
+          'aiEvaluation': {
+            'enabled': true,
+            'authorityVersion': SchoolModel.aiEvaluationAuthorityVersion,
+            'authorityConfirmedAt': Timestamp.now(),
+          },
+        };
+        await firestore.collection('schools').doc('s1').set(data);
+        final doc = await firestore.collection('schools').doc('s1').get();
+
+        expect(SchoolModel.fromFirestore(doc).aiEvaluationEnabled, isTrue);
+      });
+
+      test('fails closed for a stale or unconfirmed authority', () async {
+        final firestore = TestHelpers.createFakeFirestore();
+        final data = baseSchoolData();
+        data['settings'] = {
+          'aiEvaluation': {
+            'enabled': true,
+            'authorityVersion': 'stale-version',
+          },
+        };
+        await firestore.collection('schools').doc('s1').set(data);
+        final doc = await firestore.collection('schools').doc('s1').get();
+
+        expect(SchoolModel.fromFirestore(doc).aiEvaluationEnabled, isFalse);
       });
     });
 

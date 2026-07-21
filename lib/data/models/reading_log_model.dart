@@ -88,6 +88,17 @@ class ReadingLogModel {
   final String? comprehensionAudioPath;
   final int? comprehensionAudioDurationSec;
   final bool comprehensionAudioUploaded;
+  final DateTime? comprehensionAudioUploadedAt;
+  final String? comprehensionAudioObjectGeneration;
+  final String? comprehensionQuestionText;
+
+  // Shared teacher workflow state for the current audio object. A recording is
+  // only considered reviewed when the reviewed generation still matches the
+  // uploaded object's generation; replacing the audio therefore cannot carry
+  // a stale review marker forward.
+  final String? comprehensionAudioReviewStatus;
+  final DateTime? comprehensionAudioReviewedAt;
+  final String? comprehensionAudioReviewedGeneration;
 
   ReadingLogModel({
     required this.id,
@@ -124,6 +135,12 @@ class ReadingLogModel {
     this.comprehensionAudioPath,
     this.comprehensionAudioDurationSec,
     this.comprehensionAudioUploaded = false,
+    this.comprehensionAudioUploadedAt,
+    this.comprehensionAudioObjectGeneration,
+    this.comprehensionQuestionText,
+    this.comprehensionAudioReviewStatus,
+    this.comprehensionAudioReviewedAt,
+    this.comprehensionAudioReviewedGeneration,
   });
 
   bool get isCompleted => status == LogStatus.completed;
@@ -140,6 +157,15 @@ class ReadingLogModel {
   /// Drives the teacher's inline player visibility on the student detail row.
   bool get hasComprehensionAudio =>
       comprehensionAudioUploaded && comprehensionAudioPath != null;
+
+  /// Shared class review state. Legacy recordings without a marker remain in
+  /// the to-review state until the backfill (or a teacher listening) updates
+  /// them.
+  bool get isComprehensionAudioReviewed =>
+      comprehensionAudioReviewStatus == 'reviewed' &&
+      comprehensionAudioObjectGeneration != null &&
+      comprehensionAudioReviewedGeneration ==
+          comprehensionAudioObjectGeneration;
 
   /// Whether the viewer [uid] (acting as [role], 'parent' | 'teacher') has an
   /// unseen comment: there's a thread, its newest message is from the other
@@ -228,6 +254,17 @@ class ReadingLogModel {
           (data['comprehensionAudioDurationSec'] as num?)?.toInt(),
       comprehensionAudioUploaded:
           data['comprehensionAudioUploaded'] as bool? ?? false,
+      comprehensionAudioUploadedAt:
+          (data['comprehensionAudioUploadedAt'] as Timestamp?)?.toDate(),
+      comprehensionAudioObjectGeneration:
+          data['comprehensionAudioObjectGeneration']?.toString(),
+      comprehensionQuestionText: data['comprehensionQuestionText'] as String?,
+      comprehensionAudioReviewStatus:
+          data['comprehensionAudioReviewStatus'] as String?,
+      comprehensionAudioReviewedAt:
+          (data['comprehensionAudioReviewedAt'] as Timestamp?)?.toDate(),
+      comprehensionAudioReviewedGeneration:
+          data['comprehensionAudioReviewedGeneration']?.toString(),
     );
   }
 
@@ -269,6 +306,17 @@ class ReadingLogModel {
       'comprehensionAudioPath': comprehensionAudioPath,
       'comprehensionAudioDurationSec': comprehensionAudioDurationSec,
       'comprehensionAudioUploaded': comprehensionAudioUploaded,
+      'comprehensionAudioUploadedAt': comprehensionAudioUploadedAt != null
+          ? Timestamp.fromDate(comprehensionAudioUploadedAt!)
+          : null,
+      'comprehensionAudioObjectGeneration': comprehensionAudioObjectGeneration,
+      'comprehensionQuestionText': comprehensionQuestionText,
+      'comprehensionAudioReviewStatus': comprehensionAudioReviewStatus,
+      'comprehensionAudioReviewedAt': comprehensionAudioReviewedAt != null
+          ? Timestamp.fromDate(comprehensionAudioReviewedAt!)
+          : null,
+      'comprehensionAudioReviewedGeneration':
+          comprehensionAudioReviewedGeneration,
     };
   }
 
@@ -307,6 +355,12 @@ class ReadingLogModel {
     String? comprehensionAudioPath,
     int? comprehensionAudioDurationSec,
     bool? comprehensionAudioUploaded,
+    DateTime? comprehensionAudioUploadedAt,
+    String? comprehensionAudioObjectGeneration,
+    String? comprehensionQuestionText,
+    String? comprehensionAudioReviewStatus,
+    DateTime? comprehensionAudioReviewedAt,
+    String? comprehensionAudioReviewedGeneration,
   }) {
     return ReadingLogModel(
       id: id ?? this.id,
@@ -348,6 +402,19 @@ class ReadingLogModel {
           comprehensionAudioDurationSec ?? this.comprehensionAudioDurationSec,
       comprehensionAudioUploaded:
           comprehensionAudioUploaded ?? this.comprehensionAudioUploaded,
+      comprehensionAudioUploadedAt:
+          comprehensionAudioUploadedAt ?? this.comprehensionAudioUploadedAt,
+      comprehensionAudioObjectGeneration: comprehensionAudioObjectGeneration ??
+          this.comprehensionAudioObjectGeneration,
+      comprehensionQuestionText:
+          comprehensionQuestionText ?? this.comprehensionQuestionText,
+      comprehensionAudioReviewStatus:
+          comprehensionAudioReviewStatus ?? this.comprehensionAudioReviewStatus,
+      comprehensionAudioReviewedAt:
+          comprehensionAudioReviewedAt ?? this.comprehensionAudioReviewedAt,
+      comprehensionAudioReviewedGeneration:
+          comprehensionAudioReviewedGeneration ??
+              this.comprehensionAudioReviewedGeneration,
     );
   }
 
@@ -389,6 +456,15 @@ class ReadingLogModel {
       'comprehensionAudioPath': comprehensionAudioPath,
       'comprehensionAudioDurationSec': comprehensionAudioDurationSec,
       'comprehensionAudioUploaded': comprehensionAudioUploaded,
+      'comprehensionAudioUploadedAt':
+          comprehensionAudioUploadedAt?.toIso8601String(),
+      'comprehensionAudioObjectGeneration': comprehensionAudioObjectGeneration,
+      'comprehensionQuestionText': comprehensionQuestionText,
+      'comprehensionAudioReviewStatus': comprehensionAudioReviewStatus,
+      'comprehensionAudioReviewedAt':
+          comprehensionAudioReviewedAt?.toIso8601String(),
+      'comprehensionAudioReviewedGeneration':
+          comprehensionAudioReviewedGeneration,
     };
   }
 
@@ -464,6 +540,19 @@ class ReadingLogModel {
           (map['comprehensionAudioDurationSec'] as num?)?.toInt(),
       comprehensionAudioUploaded:
           map['comprehensionAudioUploaded'] as bool? ?? false,
+      comprehensionAudioUploadedAt: map['comprehensionAudioUploadedAt'] != null
+          ? DateTime.tryParse(map['comprehensionAudioUploadedAt'])
+          : null,
+      comprehensionAudioObjectGeneration:
+          map['comprehensionAudioObjectGeneration']?.toString(),
+      comprehensionQuestionText: map['comprehensionQuestionText'] as String?,
+      comprehensionAudioReviewStatus:
+          map['comprehensionAudioReviewStatus'] as String?,
+      comprehensionAudioReviewedAt: map['comprehensionAudioReviewedAt'] != null
+          ? DateTime.tryParse(map['comprehensionAudioReviewedAt'])
+          : null,
+      comprehensionAudioReviewedGeneration:
+          map['comprehensionAudioReviewedGeneration']?.toString(),
     );
   }
 

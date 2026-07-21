@@ -19,8 +19,7 @@ import '../../data/models/reading_level_option.dart';
 import '../../data/models/reading_group_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/school_model.dart';
-import '../../core/config/dev_access.dart';
-import '../../data/providers/comprehension_eval_providers.dart';
+import '../../data/providers/comprehension_recordings_provider.dart';
 import '../../services/firebase_service.dart';
 import '../../services/platform_config_service.dart';
 import '../../services/reading_level_service.dart';
@@ -143,16 +142,18 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     final schoolId = widget.teacher.schoolId;
     if (schoolId == null || schoolId.isEmpty) return;
     try {
-      // Platform kill switch fetched alongside; never throws (fails open).
-      final platformEnabledFuture =
-          PlatformConfigService().isComprehensionRecordingEnabled();
+      // Platform kill switch fetched alongside; errors fail closed.
+      final platformEnabledFuture = PlatformConfigService(firestore: _firestore)
+          .isComprehensionRecordingEnabled();
       final doc = await _firestore.collection('schools').doc(schoolId).get();
       final platformEnabled = await platformEnabledFuture;
       if (!mounted || !doc.exists) return;
       final school = SchoolModel.fromFirestore(doc);
+      final audioSettings = school.comprehensionRecordingSettings;
       setState(() {
-        _comprehensionEnabled =
-            platformEnabled && school.comprehensionRecordingSettings.enabled;
+        _comprehensionEnabled = platformEnabled &&
+            audioSettings.enabled &&
+            !audioSettings.previewOnly;
       });
     } catch (_) {
       // Default false; the button stays hidden.
@@ -705,75 +706,95 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
               const SizedBox(width: 4),
               _buildComprehensionButton(selectedClass),
             ],
-            // AI comprehension review — pilot: dev-access + fail-closed
-            // entitlement gate (Consumer keeps this screen non-Riverpod).
-            if (hasDevAccess())
-              Consumer(builder: (context, ref, _) {
-                final aiOn = ref.watch(aiEvaluationEnabledProvider(
-                    widget.teacher.schoolId ?? ''));
-                if (!aiOn) return const SizedBox.shrink();
-                return Padding(
-                  padding: const EdgeInsets.only(left: 4),
-                  child: _buildComprehensionReviewButton(selectedClass),
-                );
-              }),
+            if (_comprehensionEnabled) ...[
+              const SizedBox(width: 4),
+              _buildComprehensionRecordingsButton(selectedClass),
+            ],
           ],
         ),
       ),
     );
   }
 
-  /// Header action opening the class-wide AI comprehension review screen.
-  Widget _buildComprehensionReviewButton(ClassModel selectedClass) {
-    return GestureDetector(
-      onTap: () => context.push(
-        '/teacher/comprehension-review',
-        extra: {'teacher': widget.teacher, 'classModel': selectedClass},
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.graphic_eq, size: 14, color: LumiTokens.blue),
-            const SizedBox(width: 5),
-            Text(
-              'Review',
-              style: LumiType.caption.copyWith(
-                color: LumiTokens.blue,
-                fontWeight: FontWeight.w700,
+  /// Class recording inbox with a compact unread-style badge. The badge shows
+  /// only the number, capped at 99+, so it remains useful in the tight header.
+  Widget _buildComprehensionRecordingsButton(ClassModel selectedClass) {
+    final lookup = ComprehensionRecordingsLookup(
+      schoolId: widget.teacher.schoolId ?? '',
+      classId: selectedClass.id,
+    );
+    return Consumer(builder: (context, ref, _) {
+      final count = ref
+              .watch(unreviewedComprehensionRecordingCountProvider(lookup))
+              .value ??
+          0;
+      return InkWell(
+        onTap: () => context.push(
+          '/teacher/comprehension-recordings',
+          extra: {'teacher': widget.teacher, 'classModel': selectedClass},
+        ),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+        child: Tooltip(
+          message: 'Comprehension recordings',
+          child: Semantics(
+            button: true,
+            label: 'Comprehension recordings',
+            value: count > 0 ? '$count to review' : 'No recordings to review',
+            child: SizedBox(
+              width: 36,
+              height: 36,
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.center,
+                children: [
+                  const Icon(Icons.graphic_eq_rounded,
+                      size: 20, color: LumiTokens.blue),
+                  if (count > 0)
+                    Positioned(
+                      right: -3,
+                      top: -3,
+                      child: Container(
+                        constraints:
+                            const BoxConstraints(minWidth: 17, minHeight: 17),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: LumiTokens.red,
+                          borderRadius:
+                              BorderRadius.circular(LumiTokens.radiusPill),
+                          border:
+                              Border.all(color: LumiTokens.cream, width: 1.5),
+                        ),
+                        child: Text(
+                          count >= 100 ? '99+' : '$count',
+                          style: LumiType.caption.copyWith(
+                            color: LumiTokens.paper,
+                            fontSize: 9,
+                            height: 1,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
-      ),
-    );
+      );
+    });
   }
 
   /// Header action that opens the comprehension-question editor sheet for the
   /// selected class. (The editor was previously an orphaned full page reachable
   /// only from the unused ClassDetailScreen.)
   Widget _buildComprehensionButton(ClassModel selectedClass) {
-    return GestureDetector(
-      onTap: () =>
+    return IconButton(
+      onPressed: () =>
           showComprehensionQuestionSheet(context, classModel: selectedClass),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.quiz_outlined, size: 14, color: LumiTokens.green),
-            const SizedBox(width: 5),
-            Text(
-              'Question',
-              style: LumiType.caption.copyWith(
-                color: LumiTokens.green,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
+      icon: const Icon(Icons.quiz_outlined, size: 20, color: LumiTokens.green),
+      tooltip: 'Comprehension question',
+      visualDensity: VisualDensity.compact,
     );
   }
 
@@ -1315,8 +1336,8 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                     ),
                                     if (showGroup) ...[
                                       Text('  ·  ',
-                                          style: LumiType.caption
-                                              .copyWith(color: LumiTokens.muted)),
+                                          style: LumiType.caption.copyWith(
+                                              color: LumiTokens.muted)),
                                       Container(
                                         width: 6,
                                         height: 6,
@@ -2250,4 +2271,3 @@ class _SheetSurface extends StatelessWidget {
     );
   }
 }
-

@@ -17,6 +17,7 @@ enum ReadingLevelSchema {
 }
 
 class SchoolModel {
+  static const aiEvaluationAuthorityVersion = 'school-ai-eval-v1-2026-07-20';
   final String id;
   final String name;
   final String? logoUrl;
@@ -180,11 +181,14 @@ class SchoolModel {
   }
 
   /// AI comprehension evaluation entitlement. Written only by the Lumi team
-  /// (super-admin portal); FAIL-CLOSED — anything but the literal `true` is
-  /// off, mirroring the server-side gate.
+  /// (super-admin portal); FAIL-CLOSED unless the switch, current authority
+  /// version and server-stamped confirmation all match the server-side gate.
   bool get aiEvaluationEnabled {
     final ai = settings?['aiEvaluation'];
-    return ai is Map && ai['enabled'] == true;
+    return ai is Map &&
+        ai['enabled'] == true &&
+        ai['authorityVersion'] == aiEvaluationAuthorityVersion &&
+        ai['authorityConfirmedAt'] != null;
   }
 
   bool get hasReadingLevels => levelSchema != ReadingLevelSchema.none;

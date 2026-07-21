@@ -80,6 +80,33 @@ class ClassEvalsLookup {
   int get hashCode => Object.hash(schoolId, classId);
 }
 
+class RecordingEvalLookup {
+  final String schoolId;
+  final String logId;
+
+  const RecordingEvalLookup({required this.schoolId, required this.logId});
+
+  @override
+  bool operator ==(Object other) =>
+      other is RecordingEvalLookup &&
+      other.schoolId == schoolId &&
+      other.logId == logId;
+
+  @override
+  int get hashCode => Object.hash(schoolId, logId);
+}
+
+/// One evaluation, fetched only after the teacher explicitly expands the
+/// collapsed AI disclosure in the recording detail sheet.
+final recordingEvalProvider = StreamProvider.autoDispose
+    .family<ComprehensionEvalModel?, RecordingEvalLookup>((ref, lookup) {
+  if (lookup.schoolId.isEmpty || lookup.logId.isEmpty) {
+    return Stream.value(null);
+  }
+  return _evals(ref, lookup.schoolId).doc(lookup.logId).snapshots().map(
+      (doc) => doc.exists ? ComprehensionEvalModel.fromFirestore(doc) : null);
+});
+
 /// Class-wide evaluation stream for the review screen (newest first).
 /// Filtering by level band / flags / date range happens client-side over
 /// this window, mirroring the reading-history screen's approach.
@@ -93,26 +120,4 @@ final classEvalsProvider = StreamProvider.autoDispose
       .map((snap) => snap.docs
           .map(ComprehensionEvalModel.fromFirestore)
           .toList(growable: false));
-});
-
-/// Student names for eval rows (id -> display name), one subscription per
-/// class. Teachers already read their class roster elsewhere; this reuses
-/// the same class-scoped access shape.
-final classStudentNamesProvider = StreamProvider.autoDispose
-    .family<Map<String, String>, ClassEvalsLookup>((ref, lookup) {
-  return ref
-      .watch(firestoreProvider)
-      .collection('schools')
-      .doc(lookup.schoolId)
-      .collection('students')
-      .where('classId', isEqualTo: lookup.classId)
-      .snapshots()
-      .map((snap) {
-    final names = <String, String>{};
-    for (final doc in snap.docs) {
-      final name = doc.data()['name'];
-      if (name is String && name.isNotEmpty) names[doc.id] = name;
-    }
-    return names;
-  });
 });
