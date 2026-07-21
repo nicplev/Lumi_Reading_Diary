@@ -1358,6 +1358,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Super-admin TOTP (MFA) enrollment — AES-encrypted secret, deny-all. Only
+    // the admin portal runtime service account (Admin SDK) reads or writes it.
+    // (Unmatched paths are already denied; this makes the intent explicit.)
+    match /adminMfa/{uid} {
+      allow read, write: if false;
+    }
+
     // ── Developer impersonation sessions ────────────────────────────
     // Lifecycle (create, status transitions) is owned by Cloud Functions
     // via the Admin SDK. Dev clients may `get` their own active session
