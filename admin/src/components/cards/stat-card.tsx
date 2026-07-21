@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +15,7 @@ interface StatCardProps {
   description?: string;
   icon?: LucideIcon;
   delta?: StatCardDelta;
+  href?: string;
 }
 
 const deltaIcons = {
@@ -28,10 +30,11 @@ export function StatCard({
   description,
   icon: Icon,
   delta,
+  href,
 }: StatCardProps) {
   const DeltaIcon = delta ? deltaIcons[delta.direction] : null;
-  return (
-    <Card>
+  const card = (
+    <Card className={href ? "h-full transition-colors hover:bg-muted/50" : undefined}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
         {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
@@ -56,5 +59,12 @@ export function StatCard({
         )}
       </CardContent>
     </Card>
+  );
+  return href ? (
+    <Link href={href} className="block h-full" aria-label={`View ${title}`}>
+      {card}
+    </Link>
+  ) : (
+    card
   );
 }

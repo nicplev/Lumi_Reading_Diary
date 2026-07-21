@@ -1,6 +1,7 @@
 "use client";
 
 import { type ColumnDef } from "@tanstack/react-table";
+import { useRouter } from "next/navigation";
 import type { RecentActivity } from "@/lib/firestore/reading-logs";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
@@ -59,5 +60,17 @@ interface RecentActivityTableProps {
 }
 
 export function RecentActivityTable({ data }: RecentActivityTableProps) {
-  return <DataTable columns={columns} data={data} pageSize={10} />;
+  const router = useRouter();
+  return (
+    <DataTable
+      columns={columns}
+      data={data}
+      pageSize={10}
+      onRowClick={(log) =>
+        router.push(
+          `/schools/${encodeURIComponent(log.schoolId)}/reading-logs?logId=${encodeURIComponent(log.id)}`
+        )
+      }
+    />
+  );
 }

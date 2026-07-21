@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { verifySession } from "@/lib/auth";
 import { updateFeedbackStatus } from "@/lib/firestore/feedback";
+import { logAuditEvent } from "@/lib/firestore/audit-log";
 
 const bodySchema = z.object({
   status: z.enum(["new", "reviewed", "resolved"]),
@@ -22,6 +23,16 @@ export async function POST(
     const parsed = bodySchema.parse(body);
 
     await updateFeedbackStatus(id, parsed.status);
+    await logAuditEvent({
+      action: "feedback.updateStatus",
+      performedBy: session.uid,
+      performedByEmail: session.email,
+      targetType: "feedback",
+      targetId: id,
+      after: { status: parsed.status },
+    }).catch((auditError) =>
+      console.error("Feedback status audit write failed", auditError)
+    );
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

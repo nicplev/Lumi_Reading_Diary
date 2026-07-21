@@ -3,20 +3,19 @@ import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
   const sessionCookie = request.cookies.get("__session")?.value;
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
 
   // No cookie + protected route → redirect to login
   if (!sessionCookie) {
     if (pathname === "/login") return NextResponse.next();
     const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("redirect", pathname);
+    loginUrl.searchParams.set("redirect", `${pathname}${search}`);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Has cookie + login page → redirect to dashboard
-  if (sessionCookie && pathname === "/login") {
-    return NextResponse.redirect(new URL("/", request.url));
-  }
+  // Cookie presence alone does not prove the session is still valid. Let the
+  // login page render so a revoked/expired-but-present cookie cannot bounce
+  // forever between the authenticated layout and /login.
 
   return NextResponse.next();
 }

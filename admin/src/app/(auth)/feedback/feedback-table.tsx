@@ -1,13 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { type ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { formatDate } from "@/lib/utils";
 import type { FeedbackListItem } from "@/lib/firestore/feedback";
 
@@ -59,9 +72,53 @@ function StatusActions({
   );
 }
 
-export function FeedbackTable({ data }: { data: FeedbackListItem[] }) {
+type FeedbackStatusFilter = "all" | "new" | "reviewed" | "resolved";
+
+export function FeedbackTable({
+  data,
+  initialStatus = "all",
+  initialItemId,
+}: {
+  data: FeedbackListItem[];
+  initialStatus?: string;
+  initialItemId?: string;
+}) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<FeedbackStatusFilter>(
+    initialStatus as FeedbackStatusFilter
+  );
+  const [selectedFeedback, setSelectedFeedback] = useState<FeedbackListItem | null>(
+    data.find((item) => item.id === initialItemId) ?? null
+  );
+
+  const filteredData =
+    statusFilter === "all"
+      ? data
+      : data.filter((item) => item.status === statusFilter);
+
+  const replaceQuery = (updates: Record<string, string | null>) => {
+    const params = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(updates)) {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    }
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
+
+  const changeStatusFilter = (status: FeedbackStatusFilter) => {
+    setStatusFilter(status);
+    setSelectedFeedback(null);
+    replaceQuery({ status: status === "all" ? null : status, item: null });
+  };
+
+  const openFeedback = (item: FeedbackListItem) => {
+    setSelectedFeedback(item);
+    replaceQuery({ item: item.id });
+  };
 
   const handleStatusUpdate = async (id: string, status: string) => {
     setLoading(true);
@@ -76,6 +133,8 @@ export function FeedbackTable({ data }: { data: FeedbackListItem[] }) {
         throw new Error(err.error || "Failed to update status");
       }
       toast.success(`Feedback marked as ${status}`);
+      setSelectedFeedback(null);
+      replaceQuery({ item: null });
       router.refresh();
     } catch (err) {
       toast.error(
@@ -141,11 +200,92 @@ export function FeedbackTable({ data }: { data: FeedbackListItem[] }) {
   ];
 
   return (
-    <DataTable
-      columns={columns}
-      data={data}
-      searchKey="description"
-      searchPlaceholder="Search feedback..."
-    />
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <span className="text-sm font-medium">Status</span>
+        <Select
+          value={statusFilter}
+          onValueChange={(value) =>
+            value && changeStatusFilter(value as FeedbackStatusFilter)
+          }
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All feedback</SelectItem>
+            <SelectItem value="new">New</SelectItem>
+            <SelectItem value="reviewed">Reviewed</SelectItem>
+            <SelectItem value="resolved">Resolved</SelectItem>
+          </SelectContent>
+        </Select>
+        <span className="text-sm text-muted-foreground">
+          {filteredData.length} item{filteredData.length === 1 ? "" : "s"}
+        </span>
+      </div>
+
+      <DataTable
+        columns={columns}
+        data={filteredData}
+        searchKey="description"
+        searchPlaceholder="Search feedback..."
+        onRowClick={openFeedback}
+      />
+
+      <Dialog
+        open={selectedFeedback !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedFeedback(null);
+            replaceQuery({ item: null });
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Feedback detail</DialogTitle>
+          </DialogHeader>
+          {selectedFeedback && (
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="text-sm text-muted-foreground">Category</p>
+                  <p className="font-medium">
+                    {categoryLabels[selectedFeedback.category] ?? selectedFeedback.category}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <StatusBadge status={selectedFeedback.status} />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Submitted by</p>
+                  <p className="font-medium capitalize">{selectedFeedback.userRole}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Date</p>
+                  <p className="font-medium">{formatDate(selectedFeedback.createdAt)}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Description</p>
+                <p className="whitespace-pre-wrap text-sm">{selectedFeedback.description}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">User ID</p>
+                <p className="font-mono text-xs">{selectedFeedback.userId}</p>
+              </div>
+              <div className="flex justify-end">
+                <StatusActions
+                  row={selectedFeedback}
+                  onUpdate={handleStatusUpdate}
+                  loading={loading}
+                />
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

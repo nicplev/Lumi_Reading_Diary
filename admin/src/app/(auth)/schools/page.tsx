@@ -5,7 +5,13 @@ import { PageHeader } from "@/components/layout/page-header";
 import { listSchools } from "@/lib/firestore/schools";
 import { SchoolsTable } from "./schools-table";
 
-export default async function SchoolsPage() {
+export default async function SchoolsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
+  const { status } = await searchParams;
+  const initialStatus = status === "active" ? "active" : "all";
   const schools = await listSchools();
 
   return (
@@ -20,7 +26,7 @@ export default async function SchoolsPage() {
           </Button>
         }
       />
-      <SchoolsTable data={schools} />
+      <SchoolsTable data={schools} initialStatus={initialStatus} />
     </>
   );
 }

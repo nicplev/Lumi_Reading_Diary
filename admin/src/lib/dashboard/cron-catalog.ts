@@ -38,8 +38,8 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
   {
     name: "processPendingUserDeletions",
     label: "Pending user deletions",
-    scheduleLabel: "hourly",
-    staleAfterMs: 2.5 * HOUR,
+    scheduleLabel: "every 5 min",
+    staleAfterMs: 15 * MIN,
   },
   {
     name: "monitorImpersonationAnomalies",
@@ -52,6 +52,12 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
     label: "Audio retention cleanup",
     scheduleLabel: "daily 04:00 Syd",
     staleAfterMs: 26 * HOUR,
+  },
+  {
+    name: "cleanupPendingComprehensionAudio",
+    label: "Pending audio cleanup",
+    scheduleLabel: "every 24h",
+    staleAfterMs: 30 * HOUR,
   },
   {
     name: "sweepAiEvalJobs",
@@ -94,6 +100,24 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
     label: "Stats reconcile",
     scheduleLabel: "Sun 03:00 UTC",
     staleAfterMs: 8 * DAY,
+  },
+  {
+    name: "reconcileClassDailyReadingScheduled",
+    label: "Class daily-reading reconcile",
+    scheduleLabel: "Sun 04:30 Melb",
+    staleAfterMs: 8 * DAY,
+  },
+  {
+    name: "applyStateTermDates",
+    label: "State term-date fill",
+    scheduleLabel: "daily 03:45 Syd",
+    staleAfterMs: 26 * HOUR,
+  },
+  {
+    name: "refreshStreaksDaily",
+    label: "Daily streak refresh",
+    scheduleLabel: "daily 04:30 Syd",
+    staleAfterMs: 26 * HOUR,
   },
   {
     name: "topReaderAward",

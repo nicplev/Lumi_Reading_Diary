@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -9,6 +9,7 @@ import { DataTable } from "@/components/data-table/data-table";
 import type { OnboardingListItem } from "@/lib/firestore/onboarding";
 import { onboardingColumns } from "./onboarding-columns";
 import { NewRequestDialog } from "./new-request-dialog";
+import { Button } from "@/components/ui/button";
 
 const STAGES = [
   { value: "demo", label: "Demo", color: "bg-cyan-100 dark:bg-cyan-900" },
@@ -21,19 +22,39 @@ const STAGES = [
 
 interface OnboardingPipelineProps {
   requests: OnboardingListItem[];
+  initialView?: "leads";
 }
 
-export function OnboardingPipeline({ requests }: OnboardingPipelineProps) {
+export function OnboardingPipeline({
+  requests,
+  initialView,
+}: OnboardingPipelineProps) {
   const router = useRouter();
-  const [selectedStage, setSelectedStage] = useState<string | null>(null);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [selectedView, setSelectedView] = useState<string | null>(
+    initialView ?? null
+  );
   const [dragItem, setDragItem] = useState<string | null>(null);
 
   const getStageItems = (stage: string) =>
     requests.filter((r) => r.status === stage);
 
-  const filteredRequests = selectedStage
-    ? requests.filter((r) => r.status === selectedStage)
-    : requests;
+  const filteredRequests =
+    selectedView === "leads"
+      ? requests.filter((r) => r.status === "demo" || r.status === "interested")
+      : selectedView
+        ? requests.filter((r) => r.status === selectedView)
+        : requests;
+
+  const changeView = (view: string | null) => {
+    setSelectedView(view);
+    const params = new URLSearchParams(searchParams.toString());
+    if (view === "leads") params.set("view", "leads");
+    else params.delete("view");
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
 
   const handleDrop = async (targetStage: string) => {
     if (!dragItem || !targetStage) return;
@@ -64,7 +85,21 @@ export function OnboardingPipeline({ requests }: OnboardingPipelineProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Button
+            variant={selectedView === "leads" ? "default" : "outline"}
+            size="sm"
+            onClick={() => changeView(selectedView === "leads" ? null : "leads")}
+          >
+            Open leads ({requests.filter((r) => r.status === "demo" || r.status === "interested").length})
+          </Button>
+          {selectedView && selectedView !== "leads" && (
+            <Button variant="ghost" size="sm" onClick={() => changeView(null)}>
+              Show all
+            </Button>
+          )}
+        </div>
         <NewRequestDialog />
       </div>
 
@@ -75,10 +110,10 @@ export function OnboardingPipeline({ requests }: OnboardingPipelineProps) {
           return (
             <Card
               key={stage.value}
-              className={`cursor-pointer transition-all ${selectedStage === stage.value ? "ring-2 ring-primary" : ""}`}
+              className={`cursor-pointer transition-all ${selectedView === stage.value || (selectedView === "leads" && (stage.value === "demo" || stage.value === "interested")) ? "ring-2 ring-primary" : ""}`}
               onClick={() =>
-                setSelectedStage(
-                  selectedStage === stage.value ? null : stage.value
+                changeView(
+                  selectedView === stage.value ? null : stage.value
                 )
               }
               onDragOver={(e) => e.preventDefault()}
@@ -130,8 +165,10 @@ export function OnboardingPipeline({ requests }: OnboardingPipelineProps) {
       {/* Filtered Table */}
       <div>
         <h3 className="mb-3 text-lg font-medium">
-          {selectedStage
-            ? `${STAGES.find((s) => s.value === selectedStage)?.label} (${filteredRequests.length})`
+          {selectedView === "leads"
+            ? `Open Leads (${filteredRequests.length})`
+            : selectedView
+              ? `${STAGES.find((s) => s.value === selectedView)?.label} (${filteredRequests.length})`
             : `All Requests (${requests.length})`}
         </h3>
         <DataTable

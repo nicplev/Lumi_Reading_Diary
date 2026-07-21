@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BookOpen } from "lucide-react";
+import { safeRedirectTarget } from "@/lib/safe-redirect";
 
 type Stage = "password" | "mfa" | "enroll";
 
@@ -20,7 +21,7 @@ interface Enrollment {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") || "/";
+  const redirect = safeRedirectTarget(searchParams.get("redirect"));
 
   const [stage, setStage] = useState<Stage>("password");
   const [email, setEmail] = useState("");
@@ -56,7 +57,7 @@ function LoginForm() {
       const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
-        router.push(redirect);
+        router.replace(redirect);
         return;
       }
       if (data.status === "mfa_required") {
@@ -95,7 +96,7 @@ function LoginForm() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        router.push(redirect);
+        router.replace(redirect);
         return;
       }
       // A stale ID token (sign-in older than 5 min) means we must restart.

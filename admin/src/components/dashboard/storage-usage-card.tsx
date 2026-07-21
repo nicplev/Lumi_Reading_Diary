@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { HardDrive } from "lucide-react";
 import { SparkAreaChart } from "@tremor/react";
 import {
@@ -110,9 +111,12 @@ export function StorageUsageCard({ storage }: { storage: StorageSection }) {
                   key={school.schoolId}
                   className="flex items-center justify-between text-xs"
                 >
-                  <span className="truncate text-muted-foreground">
+                  <Link
+                    href={`/schools/${encodeURIComponent(school.schoolId)}`}
+                    className="truncate text-muted-foreground hover:text-foreground hover:underline"
+                  >
                     {school.schoolName}
-                  </span>
+                  </Link>
                   <span className="font-medium">
                     {formatBytes(school.bytes)}
                   </span>
@@ -135,6 +139,12 @@ export function StorageUsageCard({ storage }: { storage: StorageSection }) {
             </>
           )}
         </p>
+        <Link
+          href="/operations/feature-controls"
+          className="inline-flex text-xs font-medium text-primary hover:underline"
+        >
+          Manage retention and storage thresholds
+        </Link>
       </CardContent>
     </Card>
   );

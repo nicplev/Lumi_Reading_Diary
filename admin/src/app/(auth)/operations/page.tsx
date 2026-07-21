@@ -1,7 +1,17 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Download, Shield, FileText, Upload, KeyRound, Eye, Power } from "lucide-react";
+import {
+  Download,
+  Shield,
+  FileText,
+  Upload,
+  KeyRound,
+  Eye,
+  Power,
+  MailWarning,
+  Trash2,
+} from "lucide-react";
 
 export default function OperationsPage() {
   const tools = [
@@ -10,6 +20,18 @@ export default function OperationsPage() {
       description: "Download students, reading logs, and allocations as CSV.",
       href: "/operations/export",
       icon: Download,
+    },
+    {
+      title: "Delivery Incidents",
+      description: "Review failed email batches and safely retry failed recipients.",
+      href: "/operations/delivery",
+      icon: MailWarning,
+    },
+    {
+      title: "Deletion Operations",
+      description: "Monitor deletion jobs and manage active cooling-off periods.",
+      href: "/operations/deletions",
+      icon: Trash2,
     },
     {
       title: "Audit Log",

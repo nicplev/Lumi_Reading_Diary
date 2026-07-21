@@ -19,6 +19,8 @@ import {
   Wrench,
   CreditCard,
   FileText,
+  MailWarning,
+  Trash2,
 } from "lucide-react";
 import {
   Sidebar,
@@ -82,6 +84,8 @@ const navGroups = [
     label: "Operations",
     items: [
       { title: "Operations", href: "/operations", icon: Wrench },
+      { title: "Delivery Incidents", href: "/operations/delivery", icon: MailWarning },
+      { title: "Deletion Operations", href: "/operations/deletions", icon: Trash2 },
       { title: "Subscriptions", href: "/operations/subscriptions", icon: CreditCard },
       { title: "Invoicing", href: "/operations/invoicing", icon: FileText },
       { title: "Export Data", href: "/operations/export", icon: Download },

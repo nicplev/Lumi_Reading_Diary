@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -20,6 +21,7 @@ export function ActivityFeedTabs({
 }: {
   activity: DashboardPayload["activity"];
 }) {
+  const router = useRouter();
   // RecentActivityTable's columns format createdAt via formatDateTime,
   // which accepts either type — only the prop type wants a Date.
   const logs = activity.readingLogs.map((log) => ({
@@ -57,7 +59,15 @@ export function ActivityFeedTabs({
             </TableHeader>
             <TableBody>
               {activity.adminActions.map((entry) => (
-                <TableRow key={entry.id}>
+                <TableRow
+                  key={entry.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() =>
+                    router.push(
+                      `/operations/audit-log?event=${encodeURIComponent(entry.id)}`
+                    )
+                  }
+                >
                   <TableCell className="font-mono text-xs">
                     {entry.action}
                   </TableCell>

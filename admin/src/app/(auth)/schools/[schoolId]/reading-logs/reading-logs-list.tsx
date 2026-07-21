@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type ColumnDef } from "@tanstack/react-table";
 import { MessageSquare, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ interface ReadingLogsListProps {
   initialLogs: ReadingLogListItem[];
   classes: ClassListItem[];
   students: StudentListItem[];
+  initialDetailLog: ReadingLogDetail | null;
 }
 
 export function ReadingLogsList({
@@ -38,14 +40,18 @@ export function ReadingLogsList({
   initialLogs,
   classes,
   students,
+  initialDetailLog,
 }: ReadingLogsListProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [logs, setLogs] = useState(initialLogs);
   const [loading, setLoading] = useState(false);
   const [filterClassId, setFilterClassId] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [detailLog, setDetailLog] = useState<ReadingLogDetail | null>(null);
+  const [detailLog, setDetailLog] = useState<ReadingLogDetail | null>(initialDetailLog);
   const [detailLoading, setDetailLoading] = useState(false);
 
   const studentMap = new Map(
@@ -82,23 +88,18 @@ export function ReadingLogsList({
   const handleRowClick = async (log: ReadingLogListItem) => {
     setDetailLoading(true);
     setDetailLog(null);
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set("logId", log.id);
+    router.replace(`${pathname}?${nextParams.toString()}`, { scroll: false });
     try {
-      // Fetch full detail - use the list item data + fetch detail via GET with the log ID
-      // Since we don't have a single-log GET endpoint, we'll construct from list data
-      setDetailLog({
-        ...log,
-        notes: undefined,
-        photoUrls: [],
-        syncedAt: undefined,
-        allocationId: undefined,
-        parentComment: undefined,
-        parentCommentSelections: [],
-        parentCommentFreeText: undefined,
-        teacherComment: undefined,
-        commentedAt: undefined,
-        commentedBy: undefined,
-        metadata: undefined,
-      });
+      const response = await fetch(
+        `/api/schools/${encodeURIComponent(schoolId)}/reading-logs/${encodeURIComponent(log.id)}`
+      );
+      if (!response.ok) throw new Error("Failed to load reading log");
+      const body = await response.json();
+      setDetailLog(body.log);
+    } catch {
+      setDetailLog(null);
     } finally {
       setDetailLoading(false);
     }
@@ -242,7 +243,15 @@ export function ReadingLogsList({
       <Dialog
         open={!!detailLog}
         onOpenChange={(open) => {
-          if (!open) setDetailLog(null);
+          if (!open) {
+            setDetailLog(null);
+            const nextParams = new URLSearchParams(searchParams.toString());
+            nextParams.delete("logId");
+            const query = nextParams.toString();
+            router.replace(query ? `${pathname}?${query}` : pathname, {
+              scroll: false,
+            });
+          }
         }}
       >
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">

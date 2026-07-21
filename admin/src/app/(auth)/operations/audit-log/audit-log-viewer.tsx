@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type ColumnDef } from "@tanstack/react-table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,25 +24,40 @@ import type { AuditLogEntry } from "@/lib/firestore/audit-log";
 
 interface AuditLogViewerProps {
   initialLogs: AuditLogEntry[];
+  initialEventId?: string;
 }
 
-const targetTypes = [
-  "all",
-  "school",
-  "schoolUser",
-  "student",
-  "class",
-  "book",
-  "allocation",
-  "linkCode",
-  "schoolCode",
-  "onboarding",
-];
-
-export function AuditLogViewer({ initialLogs }: AuditLogViewerProps) {
+export function AuditLogViewer({
+  initialLogs,
+  initialEventId,
+}: AuditLogViewerProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [filterType, setFilterType] = useState("all");
   const [searchEmail, setSearchEmail] = useState("");
-  const [detailLog, setDetailLog] = useState<AuditLogEntry | null>(null);
+  const [detailLog, setDetailLog] = useState<AuditLogEntry | null>(
+    initialLogs.find((log) => log.id === initialEventId) ?? null
+  );
+  const targetTypes = [
+    "all",
+    ...new Set(initialLogs.map((log) => log.targetType).filter(Boolean)),
+  ];
+
+  const openDetail = (log: AuditLogEntry) => {
+    setDetailLog(log);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("event", log.id);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  const closeDetail = () => {
+    setDetailLog(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("event");
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
 
   const filtered = initialLogs.filter((log) => {
     if (filterType !== "all" && log.targetType !== filterType) return false;
@@ -133,13 +149,13 @@ export function AuditLogViewer({ initialLogs }: AuditLogViewerProps) {
         data={filtered}
         searchKey="action"
         searchPlaceholder="Search actions..."
-        onRowClick={setDetailLog}
+        onRowClick={openDetail}
       />
 
       <Dialog
         open={!!detailLog}
         onOpenChange={(open) => {
-          if (!open) setDetailLog(null);
+          if (!open) closeDetail();
         }}
       >
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">

@@ -3,6 +3,7 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 import { getComprehensionRetentionConfig } from "@lumi/server-ops";
 import { CRON_CATALOG } from "@/lib/dashboard/cron-catalog";
+import { ATTENTION_ROUTES } from "@/lib/dashboard/attention-routes";
 import type {
   ActivityLogItem,
   AdminActionItem,
@@ -105,7 +106,9 @@ async function readActivity(schools: SchoolRef[], now: Date) {
         if (key === today) logsToday += 1;
         if (created.getTime() >= sevenDaysAgo) {
           logsThisWeek += 1;
-          if (data.studentId) weeklyActive.add(String(data.studentId));
+          if (data.studentId) {
+            weeklyActive.add(`${school.id}:${String(data.studentId)}`);
+          }
         } else {
           logsLastWeek += 1;
         }
@@ -287,8 +290,6 @@ async function readAttention(
   schools: SchoolRef[],
   now: Date
 ): Promise<AttentionItem[]> {
-  const sevenDaysAgo = now.getTime() - 7 * DAY_MS;
-
   let failedCampaigns = 0;
   let failedEmails = 0;
   let invalidLogs = 0;
@@ -300,32 +301,35 @@ async function readAttention(
           school.ref
             .collection("notificationCampaigns")
             .where("status", "in", ["failed", "partial"])
-            .select("createdAt")
+            .select("attentionStatus")
             .get(),
           school.ref
             .collection("parentOnboardingEmails")
-            .where("status", "==", "failed")
-            .count()
+            .where("status", "in", ["failed", "partial"])
+            .select("attentionStatus")
             .get(),
           school.ref
             .collection("staffOnboardingEmails")
-            .where("status", "==", "failed")
-            .count()
+            .where("status", "in", ["failed", "partial"])
+            .select("attentionStatus")
             .get(),
           school.ref
             .collection("readingLogs")
             .where("validationStatus", "==", "invalid")
-            .count()
+            .select("validationReviewStatus")
             .get(),
         ]);
 
-      failedCampaigns += campaignsSnap.docs.filter((doc) => {
-        const created = doc.data().createdAt?.toDate?.() as Date | undefined;
-        return created ? created.getTime() >= sevenDaysAgo : true;
-      }).length;
-      failedEmails +=
-        parentEmails.data().count + staffEmails.data().count;
-      invalidLogs += invalidSnap.data().count;
+      const isOpen = (doc: FirebaseFirestore.QueryDocumentSnapshot) => {
+        const status = doc.data().attentionStatus;
+        return status !== "resolved" && status !== "retried";
+      };
+      failedCampaigns += campaignsSnap.docs.filter(isOpen).length;
+      failedEmails += parentEmails.docs.filter(isOpen).length;
+      failedEmails += staffEmails.docs.filter(isOpen).length;
+      invalidLogs += invalidSnap.docs.filter(
+        (doc) => doc.data().validationReviewStatus !== "acknowledged"
+      ).length;
     })
   );
 
@@ -335,6 +339,7 @@ async function readAttention(
     newFeedback,
     newLeads,
     pendingDeletions,
+    failedDeletionJobs,
   ] = await Promise.all([
     perSchool,
     // orderBy(createdAt) routes this through the existing
@@ -352,58 +357,80 @@ async function readAttention(
       .where("status", "in", ["demo", "interested"])
       .count()
       .get(),
-    db.collection("pendingUserDeletions").count().get(),
+    db.collection("pendingUserDeletions").select("scheduledDeletionAt").get(),
+    db
+      .collection("deletionJobs")
+      .where("status", "==", "failed")
+      .select("attemptCount")
+      .get(),
   ]);
+
+  const coolingOffDeletions = pendingDeletions.docs.filter((doc) => {
+    const scheduled = doc.data().scheduledDeletionAt?.toDate?.() as
+      | Date
+      | undefined;
+    return scheduled ? scheduled.getTime() > now.getTime() : false;
+  }).length;
+  const manualReviewDeletions = failedDeletionJobs.docs.filter(
+    (doc) => Number(doc.data().attemptCount ?? 0) >= 5
+  ).length;
 
   const items: AttentionItem[] = [
     {
       key: "failedCampaigns",
       severity: "error" as const,
       count: failedCampaigns,
-      label: "notification campaign(s) failed or partial in the last 7 days",
-      href: "/schools",
+      label: "notification campaign delivery incident(s) open",
+      href: ATTENTION_ROUTES.failedCampaigns,
     },
     {
       key: "failedOnboardingEmails",
       severity: "error" as const,
       count: failedEmails,
-      label: "onboarding email(s) failed to send",
-      href: "/schools",
+      label: "onboarding email batch(es) with delivery failures",
+      href: ATTENTION_ROUTES.failedOnboardingEmails,
     },
     {
       key: "invalidReadingLogs",
       severity: "warn" as const,
       count: invalidLogs,
       label: "reading log(s) flagged invalid by validation",
-      href: "/reading-logs",
+      href: ATTENTION_ROUTES.invalidReadingLogs,
     },
     {
       key: "pendingDeletionRequests",
       severity: "warn" as const,
       count: deletionRequests.data().count,
       label: "community-book deletion request(s) awaiting review",
-      href: "/community-books",
+      href: ATTENTION_ROUTES.pendingDeletionRequests,
     },
     {
       key: "newFeedback",
       severity: "info" as const,
       count: newFeedback.data().count,
       label: "new feedback item(s) to triage",
-      href: "/feedback",
+      href: ATTENTION_ROUTES.newFeedback,
     },
     {
       key: "newLeads",
       severity: "info" as const,
       count: newLeads.data().count,
-      label: "new onboarding lead(s) (demo / interested)",
-      href: "/onboarding",
+      label: "open onboarding lead(s) (demo / interested)",
+      href: ATTENTION_ROUTES.newLeads,
     },
     {
       key: "pendingUserDeletions",
       severity: "info" as const,
-      count: pendingDeletions.data().count,
-      label: "user deletion(s) in the 24h cool-off queue",
-      href: "/operations",
+      count: coolingOffDeletions,
+      label: "user deletion(s) in the 24h cooling-off period",
+      href: ATTENTION_ROUTES.pendingUserDeletions,
+    },
+    {
+      key: "failedDeletionJobs",
+      severity: "error" as const,
+      count: manualReviewDeletions,
+      label: "deletion job(s) exhausted automatic retries",
+      href: ATTENTION_ROUTES.failedDeletionJobs,
     },
   ];
 
@@ -456,7 +483,7 @@ async function readActivityFeeds(): Promise<DashboardPayload["activity"]> {
           : item.description,
       status: item.status,
       createdAt: item.createdAt,
-      href: "/feedback",
+      href: `/feedback?status=${encodeURIComponent(item.status)}&item=${encodeURIComponent(item.id)}`,
     })),
   ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 

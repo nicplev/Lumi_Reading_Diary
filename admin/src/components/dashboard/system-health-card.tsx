@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -98,6 +99,12 @@ export function SystemHealthCard({ health }: { health: HealthSection }) {
             </div>
           ))}
         </div>
+        <Link
+          href="/operations/feature-controls"
+          className="inline-flex text-xs font-medium text-primary hover:underline"
+        >
+          Manage feature controls
+        </Link>
       </CardContent>
     </Card>
   );

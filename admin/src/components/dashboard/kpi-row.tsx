@@ -25,29 +25,34 @@ export function KpiRow({ kpis }: { kpis: DashboardKpis }) {
         value={kpis.activeSchools}
         icon={School}
         description={`${kpis.onboardingInProgress} in onboarding pipeline`}
+        href="/schools?status=active"
       />
       <StatCard
         title="Active Students"
         value={kpis.activeStudents}
         icon={Users}
+        href="/students?status=active"
       />
       <StatCard
         title="Logs Today"
         value={kpis.logsToday}
         icon={Flame}
         description="Sydney calendar day"
+        href="/reading-logs?period=today"
       />
       <StatCard
         title="Logs This Week"
         value={kpis.logsThisWeek}
         icon={BookOpen}
         delta={weekDelta(kpis)}
+        href="/reading-logs?period=7d"
       />
       <StatCard
         title="Active Readers (7d)"
         value={kpis.weeklyActiveStudents}
         icon={Activity}
         description="Students with ≥1 log"
+        href="/reading-logs?period=7d"
       />
     </div>
   );
