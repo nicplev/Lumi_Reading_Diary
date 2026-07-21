@@ -326,71 +326,20 @@ export async function applyStudentStatsDelta(
   // Neither the stats nor the view aggregates can change — bail.
   if (!beforeCounted && !afterCounted && !aggregatesRelevant) return;
 
-  const studentSnap = await studentRef.get();
-  const studentData = studentSnap.data() ?? {};
-  const stats = studentData.stats ?? {};
-
-  // Self-heal: first-ever trigger for this student in incremental mode.
-  // Run the full recompute once to seed the readingDates array (and the view
-  // aggregates, which the reconcile now writes too). Pass the school data we
-  // already read so the fallback doesn't re-read it.
-  if (!Array.isArray(stats.readingDates)) {
-    await reconcileStudentStats(schoolId, studentId, schoolData);
-    return;
-  }
-
   const today = localDateString(new Date(), tz);
+  const changedLogId = change.after.exists ? change.after.id : change.before.id;
 
-  // ── View aggregates (feelingsByDay / latestParentComment) ─────────────
-  const aggregateUpdates: Record<string, unknown> = {};
-  if (aggregatesRelevant) {
-    const storedFeelings =
-      (studentData.feelingsByDay as
-        Record<string, Record<string, number>> | undefined) ?? {};
-    aggregateUpdates["feelingsByDay"] =
-      applyFeelingsDelta(storedFeelings, before, after, tz, today);
-
-    const stored = studentData.latestParentComment as
-      {logId?: string; date?: admin.firestore.Timestamp} | null | undefined;
-    const changedLogId = change.after.exists ? change.after.id : change.before.id;
-    const afterContent = extractParentCommentContent(after);
-    const afterDate = after?.date as admin.firestore.Timestamp | undefined;
-
-    if (
-      after && afterContent && afterDate &&
-      (!stored?.date || afterDate.toMillis() >= stored.date.toMillis() ||
-        stored.logId === changedLogId)
-    ) {
-      // Newest comment (or an edit to the currently-stored one) — set it.
-      const parentName = await resolveParentName(
-        db, schoolId,
-        typeof after.parentId === "string" ? after.parentId : null,
-      );
-      aggregateUpdates["latestParentComment"] =
-        buildLatestParentComment(changedLogId, after, parentName);
-    } else if (stored?.logId === changedLogId && (!after || !afterContent)) {
-      // The stored latest lost its content (or was deleted) — bounded
-      // recompute finds the next-newest commented log.
-      const recomputed =
-        await recomputeStudentViewAggregates(db, schoolId, studentId, tz);
-      aggregateUpdates["latestParentComment"] = recomputed.latestParentComment;
-    }
-  }
-
-  // Aggregate-only writes (e.g. a feeling edit on an uncounted log) skip the
-  // stats math entirely.
-  if (!beforeCounted && !afterCounted) {
-    if (Object.keys(aggregateUpdates).length > 0) {
-      await studentRef.update(aggregateUpdates);
-    }
-    return;
-  }
-
-  const readingDates = new Set<string>(stats.readingDates as string[]);
+  // ── Pre-transaction reads ────────────────────────────────────────────
+  // Everything below reads collections OTHER than the student doc, so it is
+  // resolved before the transaction opens: a Firestore transaction must issue
+  // all of its reads through `tx`, and re-running these on every retry would
+  // multiply the read cost. None of them depend on the student's current
+  // stats, only on the log change itself.
 
   // Date may disappear if either: (a) log was counted before and isn't now,
-  // or (b) log moved to a different date. Only remove if no other counted
-  // log for this student is on that date.
+  // or (b) log moved to a different date. Only drop it if no other counted
+  // log for this student shares that date.
+  let dropBeforeDate = false;
   if (
     beforeCounted &&
     (!afterCounted || beforeCounted.localDate !== afterCounted.localDate)
@@ -407,62 +356,152 @@ export async function applyStudentStatsDelta(
       .limit(1)
       .count()
       .get();
-    if (others.data().count === 0) {
+    dropBeforeDate = others.data().count === 0;
+  }
+
+  // View-aggregate inputs that need I/O. Which one the transaction actually
+  // uses depends on the stored `latestParentComment`, which isn't known until
+  // the transactional read — so resolve whichever branch could apply. The two
+  // conditions are mutually exclusive on `afterContent`, so at most one runs.
+  const afterContent = extractParentCommentContent(after);
+  const afterDate = after?.date as admin.firestore.Timestamp | undefined;
+  let parentName = "Parent"; // resolveParentName's own fallback
+  let fallbackLatestComment: unknown = undefined;
+  if (aggregatesRelevant) {
+    if (after && afterContent && afterDate) {
+      parentName = await resolveParentName(
+        db, schoolId,
+        typeof after.parentId === "string" ? after.parentId : null,
+      );
+    } else {
+      const recomputed =
+        await recomputeStudentViewAggregates(db, schoolId, studentId, tz);
+      fallbackLatestComment = recomputed.latestParentComment;
+    }
+  }
+
+  // ── Transactional read-modify-write ──────────────────────────────────
+  // The stats are an accumulator: read totals, add a delta, write back. Doing
+  // that non-transactionally loses increments whenever two logs for the same
+  // student are written close together — a batched import, or an offline
+  // parent whose queued logs all flush on reconnect. Firestore retries the
+  // transaction on contention, so concurrent triggers serialise instead of
+  // clobbering each other.
+  let needsReconcile = false;
+
+  await db.runTransaction(async (tx) => {
+    const studentSnap = await tx.get(studentRef);
+    const studentData = studentSnap.data() ?? {};
+    const stats = studentData.stats ?? {};
+
+    // Self-heal: first-ever trigger for this student in incremental mode.
+    // reconcileStudentStats does its own writes, so it can't run inside the
+    // transaction — flag it and run it after this one commits.
+    if (!Array.isArray(stats.readingDates)) {
+      needsReconcile = true;
+      return;
+    }
+
+    // ── View aggregates (feelingsByDay / latestParentComment) ───────────
+    const aggregateUpdates:
+      FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData> = {};
+    if (aggregatesRelevant) {
+      const storedFeelings =
+        (studentData.feelingsByDay as
+          Record<string, Record<string, number>> | undefined) ?? {};
+      aggregateUpdates["feelingsByDay"] =
+        applyFeelingsDelta(storedFeelings, before, after, tz, today);
+
+      const stored = studentData.latestParentComment as
+        {logId?: string; date?: admin.firestore.Timestamp} | null | undefined;
+
+      if (
+        after && afterContent && afterDate &&
+        (!stored?.date || afterDate.toMillis() >= stored.date.toMillis() ||
+          stored.logId === changedLogId)
+      ) {
+        // Newest comment (or an edit to the currently-stored one) — set it.
+        aggregateUpdates["latestParentComment"] =
+          buildLatestParentComment(changedLogId, after, parentName);
+      } else if (
+        stored?.logId === changedLogId && (!after || !afterContent) &&
+        fallbackLatestComment !== undefined
+      ) {
+        // The stored latest lost its content (or was deleted) — the bounded
+        // recompute above found the next-newest commented log.
+        aggregateUpdates["latestParentComment"] = fallbackLatestComment;
+      }
+    }
+
+    // Aggregate-only writes (e.g. a feeling edit on an uncounted log) skip
+    // the stats math entirely.
+    if (!beforeCounted && !afterCounted) {
+      if (Object.keys(aggregateUpdates).length > 0) {
+        tx.update(studentRef, aggregateUpdates);
+      }
+      return;
+    }
+
+    const readingDates = new Set<string>(stats.readingDates as string[]);
+    if (dropBeforeDate && beforeCounted) {
       readingDates.delete(beforeCounted.localDate);
     }
-  }
-
-  if (afterCounted) {
-    readingDates.add(afterCounted.localDate);
-  }
-
-  const deltaMinutes =
-    (afterCounted?.minutes ?? 0) - (beforeCounted?.minutes ?? 0);
-  const deltaBooks =
-    (afterCounted?.books ?? 0) - (beforeCounted?.books ?? 0);
-
-  const {currentStreak, restDaysRemaining} =
-    computeGentleStreak(readingDates, today, MAX_REST_DAYS, isCountingDay);
-  const longestStreak = Math.max(
-    Number(stats.longestStreak) || 0,
-    computeLongestStreak(readingDates),
-    currentStreak,
-  );
-
-  const newTotalMinutes = Math.max(0, (Number(stats.totalMinutesRead) || 0) + deltaMinutes);
-  const newTotalBooks = Math.max(0, (Number(stats.totalBooksRead) || 0) + deltaBooks);
-  const totalReadingDays = readingDates.size;
-  const averageMinutesPerDay =
-    totalReadingDays > 0 ? newTotalMinutes / totalReadingDays : 0;
-
-  // lastReadingDate: max(prior, after). On deletes we leave it alone — the
-  // weekly reconciler will correct any drift if a delete trimmed the
-  // most-recent log.
-  let lastReadingDate = stats.lastReadingDate ?? null;
-  if (afterCounted) {
-    if (
-      !lastReadingDate ||
-      afterCounted.date.toMillis() > lastReadingDate.toMillis()
-    ) {
-      lastReadingDate = afterCounted.date;
+    if (afterCounted) {
+      readingDates.add(afterCounted.localDate);
     }
-  }
 
-  await studentRef.update({
-    ...aggregateUpdates,
-    "stats.totalMinutesRead": newTotalMinutes,
-    "stats.totalBooksRead": newTotalBooks,
-    "stats.currentStreak": currentStreak,
-    "stats.longestStreak": longestStreak,
-    "stats.lastReadingDate": lastReadingDate,
-    "stats.averageMinutesPerDay": Math.round(averageMinutesPerDay * 10) / 10,
-    "stats.totalReadingDays": totalReadingDays,
-    "stats.last30DaysCount": countInWindow(readingDates, today, 30),
-    "stats.last50DaysCount": countInWindow(readingDates, today, 50),
-    "stats.restDaysRemaining": restDaysRemaining,
-    "stats.readingDates": [...readingDates].sort(),
-    "stats.lastUpdated": admin.firestore.FieldValue.serverTimestamp(),
+    const deltaMinutes =
+      (afterCounted?.minutes ?? 0) - (beforeCounted?.minutes ?? 0);
+    const deltaBooks =
+      (afterCounted?.books ?? 0) - (beforeCounted?.books ?? 0);
+
+    const {currentStreak, restDaysRemaining} =
+      computeGentleStreak(readingDates, today, MAX_REST_DAYS, isCountingDay);
+    const longestStreak = Math.max(
+      Number(stats.longestStreak) || 0,
+      computeLongestStreak(readingDates),
+      currentStreak,
+    );
+
+    const newTotalMinutes = Math.max(0, (Number(stats.totalMinutesRead) || 0) + deltaMinutes);
+    const newTotalBooks = Math.max(0, (Number(stats.totalBooksRead) || 0) + deltaBooks);
+    const totalReadingDays = readingDates.size;
+    const averageMinutesPerDay =
+      totalReadingDays > 0 ? newTotalMinutes / totalReadingDays : 0;
+
+    // lastReadingDate: max(prior, after). On deletes we leave it alone — the
+    // weekly reconciler will correct any drift if a delete trimmed the
+    // most-recent log.
+    let lastReadingDate = stats.lastReadingDate ?? null;
+    if (afterCounted) {
+      if (
+        !lastReadingDate ||
+        afterCounted.date.toMillis() > lastReadingDate.toMillis()
+      ) {
+        lastReadingDate = afterCounted.date;
+      }
+    }
+
+    tx.update(studentRef, {
+      ...aggregateUpdates,
+      "stats.totalMinutesRead": newTotalMinutes,
+      "stats.totalBooksRead": newTotalBooks,
+      "stats.currentStreak": currentStreak,
+      "stats.longestStreak": longestStreak,
+      "stats.lastReadingDate": lastReadingDate,
+      "stats.averageMinutesPerDay": Math.round(averageMinutesPerDay * 10) / 10,
+      "stats.totalReadingDays": totalReadingDays,
+      "stats.last30DaysCount": countInWindow(readingDates, today, 30),
+      "stats.last50DaysCount": countInWindow(readingDates, today, 50),
+      "stats.restDaysRemaining": restDaysRemaining,
+      "stats.readingDates": [...readingDates].sort(),
+      "stats.lastUpdated": admin.firestore.FieldValue.serverTimestamp(),
+    });
   });
+
+  if (needsReconcile) {
+    await reconcileStudentStats(schoolId, studentId, schoolData);
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -585,15 +624,6 @@ export async function applyClassStatsDelta(
   if (!classId || typeof classId !== "string") return;
 
   const classRef = db.doc(`schools/${schoolId}/classes/${classId}`);
-  const classSnap = await classRef.get();
-  if (!classSnap.exists) return;
-
-  // Self-heal: if activeStudentIds isn't populated, fall back to full recompute.
-  const stats = classSnap.data()?.stats ?? {};
-  if (!Array.isArray(stats.activeStudentIds)) {
-    await reconcileClassStats(schoolId, classId);
-    return;
-  }
 
   const beforeCounted =
     before && COUNTED_STATUSES.includes(String(before.status ?? "")) &&
@@ -617,14 +647,11 @@ export async function applyClassStatsDelta(
   const deltaMinutes = (afterCounted?.minutes ?? 0) - (beforeCounted?.minutes ?? 0);
   const deltaBooks = (afterCounted?.books ?? 0) - (beforeCounted?.books ?? 0);
 
-  const activeStudentIds = new Set<string>(stats.activeStudentIds as string[]);
-  let activeStudentIdsChanged = false;
-
-  if (afterCounted && !activeStudentIds.has(studentId)) {
-    activeStudentIds.add(studentId);
-    activeStudentIdsChanged = true;
-  } else if (!afterCounted && beforeCounted) {
-    // Removing the last counted log for this student in this class?
+  // Pre-transaction read: does this student still have any counted log after
+  // this change? Reads readingLogs, not the class doc, so it stays outside the
+  // transaction (see applyStudentStatsDelta for the full rationale).
+  let studentHasNoRemainingLogs = false;
+  if (!afterCounted && beforeCounted) {
     const others = await db
       .collection(`schools/${schoolId}/readingLogs`)
       .where("studentId", "==", studentId)
@@ -633,26 +660,59 @@ export async function applyClassStatsDelta(
       .limit(1)
       .count()
       .get();
-    if (others.data().count === 0 && activeStudentIds.has(studentId)) {
+    studentHasNoRemainingLogs = others.data().count === 0;
+  }
+
+  // Class totals accumulate the same way student stats do, so they lose
+  // increments under the same concurrency. Every log written for any student
+  // in the class contends here, making this the hotter of the two documents.
+  let needsReconcile = false;
+
+  await db.runTransaction(async (tx) => {
+    const classSnap = await tx.get(classRef);
+    if (!classSnap.exists) return;
+
+    // Self-heal: if activeStudentIds isn't populated, fall back to full
+    // recompute (which writes, so it runs after this transaction commits).
+    const stats = classSnap.data()?.stats ?? {};
+    if (!Array.isArray(stats.activeStudentIds)) {
+      needsReconcile = true;
+      return;
+    }
+
+    const activeStudentIds = new Set<string>(stats.activeStudentIds as string[]);
+    let activeStudentIdsChanged = false;
+
+    if (afterCounted && !activeStudentIds.has(studentId)) {
+      activeStudentIds.add(studentId);
+      activeStudentIdsChanged = true;
+    } else if (
+      studentHasNoRemainingLogs && activeStudentIds.has(studentId)
+    ) {
       activeStudentIds.delete(studentId);
       activeStudentIdsChanged = true;
     }
+
+    const newTotalMinutes = Math.max(0, (Number(stats.totalMinutesRead) || 0) + deltaMinutes);
+    const newTotalBooks = Math.max(0, (Number(stats.totalBooksRead) || 0) + deltaBooks);
+
+    const update:
+      FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData> = {
+        "stats.totalMinutesRead": newTotalMinutes,
+        "stats.totalBooksRead": newTotalBooks,
+        "stats.lastUpdated": admin.firestore.FieldValue.serverTimestamp(),
+      };
+    if (activeStudentIdsChanged) {
+      update["stats.activeStudents"] = activeStudentIds.size;
+      update["stats.activeStudentIds"] = [...activeStudentIds].sort();
+    }
+
+    tx.update(classRef, update);
+  });
+
+  if (needsReconcile) {
+    await reconcileClassStats(schoolId, classId);
   }
-
-  const newTotalMinutes = Math.max(0, (Number(stats.totalMinutesRead) || 0) + deltaMinutes);
-  const newTotalBooks = Math.max(0, (Number(stats.totalBooksRead) || 0) + deltaBooks);
-
-  const update: Record<string, unknown> = {
-    "stats.totalMinutesRead": newTotalMinutes,
-    "stats.totalBooksRead": newTotalBooks,
-    "stats.lastUpdated": admin.firestore.FieldValue.serverTimestamp(),
-  };
-  if (activeStudentIdsChanged) {
-    update["stats.activeStudents"] = activeStudentIds.size;
-    update["stats.activeStudentIds"] = [...activeStudentIds].sort();
-  }
-
-  await classRef.update(update);
 }
 
 // ──────────────────────────────────────────────────────────────────────
