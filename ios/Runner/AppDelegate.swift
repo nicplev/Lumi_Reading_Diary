@@ -4,6 +4,8 @@ import FirebaseAuth
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
+  private var bluetoothSettingsChannel: FlutterMethodChannel?
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -32,6 +34,34 @@ import FirebaseAuth
       HidKeyboardChannel.register(with: registrar)
     } else {
       NSLog("[HidKeyboard] SKIPPED registration: registrar(forPlugin:) returned nil")
+    }
+    if let registrar = self.registrar(forPlugin: "BluetoothSettingsChannel") {
+      let channel = FlutterMethodChannel(
+        name: "lumi/bluetooth_settings",
+        binaryMessenger: registrar.messenger()
+      )
+      channel.setMethodCallHandler { call, result in
+        guard call.method == "openBluetoothSettings" else {
+          result(FlutterMethodNotImplemented)
+          return
+        }
+
+        // UIKit only publishes an app-specific Settings URL; using it here is
+        // what previously sent teachers to Lumi's permissions page. The
+        // Bluetooth subpath below is best-effort: current iOS versions may
+        // ignore the subpath and show Settings home, so Flutter presents the
+        // one remaining "tap Bluetooth" instruction before opening it.
+        guard let settingsURL = URL(string: "App-Prefs:root=Bluetooth") else {
+          result("unavailable")
+          return
+        }
+        UIApplication.shared.open(settingsURL, options: [:]) { opened in
+          result(opened ? "systemSettings" : "unavailable")
+        }
+      }
+      bluetoothSettingsChannel = channel
+    } else {
+      NSLog("[BluetoothSettings] SKIPPED registration: registrar(forPlugin:) returned nil")
     }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }

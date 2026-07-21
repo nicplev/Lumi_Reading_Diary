@@ -8,6 +8,7 @@ import 'package:lumi_reading_tracker/data/models/class_model.dart';
 import 'package:lumi_reading_tracker/data/models/student_model.dart';
 import 'package:lumi_reading_tracker/data/models/user_model.dart';
 import 'package:lumi_reading_tracker/screens/teacher/kiosk/kiosk_scan_session_screen.dart';
+import 'package:lumi_reading_tracker/services/bluetooth_settings_service.dart';
 import 'package:lumi_reading_tracker/services/hid_scanner_connection_service.dart';
 import 'package:lumi_reading_tracker/services/isbn_assignment_service.dart';
 
@@ -132,6 +133,57 @@ void main() {
 
     expect(find.text('Connect your scanner'), findsOneWidget);
   });
+
+  testWidgets('Android opens the native Bluetooth device settings directly',
+      (tester) async {
+    final service = _QueueTestIsbnService(gateFirstLookup: false);
+    final hid = _FakeHidScannerConnectionService(false);
+    final bluetooth = _FakeBluetoothSettingsController();
+    addTearDown(hid.dispose);
+    await _pumpScreen(
+      tester,
+      service: service,
+      hid: hid,
+      bluetooth: bluetooth,
+      platform: TargetPlatform.android,
+    );
+
+    await tester.tap(find.text('Open Bluetooth settings'));
+    await tester.pumpAndSettle();
+
+    expect(bluetooth.openCalls, 1);
+    expect(find.text('Open Bluetooth on this device'), findsNothing);
+  });
+
+  testWidgets('iOS explains the final Bluetooth tap before opening Settings',
+      (tester) async {
+    final service = _QueueTestIsbnService(gateFirstLookup: false);
+    final hid = _FakeHidScannerConnectionService(false);
+    final bluetooth = _FakeBluetoothSettingsController(
+      destination: BluetoothSettingsDestination.systemSettings,
+    );
+    addTearDown(hid.dispose);
+    await _pumpScreen(
+      tester,
+      service: service,
+      hid: hid,
+      bluetooth: bluetooth,
+      platform: TargetPlatform.iOS,
+    );
+
+    await tester.tap(find.text('Open Bluetooth settings'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Open Bluetooth on this device'), findsOneWidget);
+    expect(find.textContaining('tap Bluetooth'), findsOneWidget);
+    expect(bluetooth.openCalls, 0);
+
+    await tester.tap(find.text('Open Settings'));
+    await tester.pumpAndSettle();
+
+    expect(bluetooth.openCalls, 1);
+    expect(find.text('Open Bluetooth on this device'), findsNothing);
+  });
 }
 
 class _QueueTestIsbnService extends IsbnAssignmentService {
@@ -222,10 +274,27 @@ class _FakeHidScannerConnectionService extends HidScannerConnectionService {
   Future<void> dispose() => _controller.close();
 }
 
+class _FakeBluetoothSettingsController implements BluetoothSettingsController {
+  _FakeBluetoothSettingsController({
+    this.destination = BluetoothSettingsDestination.bluetooth,
+  });
+
+  final BluetoothSettingsDestination destination;
+  int openCalls = 0;
+
+  @override
+  Future<BluetoothSettingsDestination> openBluetoothSettings() async {
+    openCalls += 1;
+    return destination;
+  }
+}
+
 Future<void> _pumpScreen(
   WidgetTester tester, {
   required IsbnAssignmentService service,
   required HidScannerConnectionService hid,
+  BluetoothSettingsController? bluetooth,
+  TargetPlatform? platform,
 }) async {
   await tester.binding.setSurfaceSize(const Size(430, 900));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -257,12 +326,14 @@ Future<void> _pumpScreen(
 
   await tester.pumpWidget(
     MaterialApp(
+      theme: platform == null ? null : ThemeData(platform: platform),
       home: KioskScanSessionScreen(
         teacher: teacher,
         classModel: classModel,
         student: student,
         isbnAssignmentService: service,
         hidScannerConnectionService: hid,
+        bluetoothSettingsController: bluetooth,
       ),
     ),
   );

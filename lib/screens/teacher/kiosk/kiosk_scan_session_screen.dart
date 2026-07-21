@@ -5,8 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/utils/image_decode.dart';
 import '../../../core/widgets/common_widgets.dart';
@@ -14,6 +12,7 @@ import '../../../core/widgets/lumi/student_avatar.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/student_model.dart';
 import '../../../data/models/user_model.dart';
+import '../../../services/bluetooth_settings_service.dart';
 import '../../../services/hid_scanner_connection_service.dart';
 import '../../../services/isbn_assignment_service.dart';
 import '../../../theme/lumi_tokens.dart';
@@ -51,6 +50,7 @@ class KioskScanSessionScreen extends StatefulWidget {
     required this.student,
     @visibleForTesting this.isbnAssignmentService,
     @visibleForTesting this.hidScannerConnectionService,
+    @visibleForTesting this.bluetoothSettingsController,
   });
 
   final UserModel teacher;
@@ -58,6 +58,7 @@ class KioskScanSessionScreen extends StatefulWidget {
   final StudentModel student;
   final IsbnAssignmentService? isbnAssignmentService;
   final HidScannerConnectionService? hidScannerConnectionService;
+  final BluetoothSettingsController? bluetoothSettingsController;
 
   @override
   State<KioskScanSessionScreen> createState() => _KioskScanSessionScreenState();
@@ -66,6 +67,7 @@ class KioskScanSessionScreen extends StatefulWidget {
 class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
   late final IsbnAssignmentService _service;
   late final HidScannerConnectionService _hidScannerConnectionService;
+  late final BluetoothSettingsController _bluetoothSettingsController;
   final FocusNode _keyboardFocus = FocusNode();
   final StringBuffer _wedgeBuffer = StringBuffer();
 
@@ -108,6 +110,8 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
     _service = widget.isbnAssignmentService ?? IsbnAssignmentService();
     _hidScannerConnectionService =
         widget.hidScannerConnectionService ?? HidScannerConnectionService();
+    _bluetoothSettingsController =
+        widget.bluetoothSettingsController ?? BluetoothSettingsService();
     _sessionId = 'kiosk_${DateTime.now().millisecondsSinceEpoch}';
     _scannerConnectionSub =
         _hidScannerConnectionService.connectionChanges().listen((connected) {
@@ -538,19 +542,40 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
             duration: 700.ms, color: LumiTokens.paper.withValues(alpha: 0.6));
   }
 
-  /// The central scan call-to-action card (mascot + heading + camera button).
-  /// Best-effort jump to Bluetooth settings so a teacher can pair the scanner.
-  /// iOS has no public Bluetooth-pane deep link, so we try the (unofficial)
-  /// Prefs URL, fall back to the app's settings page, and finally show a manual
-  /// hint. Android follows the same safe fallback path.
+  /// Opens the operating system's Bluetooth pairing route. Android can open
+  /// the Bluetooth device list directly. iOS does not expose a public deep
+  /// link to that pane, so explain the final tap before opening system Settings.
   Future<void> _openBluetoothSettings() async {
-    try {
-      if (await launchUrl(Uri.parse('App-Prefs:root=Bluetooth'))) return;
-    } catch (_) {}
-    try {
-      if (await openAppSettings()) return;
-    } catch (_) {}
-    if (mounted) {
+    final platform = Theme.of(context).platform;
+    if (platform == TargetPlatform.iOS) {
+      final shouldOpen = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Open Bluetooth on this device'),
+          content: const Text(
+            'Apple does not let Lumi jump reliably to the Bluetooth device '
+            'list. Settings will open next — tap Bluetooth, then select your '
+            'scanner to connect or disconnect it.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Not now'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Open Settings'),
+            ),
+          ],
+        ),
+      );
+      if (shouldOpen != true || !mounted) return;
+    }
+
+    final destination =
+        await _bluetoothSettingsController.openBluetoothSettings();
+    if (!mounted) return;
+    if (destination == BluetoothSettingsDestination.unavailable) {
       CommonWidgets.showInfoSnackbar(
         context,
         "Open your device's Settings app → Bluetooth to connect your scanner.",
