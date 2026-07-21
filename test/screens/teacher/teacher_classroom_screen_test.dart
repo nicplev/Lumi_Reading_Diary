@@ -3,6 +3,7 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_core_platform_interface/test.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lumi_reading_tracker/data/providers/active_child_provider.dart'
@@ -459,12 +460,99 @@ void main() {
       expect(find.text('1'), findsOneWidget);
       expect(find.textContaining('recording to review'), findsNothing);
     });
+
+    testWidgets(
+        'narrow Android header keeps a named class and student count readable',
+        (tester) async {
+      await _setSurface(tester, const Size(360, 800));
+      await _seedDemoStudents(firestore, classModel);
+      for (var index = 4; index <= 16; index++) {
+        await _seedStudent(
+          firestore,
+          classModel: classModel,
+          id: 'student_$index',
+          firstName: 'Student',
+          lastName: '$index',
+          currentReadingLevel: null,
+          currentStreak: 0,
+          lastReadingDate: DateTime.now(),
+          totalBooksRead: 0,
+        );
+      }
+      final namedClass = classModel.copyWith(name: '5A Amazing Animals');
+
+      await tester.pumpWidget(
+        _wrapClassroom(
+          teacher: teacher,
+          classModel: namedClass,
+          firestore: firestore,
+          readingLevelService: readingLevelService,
+          studentReadingLevelService: studentReadingLevelService,
+          platform: TargetPlatform.android,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('5A Amazing Animals'), findsOneWidget);
+      expect(find.text('16 students'), findsOneWidget);
+      expect(find.text('Assign books'), findsOneWidget);
+      _expectTextFits(tester, const ValueKey('classroom_class_name'));
+      _expectTextFits(tester, const ValueKey('classroom_student_count'));
+    });
+
+    testWidgets(
+        'narrow iOS header fits all audio actions beside untruncated metadata',
+        (tester) async {
+      await _setSurface(tester, const Size(390, 844));
+      await _seedDemoStudents(firestore, classModel);
+      final namedClass = classModel.copyWith(name: '3G Gorillas');
+      PlatformConfigService.debugResetCache();
+      await firestore
+          .collection('platformConfig')
+          .doc('comprehensionRecording')
+          .set({'enabled': true});
+      await firestore.collection('schools').doc(teacher.schoolId!).update({
+        'settings.comprehensionRecording': {
+          'enabled': true,
+          'retentionDays': 90,
+        },
+      });
+
+      await tester.pumpWidget(
+        _wrapClassroom(
+          teacher: teacher,
+          classModel: namedClass,
+          firestore: firestore,
+          readingLevelService: readingLevelService,
+          studentReadingLevelService: studentReadingLevelService,
+          platform: TargetPlatform.iOS,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('3G Gorillas'), findsOneWidget);
+      expect(find.text('3 students'), findsOneWidget);
+      expect(find.text('Assign books'), findsOneWidget);
+      expect(find.byTooltip('Comprehension question'), findsOneWidget);
+      expect(find.byTooltip('Comprehension recordings'), findsOneWidget);
+      _expectTextFits(tester, const ValueKey('classroom_class_name'));
+      _expectTextFits(tester, const ValueKey('classroom_student_count'));
+    });
   });
 }
 
-Future<void> _setLargeSurface(WidgetTester tester) async {
-  await tester.binding.setSurfaceSize(const Size(1280, 1800));
+Future<void> _setSurface(WidgetTester tester, Size size) async {
+  await tester.binding.setSurfaceSize(size);
   addTearDown(() => tester.binding.setSurfaceSize(null));
+}
+
+Future<void> _setLargeSurface(WidgetTester tester) async {
+  await _setSurface(tester, const Size(1280, 1800));
+}
+
+void _expectTextFits(WidgetTester tester, Key key) {
+  final paragraph = tester.renderObject<RenderParagraph>(find.byKey(key));
+  expect(paragraph.didExceedMaxLines, isFalse);
 }
 
 Future<void> _openSortSheet(WidgetTester tester) async {
@@ -478,10 +566,12 @@ Widget _wrapClassroom({
   required FakeFirebaseFirestore firestore,
   required ReadingLevelService readingLevelService,
   required StudentReadingLevelService studentReadingLevelService,
+  TargetPlatform? platform,
 }) {
   return ProviderScope(
     overrides: [firestoreProvider.overrideWithValue(firestore)],
     child: MaterialApp(
+      theme: platform == null ? null : ThemeData(platform: platform),
       home: Scaffold(
         body: TeacherClassroomScreen(
           teacher: teacher,

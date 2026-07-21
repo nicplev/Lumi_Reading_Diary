@@ -613,106 +613,146 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     required bool isLoading,
   }) {
     final totalStudents = students.length;
-    final summaryParts = <String>[
-      '$totalStudents students',
-    ];
+    final studentCountLabel =
+        '$totalStudents ${totalStudents == 1 ? 'student' : 'students'}';
 
     return SafeArea(
       bottom: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
-        child: Row(
-          children: [
-            // Class name + optional dropdown
-            Expanded(
-              child: Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final textScale = MediaQuery.textScalerOf(context).scale(1);
+            final usePhoneLayout =
+                constraints.maxWidth < 560 || textScale > 1.3;
+
+            final title = _buildClassTitle(selectedClass);
+            final count = Text(
+              studentCountLabel,
+              key: const ValueKey('classroom_student_count'),
+              style: LumiType.caption.copyWith(
+                color: LumiTokens.muted,
+                fontWeight: FontWeight.w400,
+              ),
+              maxLines: 1,
+              softWrap: false,
+            );
+            final actions = _buildClassHeaderActions(selectedClass);
+
+            if (!usePhoneLayout) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Flexible(
-                    flex: 2,
-                    child: GestureDetector(
-                      onTap: widget.classes.length > 1
-                          ? () => _showClassSelectorBottomSheet(context)
-                          : null,
-                      child: Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              selectedClass.name,
-                              style: LumiType.heading,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (widget.classes.length > 1) ...[
-                            const SizedBox(width: 4),
-                            Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              size: 22,
-                              color: LumiTokens.muted,
-                            ),
-                          ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        title,
+                        if (!isLoading) ...[
+                          const SizedBox(height: LumiTokens.space1),
+                          count,
                         ],
-                      ),
+                      ],
                     ),
                   ),
-                  if (!isLoading) ...[
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        summaryParts.join(' · '),
-                        style: LumiType.caption.copyWith(
-                          color: LumiTokens.muted,
-                          fontWeight: FontWeight.w400,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                  const SizedBox(width: LumiTokens.space4),
+                  Flexible(child: actions),
+                ],
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                title,
+                const SizedBox(height: LumiTokens.space1),
+                if (!isLoading) count,
+                const SizedBox(height: LumiTokens.space1),
+                Align(alignment: Alignment.centerRight, child: actions),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildClassTitle(ClassModel selectedClass) {
+    final canChangeClass = widget.classes.length > 1;
+    return GestureDetector(
+      key: const ValueKey('classroom_class_selector'),
+      onTap:
+          canChangeClass ? () => _showClassSelectorBottomSheet(context) : null,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Flexible(
+            child: Text(
+              selectedClass.name,
+              key: const ValueKey('classroom_class_name'),
+              style: LumiType.heading,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (canChangeClass) ...[
+            const SizedBox(width: LumiTokens.space1),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 22,
+              color: LumiTokens.muted,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClassHeaderActions(ClassModel selectedClass) {
+    return Wrap(
+      key: const ValueKey('classroom_header_actions'),
+      alignment: WrapAlignment.end,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: LumiTokens.space1,
+      runSpacing: LumiTokens.space1,
+      children: [
+        LumiTourTarget(
+          id: 'teacher.class.assignBooks',
+          child: GestureDetector(
+            onTap: _openAllocationScreen,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: LumiTokens.space1,
+                vertical: 6,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.auto_awesome_rounded,
+                    size: 14,
+                    color: LumiTokens.green,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    'Assign books',
+                    style: LumiType.caption.copyWith(
+                      color: LumiTokens.green,
+                      fontWeight: FontWeight.w700,
                     ),
-                  ],
+                  ),
                 ],
               ),
             ),
-            const SizedBox(width: 12),
-            LumiTourTarget(
-              id: 'teacher.class.assignBooks',
-              child: GestureDetector(
-                onTap: _openAllocationScreen,
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.auto_awesome_rounded,
-                          size: 14, color: LumiTokens.green),
-                      const SizedBox(width: 5),
-                      Text(
-                        'Assign books',
-                        style: LumiType.caption.copyWith(
-                          color: LumiTokens.green,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            // Always-visible editor for the per-class comprehension question,
-            // shown only when comprehension recording is enabled (school admin
-            // setting + platform kill switch) — otherwise it'd never reach
-            // parents.
-            if (_comprehensionEnabled) ...[
-              const SizedBox(width: 4),
-              _buildComprehensionButton(selectedClass),
-            ],
-            if (_comprehensionEnabled) ...[
-              const SizedBox(width: 4),
-              _buildComprehensionRecordingsButton(selectedClass),
-            ],
-          ],
+          ),
         ),
-      ),
+        // These remain compact icon actions. Their tooltips and semantics carry
+        // the full labels without taking space away from the class identity.
+        if (_comprehensionEnabled) _buildComprehensionButton(selectedClass),
+        if (_comprehensionEnabled)
+          _buildComprehensionRecordingsButton(selectedClass),
+      ],
     );
   }
 
