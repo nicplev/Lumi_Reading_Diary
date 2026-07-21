@@ -1,6 +1,6 @@
 # Teacher comprehension recordings screen — refinement plan
 
-**Status:** Implemented in workspace; deployment and physical-device QA pending
+**Status:** Backend and portals deployed; mobile physical-device/store QA pending
 **Date:** 21 July 2026
 **Primary surface:** Flutter teacher app
 **Recommended user-facing name:** **Comprehension recordings**
@@ -684,3 +684,28 @@ The recording-first release is complete when:
 Avoid changing `storage.rules`, the canonical object layout, or the callable
 authorization contract unless a failing security test demonstrates a concrete
 need.
+
+## 14. Production deployment evidence — 21 July 2026
+
+- PR #503 merged to `main` as `7a2a282` after admin CI, demo regression and
+  full-history secret scanning passed.
+- All three recording-inbox composite indexes reached `READY` before the
+  Functions and Rules rollout.
+- The five affected Functions deployed with zero errors and retained the
+  dedicated `lumi-functions-runtime` service account.
+- Firestore ruleset `1bad00d5-4534-46da-ba53-02e45deb640a` matches the merged
+  `firestore.rules` SHA-256 exactly.
+- The school portal is live on Sydney revision
+  `ssrlumischooladminau-00089-xew`; the main-branch super-admin deployment also
+  passed with its separate runtime identity.
+- The dry-run-first migration normalised 15 retained recordings across five
+  school documents to `pending`; the post-write aggregate check found 15 valid
+  pending rows and zero invalid review states.
+- Live checks returned HTTP 200 for the school login, privacy and support pages,
+  HTTP 403 for unauthenticated Firestore listing, and no current Scheduler IAM
+  or cron-heartbeat failures.
+
+The Flutter screen is merged but intentionally not represented as shipped to a
+device. Complete signed-store availability, physical iOS/Android playback,
+deletion, shared-review and narrow-layout checks before closing the remaining
+acceptance criteria.
