@@ -1201,8 +1201,11 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
           right: 16,
           bottom: 24,
         ),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: maxCardHeight),
+        child: Center(
+          child: ConstrainedBox(
+          // Height-only on phones; capped width too so this card doesn't
+          // stretch edge-to-edge on tablets, matching the auth screens.
+          constraints: BoxConstraints(maxHeight: maxCardHeight, maxWidth: 520),
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 450),
             switchInCurve: Curves.easeOutCubic,
@@ -1231,6 +1234,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
                     // shifted the modal, and dropped the field's focus.
                     child: AutofillGroup(child: _buildFormCard()),
                   ),
+          ),
           ),
         ),
       ),

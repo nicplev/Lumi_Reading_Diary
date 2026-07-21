@@ -815,7 +815,9 @@ class _LoginScreenState extends State<LoginScreen> {
             final artworkHeight = isCompactHeight ? 96.0 : 116.0;
             final headingSize = isCompactHeight ? 28.0 : 32.0;
 
-            return GestureDetector(
+            return Stack(
+              children: [
+                GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => FocusScope.of(context).unfocus(),
               child: SingleChildScrollView(
@@ -835,18 +837,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: IconButton(
-                              onPressed: () => _showLandingPage(
-                                _LoginLandingPage.welcome,
-                              ),
-                              icon: const Icon(Icons.arrow_back_rounded),
-                              color: LumiTokens.ink,
-                              tooltip: 'Back',
-                            ),
-                          ),
-                          SizedBox(height: isCompactHeight ? 2 : 8),
+                          // The back button lives in a Positioned layer
+                          // outside this width-capped column (see below) so
+                          // it stays anchored to the true screen edge instead
+                          // of drifting toward center on tablets. This
+                          // reserves the vertical space it used to occupy.
+                          SizedBox(height: isCompactHeight ? 50.0 : 56.0),
                           Center(
                             child: Image.asset(
                               'assets/UI Lumi/Lumi signup.png',
@@ -949,6 +945,22 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
+                ),
+                // Anchored to the true screen edge (outside the width-capped
+                // content column above) so it doesn't drift toward center on
+                // wide/tablet screens.
+                Positioned(
+                  top: 12,
+                  left: horizontalPadding,
+                  child: IconButton(
+                    onPressed: () =>
+                        _showLandingPage(_LoginLandingPage.welcome),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    color: LumiTokens.ink,
+                    tooltip: 'Back',
+                  ),
+                ),
+              ],
             );
           },
         ),
@@ -991,7 +1003,9 @@ class _LoginScreenState extends State<LoginScreen> {
       child: Scaffold(
         backgroundColor: LumiTokens.red,
         body: SafeArea(
-          child: GestureDetector(
+          child: Stack(
+            children: [
+              GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () => FocusScope.of(context).unfocus(),
             child: SingleChildScrollView(
@@ -1006,9 +1020,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 alignment: Alignment.topCenter,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 520),
-                  child: Stack(
-                    children: [
-                      Column(
+                  child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           // Taller phones get a little top breathing room to keep
@@ -1369,25 +1381,28 @@ class _LoginScreenState extends State<LoginScreen> {
                           ],
                         ],
                       ),
-                      Positioned(
-                        top: 0,
-                        left: 0,
-                        child: IconButton(
-                          onPressed: () =>
-                              _showLandingPage(_LoginLandingPage.welcome),
-                          icon: const Icon(Icons.arrow_back_rounded),
-                          color: LumiTokens.paper,
-                          tooltip: 'Back to welcome',
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
             ),
+                ),
+                // Anchored to the true screen edge (outside the width-capped
+                // content column above) so it doesn't drift toward center on
+                // wide/tablet screens.
+                Positioned(
+                  top: 0,
+                  left: horizontalPadding,
+                  child: IconButton(
+                    onPressed: () =>
+                        _showLandingPage(_LoginLandingPage.welcome),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    color: LumiTokens.paper,
+                    tooltip: 'Back to welcome',
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
     );
   }
 }
