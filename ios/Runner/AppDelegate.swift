@@ -28,6 +28,11 @@ import FirebaseAuth
     } else {
       NSLog("[AppIcon] SKIPPED registration: registrar(forPlugin:) returned nil")
     }
+    if let registrar = self.registrar(forPlugin: "HidKeyboardChannel") {
+      HidKeyboardChannel.register(with: registrar)
+    } else {
+      NSLog("[HidKeyboard] SKIPPED registration: registrar(forPlugin:) returned nil")
+    }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 

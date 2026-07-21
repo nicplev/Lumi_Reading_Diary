@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,15 +8,25 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/utils/image_decode.dart';
 import '../../../core/widgets/common_widgets.dart';
 import '../../../core/widgets/lumi/student_avatar.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/student_model.dart';
 import '../../../data/models/user_model.dart';
+import '../../../services/hid_scanner_connection_service.dart';
 import '../../../services/isbn_assignment_service.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
-import '../../../core/utils/image_decode.dart';
+
+const Size _kKioskReticleSize = Size(260, 160);
+
+@visibleForTesting
+Rect kioskCameraScanWindowFor(Size surface) => Rect.fromCenter(
+      center: Offset(surface.width / 2, surface.height / 2),
+      width: _kKioskReticleSize.width,
+      height: _kKioskReticleSize.height,
+    );
 
 /// Outcome of a single kiosk scan, used to label the session list + banner.
 enum _KioskOutcome { added, renewed, reread }
@@ -38,26 +49,41 @@ class KioskScanSessionScreen extends StatefulWidget {
     required this.teacher,
     required this.classModel,
     required this.student,
+    @visibleForTesting this.isbnAssignmentService,
+    @visibleForTesting this.hidScannerConnectionService,
   });
 
   final UserModel teacher;
   final ClassModel classModel;
   final StudentModel student;
+  final IsbnAssignmentService? isbnAssignmentService;
+  final HidScannerConnectionService? hidScannerConnectionService;
 
   @override
   State<KioskScanSessionScreen> createState() => _KioskScanSessionScreenState();
 }
 
 class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
-  final IsbnAssignmentService _service = IsbnAssignmentService();
+  late final IsbnAssignmentService _service;
+  late final HidScannerConnectionService _hidScannerConnectionService;
   final FocusNode _keyboardFocus = FocusNode();
   final StringBuffer _wedgeBuffer = StringBuffer();
 
   final List<_KioskScanEntry> _entries = <_KioskScanEntry>[];
   final Set<String> _sessionIsbns = <String>{};
+  final Queue<String> _pendingCodes = Queue<String>();
+
+  // Includes the active lookup as well as queued codes. Keeping the active
+  // code here closes the small window where a rapid duplicate can arrive after
+  // dequeue but before the resolved book reaches [_sessionIsbns].
+  final Set<String> _pendingSet = <String>{};
 
   late final String _sessionId;
   bool _isProcessing = false;
+  bool _isDraining = false;
+  bool? _scannerConnected;
+  bool _receivedScannerConnectionEvent = false;
+  StreamSubscription<bool>? _scannerConnectionSub;
   String? _bannerMessage;
   Color _bannerColor = LumiTokens.green;
 
@@ -68,24 +94,42 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
 
   // Kids walk away the moment their books are scanned, so without this the next
   // child in line would scan onto the previous child's session. After a spell
-  // of no activity we return to the roster. Each scan persists immediately, so
-  // nothing is lost by leaving.
+  // of no activity we return to the roster; queued work keeps the screen open
+  // until each accepted scan has finished saving.
   static const _idleTimeout = Duration(seconds: 30);
   Timer? _idleTimer;
 
   String get _schoolId => widget.teacher.schoolId ?? '';
+  bool get _hasPendingWork => _isProcessing || _pendingCodes.isNotEmpty;
 
   @override
   void initState() {
     super.initState();
+    _service = widget.isbnAssignmentService ?? IsbnAssignmentService();
+    _hidScannerConnectionService =
+        widget.hidScannerConnectionService ?? HidScannerConnectionService();
     _sessionId = 'kiosk_${DateTime.now().millisecondsSinceEpoch}';
+    _scannerConnectionSub =
+        _hidScannerConnectionService.connectionChanges().listen((connected) {
+      _receivedScannerConnectionEvent = true;
+      if (mounted) setState(() => _scannerConnected = connected);
+    });
+    unawaited(_seedScannerConnectionState());
     WidgetsBinding.instance.addPostFrameCallback((_) => _refocus());
     _resetIdleTimer();
+  }
+
+  Future<void> _seedScannerConnectionState() async {
+    final connected = await _hidScannerConnectionService.isConnected();
+    // A streamed connect/disconnect event is newer than the one-shot result.
+    if (!mounted || _receivedScannerConnectionEvent) return;
+    setState(() => _scannerConnected = connected);
   }
 
   @override
   void dispose() {
     _idleTimer?.cancel();
+    unawaited(_scannerConnectionSub?.cancel());
     _keyboardFocus.dispose();
     super.dispose();
   }
@@ -100,7 +144,10 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
     // Don't pop out from under a modal (camera / already-read sheet) or while a
     // lookup is mid-flight — reschedule instead.
     final isCurrent = ModalRoute.of(context)?.isCurrent ?? false;
-    if (!isCurrent || _isProcessing) {
+    if (!isCurrent ||
+        _isProcessing ||
+        _isDraining ||
+        _pendingCodes.isNotEmpty) {
       _resetIdleTimer();
       return;
     }
@@ -140,14 +187,15 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
     }
   }
 
-  Future<void> _handleCode(String rawCode) async {
-    if (_isProcessing) return;
+  void _handleCode(String rawCode) {
+    _resetIdleTimer();
     final normalized = IsbnAssignmentService.normalizeIsbn(rawCode);
     if (normalized == null) {
       _showBanner("That doesn't look like a book barcode.", LumiTokens.orange);
       return;
     }
-    if (_sessionIsbns.contains(normalized)) {
+    if (_sessionIsbns.contains(normalized) ||
+        _pendingSet.contains(normalized)) {
       _showBanner('Already scanned just now.', LumiTokens.blue);
       return;
     }
@@ -156,40 +204,63 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
       return;
     }
 
-    setState(() => _isProcessing = true);
+    setState(() {
+      _pendingCodes.add(normalized);
+      _pendingSet.add(normalized);
+    });
+    unawaited(_drainQueue());
+  }
+
+  Future<void> _drainQueue() async {
+    if (_isDraining) return;
+    _isDraining = true;
     try {
-      final resolution = await _service.resolveIsbn(
-        rawCode: normalized,
-        schoolId: _schoolId,
-        teacherId: widget.teacher.id,
-      );
-      if (!mounted) return;
-      switch (resolution) {
-        case IsbnResolved(:final book):
-          await _processBook(book);
-        case IsbnNotFound():
-          _showBanner(
-            "We couldn't find that book — ask your teacher.",
-            LumiTokens.orange,
+      while (_pendingCodes.isNotEmpty && mounted) {
+        final code = _pendingCodes.removeFirst();
+        if (_sessionIsbns.contains(code)) {
+          _pendingSet.remove(code);
+          continue;
+        }
+
+        setState(() => _isProcessing = true);
+        try {
+          final resolution = await _service.resolveIsbn(
+            rawCode: code,
+            schoolId: _schoolId,
+            teacherId: widget.teacher.id,
           );
-        case IsbnLookupUnavailable():
-          _showBanner(
-            "You're offline — try that book again once you're connected.",
-            LumiTokens.orange,
-          );
-        case IsbnInvalid():
-          _showBanner(
-            "That doesn't look like a book barcode.",
-            LumiTokens.orange,
-          );
-      }
-    } catch (_) {
-      if (mounted) {
-        _showBanner('Something went wrong. Try again.', LumiTokens.red);
+          if (!mounted) return;
+          switch (resolution) {
+            case IsbnResolved(:final book):
+              await _processBook(book);
+            case IsbnNotFound():
+              _showBanner(
+                "We couldn't find that book — ask your teacher.",
+                LumiTokens.orange,
+              );
+            case IsbnLookupUnavailable():
+              _showBanner(
+                "You're offline — try that book again once you're connected.",
+                LumiTokens.orange,
+              );
+            case IsbnInvalid():
+              _showBanner(
+                "That doesn't look like a book barcode.",
+                LumiTokens.orange,
+              );
+          }
+        } catch (_) {
+          if (mounted) {
+            _showBanner('Something went wrong. Try again.', LumiTokens.red);
+          }
+        } finally {
+          _pendingSet.remove(code);
+          if (mounted) setState(() => _isProcessing = false);
+        }
       }
     } finally {
-      if (mounted) setState(() => _isProcessing = false);
-      _refocus();
+      _isDraining = false;
+      if (mounted) _refocus();
     }
   }
 
@@ -311,7 +382,7 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
     if (capturedCodes != null && capturedCodes.isNotEmpty) {
       for (final code in capturedCodes) {
         if (!mounted) return;
-        await _handleCode(code);
+        _handleCode(code);
       }
     } else {
       _refocus();
@@ -320,6 +391,21 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return PopScope<int>(
+      canPop: !_hasPendingWork,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _hasPendingWork) {
+          CommonWidgets.showInfoSnackbar(
+            context,
+            'Please wait while your scanned books finish saving.',
+          );
+        }
+      },
+      child: _buildKioskScaffold(),
+    );
+  }
+
+  Widget _buildKioskScaffold() {
     return KeyboardListener(
       focusNode: _keyboardFocus,
       autofocus: true,
@@ -453,10 +539,10 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
   }
 
   /// The central scan call-to-action card (mascot + heading + camera button).
-  /// Best-effort jump to the iPad's Bluetooth settings so a teacher can pair
-  /// the barcode scanner. iOS has no public Bluetooth-pane deep link, so we try
-  /// the (unofficial) Prefs URL, fall back to the app's settings page, and
-  /// finally show a manual hint.
+  /// Best-effort jump to Bluetooth settings so a teacher can pair the scanner.
+  /// iOS has no public Bluetooth-pane deep link, so we try the (unofficial)
+  /// Prefs URL, fall back to the app's settings page, and finally show a manual
+  /// hint. Android follows the same safe fallback path.
   Future<void> _openBluetoothSettings() async {
     try {
       if (await launchUrl(Uri.parse('App-Prefs:root=Bluetooth'))) return;
@@ -467,7 +553,7 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
     if (mounted) {
       CommonWidgets.showInfoSnackbar(
         context,
-        "Open the iPad's Settings app → Bluetooth to connect your scanner.",
+        "Open your device's Settings app → Bluetooth to connect your scanner.",
       );
     }
   }
@@ -508,21 +594,13 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
   }
 
   Widget _buildScanPanel() {
-    // Before the first scan, lead with how to connect the Bluetooth scanner;
-    // once scanning works (a scan lands or one is in flight) switch to the
-    // active scan prompt.
-    //
-    // TODO(kiosk): real HID scanner connect/disconnect detection.
-    // Today this is a heuristic — the connect-help shows until the first scan
-    // registers. To detect actual connection state (and re-prompt on a
-    // mid-session disconnect, e.g. the scanner's battery dies), add an iOS
-    // GameController `GCKeyboard` platform channel: a MethodChannel for the
-    // current state + an EventChannel streaming GCKeyboardDidConnect/Disconnect
-    // (iOS 14+). Wire it into `showConnectHelp` here and fail OPEN (assume
-    // connected if the channel is unavailable/null) so a native hiccup can
-    // never block scanning. Android: default to connected. See PR #126.
-    final showConnectHelp =
+    final heuristicShow =
         _entries.isEmpty && _celebrateAsset == null && !_isProcessing;
+    final showConnectHelp = switch (_scannerConnected) {
+      true => false,
+      false => !_isProcessing && _pendingCodes.isEmpty,
+      null => heuristicShow,
+    };
     return showConnectHelp
         ? _buildConnectScannerPanel()
         : _buildActiveScanPanel();
@@ -550,7 +628,7 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
       ),
       const SizedBox(height: 8),
       Text(
-        "Pair your barcode scanner in the iPad's Bluetooth settings, then point "
+        "Pair your barcode scanner in your device's Bluetooth settings, then point "
         "it at a book's barcode to add it. Already paired? Just start scanning.",
         style: LumiType.body.copyWith(color: LumiTokens.muted),
         textAlign: TextAlign.center,
@@ -588,6 +666,14 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
         style: LumiType.heading,
         textAlign: TextAlign.center,
       ),
+      if (_isProcessing && _pendingCodes.isNotEmpty) ...[
+        const SizedBox(height: 6),
+        Text(
+          '${_pendingCodes.length} more waiting',
+          style: LumiType.caption.copyWith(color: LumiTokens.muted),
+          textAlign: TextAlign.center,
+        ),
+      ],
       const SizedBox(height: 8),
       Text(
         'Point the barcode scanner at each book — or use the camera to grab '
@@ -784,13 +870,15 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
         width: double.infinity,
         height: 56,
         child: FilledButton(
-          onPressed: () {
-            CommonWidgets.showSuccessSnackbar(
-              context,
-              '${widget.student.firstName} scanned ${_entries.length} book(s).',
-            );
-            Navigator.of(context).pop(_entries.length);
-          },
+          onPressed: _hasPendingWork
+              ? null
+              : () {
+                  CommonWidgets.showSuccessSnackbar(
+                    context,
+                    '${widget.student.firstName} scanned ${_entries.length} book(s).',
+                  );
+                  Navigator.of(context).pop(_entries.length);
+                },
           style: FilledButton.styleFrom(
             backgroundColor: LumiTokens.green,
             foregroundColor: LumiTokens.paper,
@@ -799,7 +887,9 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
             ),
           ),
           child: Text(
-            _entries.isEmpty ? 'Done' : "I'm done!",
+            _hasPendingWork
+                ? 'Saving books…'
+                : (_entries.isEmpty ? 'Done' : "I'm done!"),
             style: LumiType.button,
           ),
         ),
@@ -885,113 +975,123 @@ class _KioskCameraScannerSheetState extends State<_KioskCameraScannerSheet> {
         height: MediaQuery.of(context).size.height * 0.74,
         child: ColoredBox(
           color: LumiTokens.ink,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              MobileScanner(
-                controller: _controller,
-                onDetect: _onDetect,
-                errorBuilder: (context, error) => _CameraUnavailable(
-                  onClose: widget.onCloseEmpty,
-                ),
-              ),
-              Center(child: _KioskCameraReticle(flashTick: _flashTick)),
-              Center(child: _KioskScanSuccessTickOverlay(tick: _flashTick)),
-              Positioned(
-                top: 16,
-                right: 16,
-                child: Material(
-                  color: LumiTokens.paper,
-                  shape: const CircleBorder(),
-                  child: IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(
-                      Icons.close_rounded,
-                      color: LumiTokens.ink,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final scanWindow = kioskCameraScanWindowFor(constraints.biggest);
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  MobileScanner(
+                    controller: _controller,
+                    scanWindow: scanWindow,
+                    onDetect: _onDetect,
+                    errorBuilder: (context, error) => _CameraUnavailable(
+                      onClose: widget.onCloseEmpty,
                     ),
                   ),
-                ),
-              ),
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: 16,
-                child: SafeArea(
-                  top: false,
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: LumiTokens.paper.withValues(alpha: 0.96),
-                      borderRadius: BorderRadius.circular(24),
+                  Center(child: _KioskCameraReticle(flashTick: _flashTick)),
+                  Center(
+                    child: _KioskScanSuccessTickOverlay(tick: _flashTick),
+                  ),
+                  Positioned(
+                    top: 16,
+                    right: 16,
+                    child: Material(
+                      color: LumiTokens.paper,
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: LumiTokens.ink,
+                        ),
+                      ),
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
+                  ),
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 16,
+                    child: SafeArea(
+                      top: false,
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: LumiTokens.paper.withValues(alpha: 0.96),
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: LumiTokens.tintGreen,
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: const Icon(
-                                Icons.qr_code_scanner_rounded,
-                                color: LumiTokens.green,
-                              ),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: LumiTokens.tintGreen,
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: const Icon(
+                                    Icons.qr_code_scanner_rounded,
+                                    color: LumiTokens.green,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        statusText,
+                                        style: LumiType.subhead,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Place each book barcode inside the green box, then tap Done.',
+                                        style: LumiType.caption.copyWith(
+                                          color: LumiTokens.muted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    statusText,
-                                    style: LumiType.subhead,
+                            const SizedBox(height: 14),
+                            FilledButton.icon(
+                              onPressed: foundCount == 0 ? null : _finish,
+                              icon: const Icon(Icons.check_rounded),
+                              label: Text(
+                                foundCount == 0
+                                    ? 'Find book barcodes'
+                                    : 'Done with $foundCount',
+                                style: LumiType.button,
+                              ),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: LumiTokens.green,
+                                foregroundColor: LumiTokens.paper,
+                                disabledBackgroundColor: LumiTokens.rule,
+                                disabledForegroundColor: LumiTokens.muted,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    LumiTokens.radiusPill,
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Point at all the book barcodes, then tap Done.',
-                                    style: LumiType.caption.copyWith(
-                                      color: LumiTokens.muted,
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 14),
-                        FilledButton.icon(
-                          onPressed: foundCount == 0 ? null : _finish,
-                          icon: const Icon(Icons.check_rounded),
-                          label: Text(
-                            foundCount == 0
-                                ? 'Find book barcodes'
-                                : 'Done with $foundCount',
-                            style: LumiType.button,
-                          ),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: LumiTokens.green,
-                            foregroundColor: LumiTokens.paper,
-                            disabledBackgroundColor: LumiTokens.rule,
-                            disabledForegroundColor: LumiTokens.muted,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                LumiTokens.radiusPill,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -1009,14 +1109,12 @@ class _KioskCameraReticle extends StatelessWidget {
     return AnimatedContainer(
       key: ValueKey(flashTick),
       duration: 160.ms,
-      width: 220,
-      height: 150,
+      width: _kKioskReticleSize.width,
+      height: _kKioskReticleSize.height,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: flashTick == 0
-              ? Colors.white.withValues(alpha: 0.8)
-              : LumiTokens.green,
+          color: LumiTokens.green,
           width: flashTick == 0 ? 3 : 5,
         ),
       ),
