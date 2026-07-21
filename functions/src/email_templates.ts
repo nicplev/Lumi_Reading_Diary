@@ -172,12 +172,14 @@ interface EmailShellParams {
   mascotSrc: string;
 }
 
-export function renderEmailShell(params: EmailShellParams): string {
-  const {schoolName, customMessage, appStoreUrl, playStoreUrl, entryCards, mascotSrc} =
-    params;
-
-  const customMessageBlock = customMessage ?
-    `
+// Optional "A note from your school" block. The message is admin-supplied
+// free text, so it is HTML-escaped (like invoice_email) before it lands in an
+// email sent from Lumi's address — a school admin must not be able to inject
+// links, tracking pixels or spoofed markup into onboarding mail.
+export function renderSchoolNoteBlock(customMessage?: string): string {
+  if (!customMessage) return "";
+  const safe = escapeHtml(customMessage).replace(/\n/g, "<br/>");
+  return `
       <tr>
         <td style="padding: 0 24px 24px 24px;">
           <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: ${NOTE_BG}; border-radius: 14px;">
@@ -187,14 +189,20 @@ export function renderEmailShell(params: EmailShellParams): string {
                   A note from your school
                 </p>
                 <p style="margin: 0; font-family: ${FONT_BODY}; font-size: 14px; color: ${INK}; line-height: 1.65;">
-                  ${customMessage}
+                  ${safe}
                 </p>
               </td>
             </tr>
           </table>
         </td>
-      </tr>` :
-    "";
+      </tr>`;
+}
+
+export function renderEmailShell(params: EmailShellParams): string {
+  const {schoolName, customMessage, appStoreUrl, playStoreUrl, entryCards, mascotSrc} =
+    params;
+
+  const customMessageBlock = renderSchoolNoteBlock(customMessage);
 
   return `<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
@@ -389,25 +397,7 @@ export function buildStaffOnboardingEmail(params: {
   // join code would just be noise — keep that email focused on logging in.
   const showSchoolCode = !!schoolCode && !isAdmin && !hasTempPassword;
 
-  const customMessageBlock = customMessage ?
-    `
-      <tr>
-        <td style="padding: 0 24px 24px 24px;">
-          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: ${NOTE_BG}; border-radius: 14px;">
-            <tr>
-              <td style="padding: 18px 22px;">
-                <p style="margin: 0 0 6px 0; font-family: ${FONT_DISPLAY}; font-size: 11px; font-weight: 700; color: ${NOTE_LABEL}; text-transform: uppercase; letter-spacing: 2px;">
-                  A note from your school
-                </p>
-                <p style="margin: 0; font-family: ${FONT_BODY}; font-size: 14px; color: ${INK}; line-height: 1.65;">
-                  ${customMessage}
-                </p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>` :
-    "";
+  const customMessageBlock = renderSchoolNoteBlock(customMessage);
 
   const credentialCard = hasTempPassword ? `
       <tr>
