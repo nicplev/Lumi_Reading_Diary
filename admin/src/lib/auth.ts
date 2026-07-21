@@ -28,8 +28,14 @@ function signPayload(encodedPayload: string): Buffer {
   return createHmac("sha256", sessionSecret()).update(encodedPayload).digest();
 }
 
+// Session payload version. Bumped 1 -> 2 when TOTP MFA became mandatory: a
+// session is now minted only after the second factor passes, so invalidating
+// every pre-MFA (v1) cookie forces all super-admins to re-authenticate through
+// MFA on deploy.
+const SESSION_VERSION = 2;
+
 function encodeSession(session: AdminSession): string {
-  const payload = Buffer.from(JSON.stringify({ v: 1, ...session }))
+  const payload = Buffer.from(JSON.stringify({ v: SESSION_VERSION, ...session }))
     .toString("base64url");
   return `${payload}.${signPayload(payload).toString("base64url")}`;
 }
@@ -48,7 +54,7 @@ function decodeSession(token: string): AdminSession | null {
     ) as Partial<AdminSession> & { v?: unknown };
     const now = Math.floor(Date.now() / 1000);
     if (
-      payload.v !== 1 ||
+      payload.v !== SESSION_VERSION ||
       typeof payload.uid !== "string" ||
       payload.uid.length === 0 ||
       (payload.email !== undefined && typeof payload.email !== "string") ||
