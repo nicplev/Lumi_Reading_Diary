@@ -320,6 +320,23 @@ service cloud.firestore {
                 newSettings.get('comprehensionRecording', null);
       }
 
+      // Server-owned commercial/provisioning fields. Entitlement is granted by
+      // Cloud Functions / the super-admin portal via the deny-all
+      // schoolSubscriptions collection, never by a school-side client. A
+      // schoolAdmin editing name/theme/term dates/level config must not be able
+      // to touch these (defense-in-depth: student.access is the live gate, but
+      // the school doc must not be a self-service entitlement surface).
+      function schoolCommercialFieldsUnchanged() {
+        let oldData = resource.data;
+        let newData = request.resource.data;
+        return oldData.get('subscription', null) ==
+                newData.get('subscription', null) &&
+            oldData.get('access', null) == newData.get('access', null) &&
+            oldData.get('accessMode', null) == newData.get('accessMode', null) &&
+            oldData.get('isDemo', null) == newData.get('isDemo', null) &&
+            oldData.get('createdBy', null) == newData.get('createdBy', null);
+      }
+
       // No client `list`. A collection query returns full documents, and the
       // school doc holds cross-tenant org/billing data (address, contactEmail,
       // contactPhone, subscription, access). Any signed-in user could otherwise
@@ -341,7 +358,8 @@ service cloud.firestore {
       allow update: if isSchoolAdmin(schoolId) &&
           writeAllowedForDev() &&
           aiEvaluationSettingsUnchanged() &&
-          comprehensionRecordingSettingsUnchanged();
+          comprehensionRecordingSettingsUnchanged() &&
+          schoolCommercialFieldsUnchanged();
 
       // Controlled counter increments for onboarding/registration lifecycle.
       allow update: if isSignedIn() &&

@@ -4048,3 +4048,33 @@ test('adminMfa: all client reads and writes are denied (server-only)', async () 
   await assertFails(owner.collection('adminMfa').doc('super_1').set({ secret: {} }));
   await assertFails(unauthDb().collection('adminMfa').doc('super_1').get());
 });
+
+test('schools: schoolAdmin edits config but not commercial/provisioning fields', async () => {
+  await seedData(async (db) => {
+    await db.collection('schools').doc('school_1').set({
+      name: 'Lumi School',
+      displayName: 'Lumi',
+      createdBy: 'admin_1',
+      subscription: { tier: 'basic' },
+      access: { status: 'active' },
+      accessMode: 'standard',
+      isDemo: false,
+      teacherCount: 0, parentCount: 0, studentCount: 0,
+    });
+    await db.collection('schools').doc('school_1').collection('users').doc('admin_1').set({
+      role: 'schoolAdmin', schoolId: 'school_1',
+    });
+  });
+
+  const school = () => authDb('admin_1').collection('schools').doc('school_1');
+
+  // Benign config edits remain allowed.
+  await assertSucceeds(school().update({ displayName: 'Lumi Primary' }));
+
+  // Server-owned commercial/provisioning fields are locked to the client.
+  await assertFails(school().update({ subscription: { tier: 'pro' } }));
+  await assertFails(school().update({ access: { status: 'expired' } }));
+  await assertFails(school().update({ accessMode: 'unlimited' }));
+  await assertFails(school().update({ isDemo: true }));
+  await assertFails(school().update({ createdBy: 'forged' }));
+});
