@@ -36,7 +36,7 @@ interface SidebarProps {
 
 export function Sidebar({ hasDevAccess = false }: SidebarProps) {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
   const { data: school } = useSchool();
 
   const isAdmin = user?.role === 'schoolAdmin';
@@ -127,9 +127,29 @@ export function Sidebar({ hasDevAccess = false }: SidebarProps) {
             characterId={user?.characterId}
             size="sm"
           />
+          {/* "Loading…" must never be a resting state here. It used to be the
+              fallback for a null user, which is also the signed-out state — so
+              a tab whose client session had lapsed showed a full page with a
+              permanently-loading chip. Skeleton while genuinely loading; and
+              never guess the role, because falling back to "Teacher" told a
+              school admin they were a teacher. */}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-ink truncate">{user?.fullName || user?.email || 'Loading...'}</p>
-            <p className="text-[11px] text-muted capitalize">{user?.role === 'schoolAdmin' ? 'Admin' : 'Teacher'}</p>
+            {user ? (
+              <>
+                <p className="text-sm font-semibold text-ink truncate">
+                  {user.fullName || user.email}
+                </p>
+                <p className="text-[11px] text-muted capitalize">
+                  {user.role === 'schoolAdmin' ? 'Admin' : 'Teacher'}
+                </p>
+              </>
+            ) : (
+              <div aria-hidden={!loading} aria-busy={loading}>
+                <span className="sr-only">{loading ? 'Loading your profile' : ''}</span>
+                <div className="h-3.5 w-28 rounded bg-rule/60 animate-pulse" />
+                <div className="mt-1.5 h-2.5 w-14 rounded bg-rule/60 animate-pulse" />
+              </div>
+            )}
           </div>
         </Link>
         <button

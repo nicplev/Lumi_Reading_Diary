@@ -390,6 +390,20 @@ function LoginForm() {
           </p>
         </div>
 
+        {/* Explains an automatic bounce from a tab whose session had lapsed.
+            Without it the user simply finds themselves on a login screen with
+            no idea why, which reads as the portal having logged them out at
+            random. Not an error — they did nothing wrong. */}
+        {searchParams.get('reason') === 'expired' && !error && (
+          <div className="mb-4 rounded-[var(--radius-md)] border border-section/20 bg-section/5 px-4 py-3">
+            <p className="text-sm font-semibold text-ink">Your session expired</p>
+            <p className="mt-1 text-xs leading-5 text-muted">
+              You were signed out after a period of inactivity. Sign in again to
+              pick up where you left off.
+            </p>
+          </div>
+        )}
+
         {totpEnrollmentToken ? (
           /* Mandatory administrator TOTP enrollment */
           <form onSubmit={handleTotpEnrollmentSubmit} className="space-y-4">
