@@ -1,5 +1,6 @@
 export * from "./audit";
 export * from "./bulkImportStudents";
+export * from "./allocationCascade";
 export * from "./resolveCommunityBookDeletion";
 export * from "./offboardSchool";
 export * from "./createSchoolUser";

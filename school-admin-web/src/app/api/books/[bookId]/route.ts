@@ -50,8 +50,12 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 
   const { bookId } = await params;
   try {
-    await deleteBook(session.schoolId, bookId);
-    return NextResponse.json({ success: true });
+    const { allocationsUpdated } = await deleteBook(
+      session.schoolId,
+      bookId,
+      session.uid,
+    );
+    return NextResponse.json({ success: true, allocationsUpdated });
   } catch {
     return NextResponse.json({ error: 'Failed to delete book' }, { status: 500 });
   }
