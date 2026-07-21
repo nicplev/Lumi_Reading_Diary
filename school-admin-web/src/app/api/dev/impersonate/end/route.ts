@@ -30,6 +30,12 @@ export async function POST() {
     schoolId: session.impersonation.realSchoolId,
     role: session.impersonation.realRole,
     mfaVerified: session.mfaVerified,
+    // Rebuilt field by field, so these must be carried explicitly: without
+    // authTime the restored session escapes the token-revocation check, and
+    // without expiresAt an impersonation round trip silently renewed the
+    // underlying session for another 5 days.
+    authTime: session.authTime,
+    expiresAt: session.expiresAt,
   };
 
   await createSessionCookie(restored);

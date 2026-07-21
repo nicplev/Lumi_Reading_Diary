@@ -100,6 +100,13 @@ export async function POST(request: NextRequest) {
     // is admin, getSession() will reject the impersonated cookie unless this
     // proof is present as well.
     mfaVerified: session.mfaVerified,
+    // Carry the real sign-in time and absolute expiry forward: this object is
+    // rebuilt field by field, so anything omitted is silently dropped.
+    // Without authTime the impersonated cookie would escape the
+    // token-revocation check; without expiresAt, starting an impersonation
+    // would hand the underlying session a fresh 5-day window.
+    authTime: session.authTime,
+    expiresAt: session.expiresAt,
     // EFFECTIVE school/role — every existing API route reads `session.schoolId`
     // and naturally queries the target school from this point on.
     schoolId: targetSchoolId,

@@ -6,8 +6,10 @@ import {
   auditDemoAllocationMutation,
   authorizeDemoAllocationMutation,
   type AuthorizedDemoAllocationSession,
-  DemoAllocationSecurityError,
 } from '@/lib/demo/allocation-security';
+// Base type: catches both DemoAllocationSecurityError and anything raised by
+// the shared origin/rate-limit guards it now delegates to.
+import { RequestGuardError } from '@/lib/http/request-guards';
 
 const dateString = z.string().trim().min(10).max(40).refine(
   (value) => Number.isFinite(Date.parse(value)),
@@ -75,7 +77,7 @@ export async function POST(request: NextRequest) {
         'rejected',
       ).catch(() => undefined);
     }
-    if (error instanceof DemoAllocationSecurityError) {
+    if (error instanceof RequestGuardError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
     if (error instanceof z.ZodError) {

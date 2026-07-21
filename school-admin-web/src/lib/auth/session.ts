@@ -1,9 +1,12 @@
 import { cookies } from 'next/headers';
 import { SignJWT, jwtVerify } from 'jose';
-import { adminDb } from '@/lib/firebase/admin';
+import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import {
   allowVerifiedJwtAfterMembershipLookupFailure,
   isCurrentMembershipValid,
+  isDefinitiveAuthLookupFailure,
+  isSessionValidForAuthAccount,
+  remainingSessionSeconds,
 } from '@/lib/auth/session-policy';
 
 export interface ImpersonationSessionBlock {
@@ -54,6 +57,22 @@ export interface SessionData {
   demoGenerationId?: string;
   /** Server-issued UI capability; handlers still re-authorize independently. */
   demoAllocationMutations?: true;
+  /**
+   * Firebase `auth_time` (seconds) of the sign-in this session was minted
+   * from. Compared against the account's `tokensValidAfterTime` on every
+   * `getSession()` so revoking refresh tokens — or resetting a password —
+   * actually terminates the portal session instead of leaving it valid for
+   * the cookie's full lifetime. Optional only for cookies minted before this
+   * shipped; see `isSessionValidForAuthAccount`.
+   */
+  authTime?: number;
+  /**
+   * Absolute end of this session (unix seconds), fixed at login. Re-mints
+   * (profile edit, impersonation start/end) carry it forward rather than
+   * starting a new window, so routine actions cannot silently extend a
+   * session. Optional only for cookies minted before this shipped.
+   */
+  expiresAt?: number;
   /** Present iff a developer impersonation session is active. */
   impersonation?: ImpersonationSessionBlock;
 }
@@ -112,8 +131,26 @@ export async function createSessionCookie(sessionData: SessionData) {
   // Cap the demo school here rather than at the call site so no caller can
   // forget it — the JWT `exp` and the cookie maxAge are set together, since
   // capping only the cookie would leave a replayed token verifiable for 5 days.
-  const maxAgeSeconds = sessionMaxAgeForSchool(sessionData.schoolId);
-  const token = await new SignJWT({ ...sessionData })
+  const freshWindow = sessionMaxAgeForSchool(sessionData.schoolId);
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  // A re-mint (profile edit, impersonation start/end) must NOT restart the
+  // clock — that turned an avatar change into a 5-day session extension.
+  const maxAgeSeconds = remainingSessionSeconds(
+    sessionData.expiresAt,
+    freshWindow,
+    nowSeconds,
+  );
+  if (maxAgeSeconds <= 0) {
+    // Already past its absolute end: clear rather than mint a dead cookie.
+    await clearSession();
+    return;
+  }
+
+  const payload: SessionData = {
+    ...sessionData,
+    expiresAt: sessionData.expiresAt ?? nowSeconds + freshWindow,
+  };
+  const token = await new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(`${maxAgeSeconds}s`)
@@ -222,22 +259,60 @@ export async function getSession(
     // transient Firestore failure, but Admin-SDK mutation routes fail closed:
     // without a current membership read we cannot prove the user is still
     // active and still holds the role carried by the cookie.
-    if (!payload.impersonation && payload.mfaExemptReason !== 'isolatedDemoReadOnly') {
-      try {
-        const snap = await adminDb
-          .collection('schools').doc(payload.schoolId as string)
-          .collection('users').doc(payload.uid as string)
-          .get();
-        const u = snap.data();
-        if (!isCurrentMembershipValid(snap.exists, u, role)) {
+    // ...and bind EVERY session to live Firebase Auth state. The membership
+    // read catches a user deactivated or demoted IN FIRESTORE but says nothing
+    // about the Auth account: before this, revoking refresh tokens or
+    // resetting a password left the portal cookie valid for its full lifetime.
+    // The Auth check applies to impersonation sessions too (the uid is the
+    // real dev's) and to demo sessions (the nightly password scramble revokes
+    // those tokens, which is exactly when the session should end).
+    //
+    // Both reads are issued together: getSession() is on the hot path for
+    // ~125 call sites, so this must cost one round trip's latency, not two.
+    const needsMembershipCheck =
+      !payload.impersonation && payload.mfaExemptReason !== 'isolatedDemoReadOnly';
+    const failClosed = !allowVerifiedJwtAfterMembershipLookupFailure(
+      options.requireMutable === true,
+    );
+
+    const [membership, account] = await Promise.all([
+      needsMembershipCheck
+        ? adminDb
+            .collection('schools').doc(payload.schoolId as string)
+            .collection('users').doc(payload.uid as string)
+            .get()
+            .then((snap) => ({ ok: true as const, snap }))
+            .catch((err) => ({ ok: false as const, err }))
+        : Promise.resolve(null),
+      adminAuth
+        .getUser(payload.uid as string)
+        .then((user) => ({ ok: true as const, user }))
+        .catch((err) => ({ ok: false as const, err })),
+    ]);
+
+    if (membership) {
+      if (membership.ok) {
+        if (!isCurrentMembershipValid(membership.snap.exists, membership.snap.data(), role)) {
           return null;
         }
-      } catch (err) {
-        console.error('getSession: server-state re-check failed', err);
-        if (!allowVerifiedJwtAfterMembershipLookupFailure(options.requireMutable === true)) {
-          return null;
-        }
+      } else {
+        console.error('getSession: server-state re-check failed', membership.err);
+        if (failClosed) return null;
       }
+    }
+
+    if (account.ok) {
+      const cookieAuthTime =
+        typeof payload.authTime === 'number' ? payload.authTime : undefined;
+      if (!isSessionValidForAuthAccount(account.user, cookieAuthTime)) {
+        return null;
+      }
+    } else if (isDefinitiveAuthLookupFailure(account.err)) {
+      // Account deleted — a definitive negative, never a transient failure.
+      return null;
+    } else {
+      console.error('getSession: auth-state re-check failed', account.err);
+      if (failClosed) return null;
     }
 
     return {
@@ -258,6 +333,8 @@ export async function getSession(
           : undefined,
       demoAllocationMutations:
         payload.demoAllocationMutations === true ? true : undefined,
+      authTime: typeof payload.authTime === 'number' ? payload.authTime : undefined,
+      expiresAt: typeof payload.expiresAt === 'number' ? payload.expiresAt : undefined,
       impersonation: payload.impersonation as ImpersonationSessionBlock | undefined,
     };
   } catch {
