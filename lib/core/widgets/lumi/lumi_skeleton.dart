@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../theme/app_colors.dart';
 import '../../theme/teacher_constants.dart';
+import '../../../theme/lumi_tokens.dart';
 
 class LumiSkeleton extends StatefulWidget {
   final double? width;
@@ -54,7 +54,7 @@ class _LumiSkeletonState extends State<LumiSkeleton>
           width: widget.width,
           height: widget.height,
           decoration: BoxDecoration(
-            color: AppColors.textSecondary.withValues(alpha: _animation.value * 0.3),
+            color: LumiTokens.muted.withValues(alpha: _animation.value * 0.3),
             shape: widget.isCircular ? BoxShape.circle : BoxShape.rectangle,
             borderRadius: widget.isCircular ? null : BorderRadius.circular(widget.borderRadius),
           ),

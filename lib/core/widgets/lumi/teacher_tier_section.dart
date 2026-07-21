@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
 import '../../theme/teacher_constants.dart';
+import '../../../theme/lumi_tokens.dart';
 
 /// Lumi Design System - Teacher Tier Section
 ///
@@ -45,7 +45,7 @@ class TeacherTierSection extends StatelessWidget {
                 fontFamily: 'Nunito',
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: AppColors.charcoal,
+                color: LumiTokens.ink,
               ),
             ),
             const SizedBox(width: 8),

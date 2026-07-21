@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
+import '../../../theme/lumi_tokens.dart';
 
 /// Alert banner type for teacher/admin screens
 enum AlertBannerType {
@@ -107,7 +108,7 @@ class TeacherAlertBanner extends StatelessWidget {
                 fontFamily: 'Nunito',
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.charcoal,
+                color: LumiTokens.ink,
               ),
             ),
           ),

@@ -4,6 +4,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/lumi_text_styles.dart';
 import '../../theme/lumi_spacing.dart';
 import '../../theme/lumi_borders.dart';
+import '../../../theme/lumi_tokens.dart';
 
 /// Lumi Design System - Text Input
 ///
@@ -107,7 +108,7 @@ class _LumiInputState extends State<LumiInput> {
   @override
   Widget build(BuildContext context) {
     final borderless = widget.borderless;
-    final accent = widget.accentColor ?? AppColors.rosePink;
+    final accent = widget.accentColor ?? LumiTokens.red;
     // In borderless mode the label becomes the inline placeholder.
     final hintText = borderless ? (widget.hintText ?? widget.label) : widget.hintText;
 
@@ -148,23 +149,23 @@ class _LumiInputState extends State<LumiInput> {
           decoration: InputDecoration(
             hintText: hintText,
             hintStyle: LumiTextStyles.body(
-              color: AppColors.charcoal.withOpacity(0.5),
+              color: LumiTokens.ink.withOpacity(0.5),
             ),
             prefixIcon: widget.prefixIcon,
             suffixIcon: widget.suffixIcon,
             filled: !borderless,
             fillColor: widget.enabled
-                ? AppColors.white
-                : AppColors.charcoal.withOpacity(0.05),
+                ? LumiTokens.paper
+                : LumiTokens.ink.withOpacity(0.05),
             contentPadding: borderless
                 ? const EdgeInsets.symmetric(vertical: 14)
                 : LumiPadding.input,
-            border: borderless ? InputBorder.none : outline(AppColors.charcoal.withOpacity(0.2), 1.5),
-            enabledBorder: borderless ? InputBorder.none : outline(AppColors.charcoal.withOpacity(0.2), 1.5),
+            border: borderless ? InputBorder.none : outline(LumiTokens.ink.withOpacity(0.2), 1.5),
+            enabledBorder: borderless ? InputBorder.none : outline(LumiTokens.ink.withOpacity(0.2), 1.5),
             focusedBorder: borderless ? InputBorder.none : outline(accent, 2.0),
             errorBorder: borderless ? InputBorder.none : outline(AppColors.error, 1.5),
             focusedErrorBorder: borderless ? InputBorder.none : outline(AppColors.error, 2.0),
-            disabledBorder: borderless ? InputBorder.none : outline(AppColors.charcoal.withOpacity(0.1), 1.5),
+            disabledBorder: borderless ? InputBorder.none : outline(LumiTokens.ink.withOpacity(0.1), 1.5),
             errorText: widget.errorText,
             errorStyle: LumiTextStyles.error(),
           ),
@@ -252,13 +253,13 @@ class _LumiSearchInputState extends State<LumiSearchInput> {
       onChanged: widget.onChanged,
       prefixIcon: Icon(
         Icons.search,
-        color: AppColors.charcoal.withOpacity(0.5),
+        color: LumiTokens.ink.withOpacity(0.5),
       ),
       suffixIcon: _hasText
           ? IconButton(
               icon: Icon(
                 Icons.close,
-                color: AppColors.charcoal.withOpacity(0.5),
+                color: LumiTokens.ink.withOpacity(0.5),
               ),
               onPressed: _clearText,
             )
@@ -350,7 +351,7 @@ class _LumiPasswordInputState extends State<LumiPasswordInput> {
       suffixIcon: IconButton(
         icon: Icon(
           _obscureText ? Icons.visibility : Icons.visibility_off,
-          color: AppColors.charcoal.withOpacity(0.5),
+          color: LumiTokens.ink.withOpacity(0.5),
         ),
         onPressed: _toggleVisibility,
       ),
@@ -475,31 +476,31 @@ class LumiDropdown<T> extends StatelessWidget {
           decoration: InputDecoration(
             hintText: hintText,
             hintStyle: LumiTextStyles.body(
-              color: AppColors.charcoal.withOpacity(0.5),
+              color: LumiTokens.ink.withOpacity(0.5),
             ),
             filled: true,
             fillColor: enabled
-                ? AppColors.white
-                : AppColors.charcoal.withOpacity(0.05),
+                ? LumiTokens.paper
+                : LumiTokens.ink.withOpacity(0.05),
             contentPadding: LumiPadding.input,
             border: OutlineInputBorder(
               borderRadius: LumiBorders.medium,
               borderSide: BorderSide(
-                color: AppColors.charcoal.withOpacity(0.2),
+                color: LumiTokens.ink.withOpacity(0.2),
                 width: 1.5,
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: LumiBorders.medium,
               borderSide: BorderSide(
-                color: AppColors.charcoal.withOpacity(0.2),
+                color: LumiTokens.ink.withOpacity(0.2),
                 width: 1.5,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: LumiBorders.medium,
               borderSide: const BorderSide(
-                color: AppColors.rosePink,
+                color: LumiTokens.red,
                 width: 2.0,
               ),
             ),
@@ -520,7 +521,7 @@ class LumiDropdown<T> extends StatelessWidget {
             disabledBorder: OutlineInputBorder(
               borderRadius: LumiBorders.medium,
               borderSide: BorderSide(
-                color: AppColors.charcoal.withOpacity(0.1),
+                color: LumiTokens.ink.withOpacity(0.1),
                 width: 1.5,
               ),
             ),
@@ -530,9 +531,9 @@ class LumiDropdown<T> extends StatelessWidget {
           style: LumiTextStyles.body(),
           icon: Icon(
             Icons.keyboard_arrow_down,
-            color: AppColors.charcoal.withOpacity(0.5),
+            color: LumiTokens.ink.withOpacity(0.5),
           ),
-          dropdownColor: AppColors.white,
+          dropdownColor: LumiTokens.paper,
         ),
         if (helperText != null && errorText == null) ...[
           const SizedBox(height: LumiSpacing.xxs),

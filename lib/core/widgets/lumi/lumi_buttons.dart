@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../../theme/app_colors.dart';
+import '../../../theme/lumi_tokens.dart';
 import '../../theme/lumi_text_styles.dart';
 import '../../theme/lumi_spacing.dart';
 import '../../theme/lumi_borders.dart';
@@ -51,8 +51,8 @@ class LumiPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = color ?? AppColors.rosePinkAccessible;
-    final resolvedForegroundColor = foregroundColor ?? AppColors.white;
+    final primaryColor = color ?? LumiTokens.red;
+    final resolvedForegroundColor = foregroundColor ?? LumiTokens.paper;
     final shape = borderRadius != null
         ? RoundedRectangleBorder(borderRadius: borderRadius!)
         : LumiBorders.shapePill;
@@ -193,7 +193,7 @@ class LumiSecondaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accentColor = color ?? AppColors.rosePinkAccessible;
+    final accentColor = color ?? LumiTokens.red;
     final br = borderRadius ?? LumiBorders.pill;
     final shape = RoundedRectangleBorder(
       borderRadius: br,
@@ -206,9 +206,9 @@ class LumiSecondaryButton extends StatelessWidget {
       child: OutlinedButton(
         onPressed: isLoading ? null : onPressed,
         style: OutlinedButton.styleFrom(
-          backgroundColor: AppColors.white,
+          backgroundColor: LumiTokens.paper,
           foregroundColor: accentColor,
-          disabledForegroundColor: AppColors.charcoal.withValues(alpha: 0.4),
+          disabledForegroundColor: LumiTokens.ink.withValues(alpha: 0.4),
           padding: const EdgeInsets.symmetric(
             vertical: 14,
             horizontal: 22,
@@ -265,13 +265,13 @@ class LumiTextButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final foregroundColor = color ?? AppColors.rosePinkAccessible;
+    final foregroundColor = color ?? LumiTokens.red;
 
     return TextButton(
       onPressed: isLoading ? null : onPressed,
       style: TextButton.styleFrom(
         foregroundColor: foregroundColor,
-        disabledForegroundColor: AppColors.charcoal.withValues(alpha: 0.4),
+        disabledForegroundColor: LumiTokens.ink.withValues(alpha: 0.4),
         padding: const EdgeInsets.symmetric(
           vertical: 8,
           horizontal: 12,
@@ -333,7 +333,7 @@ class LumiIconButton extends StatelessWidget {
       child: IconButton(
         onPressed: onPressed,
         icon: Icon(icon),
-        color: iconColor ?? AppColors.charcoal,
+        color: iconColor ?? LumiTokens.ink,
         style: IconButton.styleFrom(
           backgroundColor: backgroundColor ?? Colors.transparent,
           shape: const CircleBorder(),
@@ -367,7 +367,7 @@ class LumiFab extends StatelessWidget {
   Widget build(BuildContext context) {
     // Rec 10: default to the AA-accessible variant so white-on-pink FABs
     // meet contrast. `rosePink` is preserved for decorative fills only.
-    final bgColor = color ?? AppColors.rosePinkAccessible;
+    final bgColor = color ?? LumiTokens.red;
 
     if (isExtended && label != null) {
       return FloatingActionButton.extended(
@@ -378,7 +378,7 @@ class LumiFab extends StatelessWidget {
           style: LumiTextStyles.button(),
         ),
         backgroundColor: bgColor,
-        foregroundColor: AppColors.white,
+        foregroundColor: LumiTokens.paper,
         elevation: 4,
       );
     }
@@ -386,7 +386,7 @@ class LumiFab extends StatelessWidget {
     return FloatingActionButton(
       onPressed: onPressed,
       backgroundColor: bgColor,
-      foregroundColor: AppColors.white,
+      foregroundColor: LumiTokens.paper,
       elevation: 4,
       child: Icon(icon),
     );

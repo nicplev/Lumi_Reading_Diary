@@ -6,6 +6,7 @@ import '../../../data/models/reading_level_event.dart';
 import '../../../data/models/reading_level_option.dart';
 import '../../../services/reading_level_service.dart';
 import 'teacher_reading_level_pill.dart';
+import '../../../theme/lumi_tokens.dart';
 
 class ReadingLevelHistorySheet extends StatelessWidget {
   const ReadingLevelHistorySheet({
@@ -46,7 +47,7 @@ class ReadingLevelHistorySheet extends StatelessWidget {
     return Container(
       height: MediaQuery.of(context).size.height * 0.72,
       decoration: const BoxDecoration(
-        color: AppColors.white,
+        color: LumiTokens.paper,
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -69,7 +70,7 @@ class ReadingLevelHistorySheet extends StatelessWidget {
           Text(
             studentName,
             style: TeacherTypography.bodyMedium.copyWith(
-              color: AppColors.textSecondary,
+              color: LumiTokens.muted,
             ),
           ),
           const SizedBox(height: 16),
@@ -87,7 +88,7 @@ class ReadingLevelHistorySheet extends StatelessWidget {
                     child: Text(
                       'No level changes recorded yet.',
                       style: TeacherTypography.bodyMedium.copyWith(
-                        color: AppColors.textSecondary,
+                        color: LumiTokens.muted,
                       ),
                     ),
                   );
@@ -132,7 +133,7 @@ class ReadingLevelHistorySheet extends StatelessWidget {
                                 child: Icon(
                                   Icons.arrow_forward_rounded,
                                   size: 18,
-                                  color: AppColors.textSecondary,
+                                  color: LumiTokens.muted,
                                 ),
                               ),
                               TeacherReadingLevelPill(
@@ -161,7 +162,7 @@ class ReadingLevelHistorySheet extends StatelessWidget {
                             Text(
                               event.reason!,
                               style: TeacherTypography.bodySmall.copyWith(
-                                color: AppColors.charcoal,
+                                color: LumiTokens.ink,
                               ),
                             ),
                           ],

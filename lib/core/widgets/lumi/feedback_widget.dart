@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import '../../theme/app_colors.dart';
 import '../../theme/lumi_text_styles.dart';
 import '../../theme/lumi_spacing.dart';
 import '../../theme/lumi_borders.dart';
@@ -133,7 +132,7 @@ class _FeedbackSheetState extends State<_FeedbackSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.divider,
+                  color: LumiTokens.rule,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -145,7 +144,7 @@ class _FeedbackSheetState extends State<_FeedbackSheet> {
             Text(
               'Help us improve Lumi for you and your family',
               style: LumiTextStyles.bodySmall(
-                color: AppColors.charcoal.withValues(alpha: 0.6),
+                color: LumiTokens.ink.withValues(alpha: 0.6),
               ),
             ),
             const SizedBox(height: LumiSpacing.m),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
+import '../../../theme/lumi_tokens.dart';
 
 /// Progressive-pill step indicator.
 ///
@@ -31,9 +31,9 @@ class LumiStepIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final active = activeColor ?? AppColors.rosePink;
+    final active = activeColor ?? LumiTokens.red;
     final inactive =
-        inactiveColor ?? AppColors.charcoal.withValues(alpha: 0.18);
+        inactiveColor ?? LumiTokens.ink.withValues(alpha: 0.18);
 
     final clamped = currentStep.clamp(0, stepCount - 1);
     final trackHeight = activeDotSize + 6;
@@ -120,7 +120,7 @@ class LumiStepIndicator extends StatelessWidget {
             width: activeDotSize * 0.35,
             height: activeDotSize * 0.35,
             decoration: const BoxDecoration(
-              color: AppColors.white,
+              color: LumiTokens.paper,
               shape: BoxShape.circle,
             ),
           ),
@@ -134,7 +134,7 @@ class LumiStepIndicator extends StatelessWidget {
         width: activeDotSize * 0.55,
         height: activeDotSize * 0.55,
         decoration: BoxDecoration(
-          color: AppColors.white.withValues(alpha: 0.9),
+          color: LumiTokens.paper.withValues(alpha: 0.9),
           shape: BoxShape.circle,
         ),
       );
