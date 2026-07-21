@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
+import '../../../theme/lumi_tokens.dart';
 
 /// Lumi Design System - Teacher Scanner Card
 ///
@@ -41,7 +42,7 @@ class TeacherScannerCard extends StatelessWidget {
             child: Icon(
               icon,
               size: 32,
-              color: AppColors.white,
+              color: LumiTokens.paper,
             ),
           ),
           const SizedBox(width: 16),
@@ -55,7 +56,7 @@ class TeacherScannerCard extends StatelessWidget {
                     fontFamily: 'Nunito',
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.white,
+                    color: LumiTokens.paper,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -65,7 +66,7 @@ class TeacherScannerCard extends StatelessWidget {
                     fontFamily: 'Nunito',
                     fontSize: 13,
                     fontWeight: FontWeight.w400,
-                    color: AppColors.white.withValues(alpha: 0.9),
+                    color: LumiTokens.paper.withValues(alpha: 0.9),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -77,7 +78,7 @@ class TeacherScannerCard extends StatelessWidget {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.white,
+                      color: LumiTokens.paper,
                       borderRadius: BorderRadius.circular(25),
                     ),
                     child: Text(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/teacher_constants.dart';
 import 'staff_avatar.dart';
+import '../../../theme/lumi_tokens.dart';
 
 /// Profile stat data for the profile card stats row.
 class ProfileStat {
@@ -40,7 +41,7 @@ class TeacherProfileCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(TeacherDimensions.paddingXXL),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: LumiTokens.paper,
         borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
         boxShadow: TeacherDimensions.cardShadow,
       ),
@@ -64,7 +65,7 @@ class TeacherProfileCard extends StatelessWidget {
               fontFamily: 'Nunito',
               fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: AppColors.charcoal,
+              color: LumiTokens.ink,
             ),
           ),
           const SizedBox(height: 4),
@@ -72,7 +73,7 @@ class TeacherProfileCard extends StatelessWidget {
           Text(
             subtitle,
             style: TeacherTypography.bodyMedium.copyWith(
-              color: AppColors.textSecondary,
+              color: LumiTokens.muted,
             ),
             textAlign: TextAlign.center,
           ),
@@ -110,7 +111,7 @@ class _ProfileStatWidget extends StatelessWidget {
             fontFamily: 'Nunito',
             fontSize: 24,
             fontWeight: FontWeight.w800,
-            color: AppColors.charcoal,
+            color: LumiTokens.ink,
           ),
         ),
         const SizedBox(height: 2),

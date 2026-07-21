@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/teacher_constants.dart';
+import '../../../theme/lumi_tokens.dart';
 
 /// Lumi Design System - Teacher Class Card
 ///
@@ -32,7 +33,7 @@ class TeacherClassCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(TeacherDimensions.paddingXL),
           decoration: BoxDecoration(
-            color: AppColors.white,
+            color: LumiTokens.paper,
             borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
             border: Border.all(color: AppColors.teacherBorder),
             boxShadow: TeacherDimensions.cardShadow,
@@ -112,7 +113,7 @@ class TeacherClassCard extends StatelessWidget {
                     child: Text(
                       '$percent% reading rate',
                       style: TeacherTypography.caption.copyWith(
-                        color: AppColors.textSecondary,
+                        color: LumiTokens.muted,
                       ),
                     ),
                   ),

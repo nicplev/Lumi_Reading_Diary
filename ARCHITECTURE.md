@@ -370,10 +370,19 @@ Flutter Build:
   ├── flutter clean
   ├── flutter pub get
   ├── flutter pub run build_runner build  (code gen: Hive adapters)
-  ├── flutter build ios --release         (iOS)
-  ├── flutter build appbundle --release   (Android)
-  └── flutter build web --release         (Web → Firebase Hosting)
+  ├── ./scripts/flutter-build.sh ipa      (iOS → TestFlight/App Store)
+  ├── ./scripts/flutter-build.sh appbundle (Android → Play)
+  └── ./scripts/flutter-build.sh web      (Web → Firebase Hosting)
 ```
+
+Release artifacts must go through `scripts/flutter-build.sh`, never raw
+`flutter build`. The wrapper applies `.dart_define.json` and refuses mobile
+release targets that lack `LUMI_APP_CHECK_ENABLED` / `LUMI_STATUS_WORKER_URL`.
+A release build missing `LUMI_STATUS_WORKER_URL` fails closed at the version
+gate (`force_update_evaluator.dart:86`) with no retry affordance — the app is
+unusable. Note that Xcode archives read `DART_DEFINES` from
+`ios/Flutter/Generated.xcconfig`, which is rewritten by the last Flutter
+command run; re-run the wrapper immediately before archiving.
 
 ### Monitoring
 

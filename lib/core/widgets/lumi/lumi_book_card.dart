@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/lumi_text_styles.dart';
 import 'persistent_cached_image.dart';
+import '../../../theme/lumi_tokens.dart';
 
 /// Book type for badge coloring
 enum BookType {
@@ -39,7 +40,7 @@ class LumiBookCard extends StatelessWidget {
       case BookType.decodable:
         return AppColors.decodableBlue;
       case BookType.other:
-        return AppColors.textSecondary;
+        return LumiTokens.muted;
     }
   }
 
@@ -61,11 +62,11 @@ class LumiBookCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: LumiTokens.paper,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: AppColors.charcoal.withValues(alpha: 0.04),
+              color: LumiTokens.ink.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -99,7 +100,7 @@ class LumiBookCard extends StatelessWidget {
                     title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: LumiTextStyles.bodyMedium(color: AppColors.charcoal)
+                    style: LumiTextStyles.bodyMedium(color: LumiTokens.ink)
                         .copyWith(fontSize: 15),
                   ),
                   if (author != null) ...[
@@ -147,7 +148,7 @@ class LumiBookCard extends StatelessWidget {
             if (onTap != null)
               Icon(
                 Icons.chevron_right,
-                color: AppColors.charcoal.withValues(alpha: 0.3),
+                color: LumiTokens.ink.withValues(alpha: 0.3),
               ),
           ],
         ),

@@ -63,9 +63,12 @@ class _AccountScreenState extends State<AccountScreen> {
   String? _diagnosticsError;
   String? _error;
 
-  bool get _canDeleteStudents =>
-      widget.user.role == UserRole.teacher ||
-      widget.user.role == UserRole.schoolAdmin;
+  /// Student data deletion is a school-admin capability. Teachers are
+  /// deliberately excluded: the destructive scope (profile, logs, audio,
+  /// links) exceeds what class assignment should confer. The server enforces
+  /// the same rule in `authorizeStudentDeletion` — this only hides the entry
+  /// point.
+  bool get _canDeleteStudents => widget.user.role == UserRole.schoolAdmin;
 
   @override
   void initState() {

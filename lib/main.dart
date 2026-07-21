@@ -9,7 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-import 'core/theme/app_theme.dart';
+import 'theme/lumi_theme.dart';
 import 'core/routing/app_router.dart';
 import 'core/services/app_check_service.dart';
 import 'core/services/dev_access_service.dart';
@@ -383,8 +383,12 @@ class _LumiAppState extends ConsumerState<LumiApp> {
     return MaterialApp.router(
       title: 'Lumi Reading Diary',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme(),
-      darkTheme: AppTheme.darkTheme(),
+      // Lumi tokens are the app-wide default so that unstyled Material
+      // widgets in new features inherit the current design language rather
+      // than the legacy rose-pink palette in AppTheme. Screens still on the
+      // old look pass AppColors explicitly and are unaffected.
+      theme: LumiTheme.base(),
+      darkTheme: LumiTheme.base(),
       themeMode: ThemeMode.light,
       routerConfig: router,
       // ForceUpdateGate sits outermost: when the status worker demands a

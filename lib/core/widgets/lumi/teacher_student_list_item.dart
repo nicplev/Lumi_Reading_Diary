@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import 'student_avatar.dart';
+import '../../../theme/lumi_tokens.dart';
 
 /// Lumi Design System - Teacher Student List Item
 ///
@@ -44,10 +45,10 @@ class TeacherStudentListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.white,
+      color: LumiTokens.paper,
       borderRadius: BorderRadius.circular(12),
       elevation: 1,
-      shadowColor: AppColors.charcoal.withValues(alpha: 0.08),
+      shadowColor: LumiTokens.ink.withValues(alpha: 0.08),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
@@ -74,7 +75,7 @@ class TeacherStudentListItem extends StatelessWidget {
                         fontFamily: 'Nunito',
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.charcoal,
+                        color: LumiTokens.ink,
                       ),
                     ),
                     if (subtitle.isNotEmpty)
@@ -84,7 +85,7 @@ class TeacherStudentListItem extends StatelessWidget {
                           fontFamily: 'Nunito',
                           fontSize: 12,
                           fontWeight: FontWeight.w400,
-                          color: AppColors.textSecondary,
+                          color: LumiTokens.muted,
                         ),
                       ),
                   ],
@@ -117,7 +118,7 @@ class TeacherStudentListItem extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: 'Nunito',
                     fontSize: 14,
-                    color: AppColors.textSecondary,
+                    color: LumiTokens.muted,
                   ),
                 ),
             ],

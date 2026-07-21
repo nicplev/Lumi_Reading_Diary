@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/teacher_constants.dart';
 import '../../../data/models/reading_level_option.dart';
+import '../../../theme/lumi_tokens.dart';
 
 class ReadingLevelPickerResult {
   const ReadingLevelPickerResult({
@@ -85,7 +86,7 @@ class _ReadingLevelPickerSheetState extends State<ReadingLevelPickerSheet> {
     return Container(
       height: MediaQuery.of(context).size.height * 0.86,
       decoration: const BoxDecoration(
-        color: AppColors.white,
+        color: LumiTokens.paper,
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
       padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + viewInsets.bottom),
@@ -113,7 +114,7 @@ class _ReadingLevelPickerSheetState extends State<ReadingLevelPickerSheet> {
           Text(
             widget.levelSystemLabel,
             style: TeacherTypography.bodyMedium.copyWith(
-              color: AppColors.textSecondary,
+              color: LumiTokens.muted,
             ),
           ),
           if (widget.currentDisplayLabel != null) ...[
@@ -198,7 +199,7 @@ class _ReadingLevelPickerSheetState extends State<ReadingLevelPickerSheet> {
                         fontWeight: FontWeight.w600,
                         color: isSelected
                             ? AppColors.teacherPrimary
-                            : AppColors.charcoal,
+                            : LumiTokens.ink,
                       ),
                     ),
                     subtitle: Text(
@@ -214,7 +215,7 @@ class _ReadingLevelPickerSheetState extends State<ReadingLevelPickerSheet> {
                           )
                         : const Icon(
                             Icons.circle_outlined,
-                            color: AppColors.textSecondary,
+                            color: LumiTokens.muted,
                           ),
                   );
                 },
@@ -264,7 +265,7 @@ class _ReadingLevelPickerSheetState extends State<ReadingLevelPickerSheet> {
                       : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.teacherPrimary,
-                    foregroundColor: AppColors.white,
+                    foregroundColor: LumiTokens.paper,
                   ),
                   child: const Text('Save'),
                 ),
@@ -346,7 +347,7 @@ class _InfoCard extends StatelessWidget {
             child: Text(
               message,
               style: TeacherTypography.bodySmall.copyWith(
-                color: AppColors.charcoal,
+                color: LumiTokens.ink,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -388,7 +389,7 @@ class _WarningCard extends StatelessWidget {
             child: Text(
               message,
               style: TeacherTypography.bodySmall.copyWith(
-                color: AppColors.charcoal,
+                color: LumiTokens.ink,
                 fontWeight: FontWeight.w600,
               ),
             ),

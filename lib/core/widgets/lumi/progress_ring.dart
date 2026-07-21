@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/lumi_text_styles.dart';
+import '../../../theme/lumi_tokens.dart';
 
 /// Lumi Design System - Progress Ring
 ///
@@ -44,13 +45,13 @@ class ProgressRing extends StatelessWidget {
             children: [
               Text(
                 totalNights.toString(),
-                style: LumiTextStyles.display(color: AppColors.charcoal)
+                style: LumiTextStyles.display(color: LumiTokens.ink)
                     .copyWith(fontSize: 48),
               ),
               Text(
                 label ?? 'Nights',
                 style: LumiTextStyles.bodySmall(
-                  color: AppColors.charcoal.withValues(alpha: 0.6),
+                  color: LumiTokens.ink.withValues(alpha: 0.6),
                 ),
               ),
             ],
@@ -84,7 +85,7 @@ class _ProgressRingPainter extends CustomPainter {
       strokeWidth: 12,
       progress: totalProgress,
       backgroundAlpha: 0.1,
-      colors: [AppColors.rosePink, AppColors.lumiPeach],
+      colors: [LumiTokens.red, AppColors.lumiPeach],
     );
 
     // Middle ring - weekly progress (140px diameter, 10px stroke)
@@ -108,7 +109,7 @@ class _ProgressRingPainter extends CustomPainter {
       backgroundAlpha: 0.06,
       colors: todayComplete
           ? [AppColors.mintGreen, AppColors.mintGreen]
-          : [AppColors.charcoal, AppColors.charcoal],
+          : [LumiTokens.ink, LumiTokens.ink],
     );
   }
 
@@ -125,7 +126,7 @@ class _ProgressRingPainter extends CustomPainter {
 
     // Background track
     final bgPaint = Paint()
-      ..color = AppColors.charcoal.withValues(alpha: backgroundAlpha)
+      ..color = LumiTokens.ink.withValues(alpha: backgroundAlpha)
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;

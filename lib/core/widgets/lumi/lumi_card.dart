@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/lumi_spacing.dart';
 import '../../theme/lumi_borders.dart';
+import '../../../theme/lumi_tokens.dart';
 
 /// Lumi Design System - Card Component
 ///
@@ -36,12 +37,12 @@ class LumiCard extends StatelessWidget {
     final container = Container(
       padding: padding ?? LumiPadding.card,
       decoration: BoxDecoration(
-        color: isHighlighted ? AppColors.skyBlue : AppColors.white,
+        color: isHighlighted ? AppColors.skyBlue : LumiTokens.paper,
         borderRadius: LumiBorders.large,
         boxShadow: showShadow
             ? [
                 BoxShadow(
-                  color: AppColors.charcoal.withOpacity(0.08),
+                  color: LumiTokens.ink.withOpacity(0.08),
                   blurRadius: 16,
                   offset: const Offset(0, 2),
                 ),
@@ -209,7 +210,7 @@ class LumiInfoCard extends StatelessWidget {
                       fontFamily: 'Nunito',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.charcoal,
+                      color: LumiTokens.ink,
                     ),
                   ),
                   const SizedBox(height: LumiSpacing.xxs),
@@ -220,7 +221,7 @@ class LumiInfoCard extends StatelessWidget {
                     fontFamily: 'Nunito',
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
-                    color: AppColors.charcoal.withOpacity(0.8),
+                    color: LumiTokens.ink.withOpacity(0.8),
                   ),
                 ),
               ],
@@ -231,7 +232,7 @@ class LumiInfoCard extends StatelessWidget {
             IconButton(
               onPressed: onDismiss,
               icon: const Icon(Icons.close, size: 18),
-              color: AppColors.charcoal.withOpacity(0.6),
+              color: LumiTokens.ink.withOpacity(0.6),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(
                 minWidth: 32,
@@ -279,7 +280,7 @@ class LumiEmptyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = accentColor ?? AppColors.rosePink;
+    final accent = accentColor ?? LumiTokens.red;
 
     return LumiCard(
       child: Center(
@@ -306,7 +307,7 @@ class LumiEmptyCard extends StatelessWidget {
                 fontFamily: 'Nunito',
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
-                color: AppColors.charcoal,
+                color: LumiTokens.ink,
               ),
               textAlign: TextAlign.center,
             ),
@@ -317,7 +318,7 @@ class LumiEmptyCard extends StatelessWidget {
                 fontFamily: 'Nunito',
                 fontSize: 14,
                 fontWeight: FontWeight.w400,
-                color: AppColors.charcoal.withOpacity(0.7),
+                color: LumiTokens.ink.withOpacity(0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -327,7 +328,7 @@ class LumiEmptyCard extends StatelessWidget {
                 onPressed: onAction,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: accent,
-                  foregroundColor: AppColors.white,
+                  foregroundColor: LumiTokens.paper,
                   padding: const EdgeInsets.symmetric(
                     vertical: 12,
                     horizontal: 24,

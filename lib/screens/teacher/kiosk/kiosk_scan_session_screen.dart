@@ -8,6 +8,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/utils/image_decode.dart';
 import '../../../core/widgets/common_widgets.dart';
+import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../core/widgets/lumi/student_avatar.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/student_model.dart';
@@ -550,24 +551,7 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
     if (platform == TargetPlatform.iOS) {
       final shouldOpen = await showDialog<bool>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Open Bluetooth on this device'),
-          content: const Text(
-            'Apple does not let Lumi jump reliably to the Bluetooth device '
-            'list. Settings will open next — tap Bluetooth, then select your '
-            'scanner to connect or disconnect it.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Not now'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Open Settings'),
-            ),
-          ],
-        ),
+        builder: (dialogContext) => const _BluetoothSettingsDialog(),
       );
       if (shouldOpen != true || !mounted) return;
     }
@@ -1340,6 +1324,81 @@ class _AlreadyReadSheet extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// iOS-only explainer shown before handing off to system Settings. Styled to
+/// the Lumi surface language (paper card, XL radius, Lumi type + buttons)
+/// rather than the platform [AlertDialog] the kiosk used previously.
+class _BluetoothSettingsDialog extends StatelessWidget {
+  const _BluetoothSettingsDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.all(LumiTokens.space5),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Container(
+          padding: const EdgeInsets.all(LumiTokens.space5),
+          decoration: BoxDecoration(
+            color: LumiTokens.paper,
+            borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+            border: Border.all(color: LumiTokens.rule),
+            boxShadow: LumiTokens.shadowFloat,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: LumiTokens.tintBlue,
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+                ),
+                child: const Icon(
+                  Icons.bluetooth_searching_rounded,
+                  color: LumiTokens.indigo,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(height: LumiTokens.space4),
+              Text(
+                'Open Bluetooth on this device',
+                style: LumiType.subhead,
+              ),
+              const SizedBox(height: LumiTokens.space2),
+              Text(
+                'Apple does not let Lumi jump reliably to the Bluetooth device '
+                'list. Settings will open next — tap Bluetooth, then select '
+                'your scanner to connect or disconnect it.',
+                style: LumiType.body.copyWith(color: LumiTokens.muted),
+              ),
+              const SizedBox(height: LumiTokens.space5),
+              LumiPrimaryButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                text: 'Open Settings',
+                icon: Icons.settings_rounded,
+                isFullWidth: true,
+              ),
+              const SizedBox(height: LumiTokens.space2),
+              LumiSecondaryButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                text: 'Not now',
+                isFullWidth: true,
+                // Muted rather than the brand red: this is a dismissal, and
+                // the accent belongs on the action that moves the task on.
+                color: LumiTokens.muted,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

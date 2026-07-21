@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/teacher_constants.dart';
+import '../../../theme/lumi_tokens.dart';
 
 /// Lumi Design System - Teacher Book Grid Item
 ///
@@ -24,7 +25,7 @@ class TeacherBookGridItem extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: LumiTokens.paper,
           borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
           boxShadow: TeacherDimensions.cardShadow,
         ),
@@ -56,7 +57,7 @@ class TeacherBookGridItem extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TeacherTypography.caption.copyWith(
-                  color: AppColors.charcoal,
+                  color: LumiTokens.ink,
                 ),
               ),
             ),
