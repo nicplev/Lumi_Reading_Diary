@@ -16,6 +16,7 @@
     "test:audio:appcheck": "npm run build && COMPREHENSION_AUDIO_APP_CHECK_ENFORCED=true ../scripts/with-jdk21.sh firebase emulators:exec --config ../firebase.deletion.json --only functions,auth --project demo-lumi-audio-appcheck \"node --test test/comprehension_audio.appcheck.integration.test.js\"",
     "test:scale": "npm run build && ../scripts/with-jdk21.sh firebase emulators:exec --config ../firebase.deletion.json --only firestore --project demo-lumi-scale \"node --test test/dashboard_scale.integration.test.js\"",
     "test:summaries": "npm run build && ../scripts/with-jdk21.sh firebase emulators:exec --config ../firebase.deletion.json --only firestore --project demo-lumi-daily-summary \"node --test test/class_daily_reading.integration.test.js\"",
+    "test:stats:concurrency": "npm run build && ../scripts/with-jdk21.sh firebase emulators:exec --config ../firebase.deletion.json --only firestore --project demo-lumi-stats-concurrency \"node --test test/stats_concurrency.integration.test.js\"",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
