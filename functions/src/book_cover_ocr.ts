@@ -18,8 +18,14 @@ import {assertNotReadOnly} from "./read_only_guard";
 import {errorCodeForLog} from "./log_safety";
 import {AI_EVAL_DEFAULT_MODEL} from "./ai_evaluation/config";
 import {vertexGenerateContent} from "./ai_evaluation/vertex_rest";
-
-export const COVER_OCR_FLAG_DOC = "platformConfig/coverOcr";
+import {
+  COVER_OCR_FLAG_DOC,
+  coverOcrEnabledFromDoc,
+} from "./book_cover_ocr_flag";
+export {
+  COVER_OCR_FLAG_DOC,
+  coverOcrEnabledFromDoc,
+} from "./book_cover_ocr_flag";
 
 const COVER_OCR_TIMEOUT_MS = 30_000;
 const COVER_OCR_APP_CHECK_ENFORCED =
@@ -54,11 +60,6 @@ export const MAX_AUTHOR_CHARS = 200;
 // Only the literal `false` closes the gate. Flipping it in the console takes
 // effect fleet-wide within the cache TTL, with no deploy — which matters
 // because Cloud Functions in this repo are not CI-deployed.
-export function coverOcrEnabledFromDoc(data: unknown): boolean {
-  if (!data || typeof data !== "object" || Array.isArray(data)) return true;
-  return (data as Record<string, unknown>).enabled !== false;
-}
-
 const FLAG_CACHE_TTL_MS = 60_000;
 let cachedFlag: boolean | null = null;
 let cachedFlagAt = 0;
