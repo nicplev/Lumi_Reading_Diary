@@ -14,6 +14,7 @@
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
 		5202FDBE2AE7E43B5CEF9A35 /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA9D7768B54EAF7E9E8CFC89 /* Pods_RunnerTests.framework */; };
 		4C9BB81A965D40E8B399CEE4 /* AppIconChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 814EED49BD6D4CE6A0309221 /* AppIconChannel.swift */; };
+		50D6887A38C44359A71D3C40 /* HidKeyboardChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 759CE8DD18CD447F8A0F5901 /* HidKeyboardChannel.swift */; };
 		64F08346FA4B32B2ADF52DA2 /* SinglePageDocumentScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70588A8A70CA72B3F6A5BDC1 /* SinglePageDocumentScanner.swift */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		7E85F0A02F87DBE700D49089 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E85F09F2F87DBE700D49089 /* WidgetKit.framework */; };
@@ -83,6 +84,7 @@
 		814EED49BD6D4CE6A0309221 /* AppIconChannel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppIconChannel.swift; sourceTree = "<group>"; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		759CE8DD18CD447F8A0F5901 /* HidKeyboardChannel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HidKeyboardChannel.swift; sourceTree = "<group>"; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Release.xcconfig; path = Flutter/Release.xcconfig; sourceTree = "<group>"; };
 		7E85F09E2F87DBE700D49089 /* LumiWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LumiWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		7E85F09F2F87DBE700D49089 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
@@ -220,6 +222,7 @@
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 				70588A8A70CA72B3F6A5BDC1 /* SinglePageDocumentScanner.swift */,
 				814EED49BD6D4CE6A0309221 /* AppIconChannel.swift */,
+				759CE8DD18CD447F8A0F5901 /* HidKeyboardChannel.swift */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -571,6 +574,7 @@
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				64F08346FA4B32B2ADF52DA2 /* SinglePageDocumentScanner.swift in Sources */,
 				4C9BB81A965D40E8B399CEE4 /* AppIconChannel.swift in Sources */,
+				50D6887A38C44359A71D3C40 /* HidKeyboardChannel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
