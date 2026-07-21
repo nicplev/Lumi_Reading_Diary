@@ -46,6 +46,11 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Audio authority parity
         run: pnpm test:audio-authority
+      # Portal and Cloud Functions must resolve the same feature-flag docs to
+      # the same state. A drift here makes a kill switch display a state the
+      # feature is not in — silent until an incident.
+      - name: Feature-flag parity
+        run: pnpm test:flag-parity
       - name: Typecheck
         run: pnpm --filter lumi-admin-scaffold exec tsc --noEmit
       - name: Lint
