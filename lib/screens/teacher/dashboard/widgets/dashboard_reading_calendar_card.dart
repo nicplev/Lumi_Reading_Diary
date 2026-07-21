@@ -119,15 +119,18 @@ class _DashboardReadingCalendarCardState
   ) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        const gap = 3.0;
-        const targetCell = 18.0;
-        // Fixed-size square cells. Days flow left→right, top→bottom and wrap
-        // onto as many rows as needed to fill the width. So fewer weeks means
-        // fewer rows (a shorter card) rather than bigger cells or empty space.
-        final perRow = ((constraints.maxWidth + gap) / (targetCell + gap))
+        const cell = 18.0;
+        const targetGap = 3.0;
+        // Fixed-size square cells regardless of card width. Days flow
+        // left→right, top→bottom and wrap onto as many rows as needed. On
+        // wide cards (e.g. iPad) the extra room goes into wider gaps between
+        // cells — not bigger cells (illegible density signal) or dead space.
+        final perRow = ((constraints.maxWidth + targetGap) / (cell + targetGap))
             .floor()
             .clamp(7, 28);
-        final cell = (constraints.maxWidth - gap * (perRow - 1)) / perRow;
+        final gap = perRow > 1
+            ? (constraints.maxWidth - cell * perRow) / (perRow - 1)
+            : 0.0;
         final totalDays = _weeks * 7;
         final rows = (totalDays / perRow).ceil();
 
@@ -140,7 +143,7 @@ class _DashboardReadingCalendarCardState
             final day = startDay.add(Duration(days: i));
             final count = byDay[day] ?? 0;
             final selected = _selectedDay == day;
-            if (c > 0) cells.add(const SizedBox(width: gap));
+            if (c > 0) cells.add(SizedBox(width: gap));
             cells.add(GestureDetector(
               onTap: () => setState(() => _selectedDay = day),
               child: Container(
