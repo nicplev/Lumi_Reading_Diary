@@ -9,9 +9,9 @@ Status markers: ☐ not started · ◐ in progress · 🔍 under test / awaiting
 
 ## ▶ Where we're up to (one glance)
 
-- **Now:** Wave 0 (source-assisted static recon) **complete**. Plan + this board written.
-- **Blocked on you:** go-ahead for **Wave 1 + Wave 2** (deeper static + isolated emulator PoCs — zero prod exposure); decision on **Wave 3** (passive prod TLS scan, needs a narrow written exception).
-- **Next action once approved:** write + run the first 6 emulator PoCs (F-01, F-02, F-03, F-06, cross-tenant collection-group sweep, callable App-Check-off abuse), each reviewed by Fable as it lands.
+- **Now:** Authorised overnight autonomous run in progress. Wave 0 done. **Wave 2 executed for F-01/F-02/F-03 — each dynamically confirmed in the emulator, fixed in `firestore.rules`, and regression-tested; full rules suite 172/172 green (commit `0d31809`).** Wave 4 (mobile AP2) done. Wave 5 (CI scanning config) in progress.
+- **Boundary held despite the blanket OK:** no active production testing, no deploys, no PRs/merges — everything is in the isolated emulator + this branch. Wave 3 (passive prod TLS scan) stays parked for an explicit hostname go-ahead.
+- **Left for a reviewed daytime pass:** F-06 storage PoC; portal fixes F-07/F-09 (need `pnpm install` + tsc to verify safely); F-04 server-ops defense-in-depth (needs the server-ops test harness); the documents workstream (Tranche A).
 
 ## How to track progress (3 ways)
 
@@ -26,11 +26,11 @@ Status markers: ☐ not started · ◐ in progress · 🔍 under test / awaiting
 | Wave | What | Environment | Status | Output |
 |---|---|---|---|---|
 | 0 — Source recon | 5 Opus agents map authz / rules / portals / vendor / env; Fable triage | Repo (read-only) | ☑ | 9 candidate findings (F-01…F-09), deduped vs closed list |
-| 1 — Deep source analysis | Per-target Opus agents + local SAST (semgrep) / SCA (osv-scanner) | Repo (read-only) | ☐ | Confirmed candidates + PoC specs |
-| 2 — Emulator dynamic PoC | Client-SDK exploit tests in the emulator; each becomes a regression test | Emulator (`demo-lumi-sec`), synthetic only | ☐ | CONFIRMED/REFUTED PoCs |
-| 3 — Passive prod config | TLS/header profile of Lumi's own hostnames (read-only) | Prod hostnames | ☐ (needs written exception) | S1/S3/S5 evidence |
-| 4 — Mobile static (AP2) | MASVS/MASTG static + MobSF on a local build | Local artifacts | ☐ | AP2 evidence |
-| 5 — Continuous automation | Dependabot, osv-scanner, semgrep/CodeQL, monthly ZAP, findings register | CI (PRs) | ☐ | AP1/T1/T2/EV11 controls |
+| 1 — Deep source analysis | Per-target Opus agents + local SCA/SAST | Repo (read-only) | ◐ | SCA run; findings register started |
+| 2 — Emulator dynamic PoC | Client-SDK exploit tests in the emulator; each becomes a regression test | Emulator (`demo-lumi-secpoc`), synthetic only | ◐ | **F-01/F-02/F-03 ☑ confirmed+fixed+regression**; F-06 pending |
+| 3 — Passive prod config | TLS/header profile of Lumi's own hostnames (read-only) | Prod hostnames | ☐ parked (needs written exception) | S1/S3/S5 evidence |
+| 4 — Mobile static (AP2) | MASVS/MASTG static review | Repo (read-only) | ☑ | AP2 findings (below); MobSF/build left for tester |
+| 5 — Continuous automation | Dependabot, osv-scanner, semgrep; findings register (ZAP deferred to prod-scan exception) | CI config | ◐ | AP1/T1/T2/EV11 controls |
 
 ---
 
@@ -38,9 +38,9 @@ Status markers: ☐ not started · ◐ in progress · 🔍 under test / awaiting
 
 | ID | Finding (short) | Sev | Status | ST4S | Evidence when done |
 |---|---|---|---|---|---|
-| F-01 | Student `create` omits server-owned-field denylist → forgeable `access` entitlement | High/Med | 🔍 source-verified, emulator PoC pending | S4, A13 | PoC test + rules fix + regression test |
-| F-02 | School `create` omits commercial-field guard | Med | 🔍 | S4 | PoC + fix |
-| F-03 | Class `update` authz off pre-image only → teacher reassign/inject | Med-Low | 🔍 | S4 | PoC + fix |
+| F-01 | Student `create` omits server-owned-field denylist → forgeable `access` entitlement | High/Med | ☑ **confirmed (emulator) + fixed + regression-tested** (`0d31809`) | S4, A13 | `security_poc.rules.test.js` F-01 |
+| F-02 | School `create` omits commercial-field guard | Med | ☑ **confirmed + fixed + regression-tested** (`0d31809`) | S4 | `security_poc.rules.test.js` F-02 |
+| F-03 | Class `update` authz off pre-image only → teacher reassigns ownership | Med-Low | ☑ **confirmed + fixed + regression-tested** (`0d31809`) | S4 | `security_poc.rules.test.js` F-03 |
 | F-04 | `server-ops` single-layer authz (gate currently present) | Med (def-in-depth) | ◐ prove gate completeness in W1 | A5, S4, A13 | Route-gate proof |
 | F-05 | App Check OFF on all callables | Low-Med | ☐ known launch gate | A13, S7 | Staged-rollout evidence |
 | F-06 | Storage cover first-claim open to any authed user | Low-Med | 🔍 | S4, PF51 | PoC + fix |
@@ -49,6 +49,23 @@ Status markers: ☐ not started · ◐ in progress · 🔍 under test / awaiting
 | F-09 | `createUser` password min-6 | Low | ☐ fold into ST4S 1.1 | **A2** | Fix + evidence |
 
 ---
+
+## Mobile (AP2) findings — MASVS/MASTG static review
+
+Owner [SEC]. Overall posture is good: the one PII-bearing signup box is AES-256 encrypted with a Keychain/Keystore key, deep-link validation is strict (scheme/host/path allowlist, no query-param forwarding), no WebView, Analytics/Crashlytics off until adult opt-in, and `allowBackup=false` + data-extraction rules exclude every domain from cloud-backup/device-transfer (so plaintext caches don't leave the device). Residual items:
+
+| ID | Finding | Sev | MASVS | Status |
+|---|---|---|---|---|
+| M-01 | Hive offline caches (students, reading_logs, pending_sync) unencrypted at rest — child PII | Med | STORAGE | Known/accepted; local-access-only (rooted/forensic) |
+| M-02 | Comprehension **audio** (child voice) written unencrypted pre-sync, then deleted | Low-Med | STORAGE | **New**; transient; same access precondition |
+| M-03 | iOS widget App Group stores child `firstName`+streak as plaintext JSON | Low | STORAGE | **New**; shared only with own widget |
+| M-04 | App Check client wired but **backend enforcement OFF** (=F-05) | Med | RESILIENCE | Known launch gate |
+| M-05 | No TLS certificate pinning | Low/Info | NETWORK | Acceptable with Firebase; note for tester |
+| M-06 | No root/jailbreak/anti-tamper/obfuscation | Low/Info | RESILIENCE | Advisory (Dart AOT limits reversibility) |
+| M-07 | Firebase API keys in bundle | None | STORAGE | **Not a vuln** — client identifiers; flagged to prevent false-positive |
+| M-08 | `debugPrint` runs in release (reviewed: no secrets/PII logged) | Low/Info | RESILIENCE | Hygiene note |
+
+MASTG gaps for the external mobile tester: at-rest inspection on rooted/jailbroken device, backup-vector extraction, deep-link fuzzing, App Check backend-enforcement replay, MITM with user CA, runtime/Frida tamper. Existing coverage credited: `test/security/android_backup_rules_test.dart` (backup/transfer exclusion).
 
 ## ST4S coverage map — what this assessment touches, by section
 
@@ -110,3 +127,4 @@ A control-assertion document may only be written once the control is **true and 
 |---|---|
 | 2026-07-23 | Board created. Wave 0 complete (5 Opus agents + Fable triage); F-01 source-verified. Awaiting Wave 1/2 go-ahead. |
 | 2026-07-23 | Clarified doc↔code sequencing: control-assertion docs (Tranche B) gated on their [SEC] item being ☑; only code-independent docs (Tranche A) run truly in parallel. Corrects the earlier "fully parallel" framing. |
+| 2026-07-23 (overnight) | Wave 2: F-01/F-02/F-03 confirmed in emulator, fixed in `firestore.rules`, regression-tested (`security_poc.rules.test.js`, wired into `test:rules`); full suite 172/172 green (commit `0d31809`). Wave 4 mobile AP2 static review completed (M-01..M-08). |
