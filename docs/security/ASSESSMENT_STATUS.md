@@ -9,7 +9,7 @@ Status markers: ☐ not started · ◐ in progress · 🔍 under test / awaiting
 
 ## ▶ Where we're up to (one glance)
 
-- **Now:** Authorised overnight autonomous run in progress. Wave 0 done. **Wave 2 executed for F-01/F-02/F-03 — each dynamically confirmed in the emulator, fixed in `firestore.rules`, and regression-tested; full rules suite 172/172 green (commit `0d31809`).** Wave 4 (mobile AP2) done. Wave 5 (CI scanning config) in progress.
+- **Now:** Overnight autonomous run **complete — paused for your review.** Delivered: Wave 0 recon; **Wave 2 → F-01/F-02/F-03 confirmed in the emulator, fixed, and regression-tested (full rules suite 172/172 green); S4 cross-tenant isolation dynamically proven**; Wave 4 mobile AP2 review; Wave 5 CI scanning config (Dependabot/osv/semgrep) + SCA & SAST baselines + findings register. **8 commits on `sec/security-assessment`; working tree clean; nothing deployed, pushed, or merged.**
 - **Boundary held despite the blanket OK:** no active production testing, no deploys, no PRs/merges — everything is in the isolated emulator + this branch. Wave 3 (passive prod TLS scan) stays parked for an explicit hostname go-ahead.
 - **Left for a reviewed daytime pass:** portal fixes F-07/F-09 (need `pnpm install` + tsc to verify safely); F-04 server-ops defense-in-depth (needs the server-ops test harness); cross-tenant collection-group sweep + callable App-Check-off PoCs; the documents workstream (Tranche A). (F-06 reclassified accept-as-designed.)
 
