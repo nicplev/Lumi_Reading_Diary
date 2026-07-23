@@ -1,0 +1,64 @@
+# Dependabot — centrally-managed dependency updates (ST4S T2 "centrally managed
+# patching" + AP1). Patches arrive as PRs; the weekly npm/pnpm audit and the
+# osv-scanner workflow catch what remains. Grouped to reduce PR noise.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule: { interval: weekly }
+    groups:
+      actions: { patterns: ["*"] }
+
+  # Cloud Functions (npm)
+  - package-ecosystem: npm
+    directory: "/functions"
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  # School portal (Next.js)
+  - package-ecosystem: npm
+    directory: "/school-admin-web"
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  # Super-admin portal (Next.js)
+  - package-ecosystem: npm
+    directory: "/admin"
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  # Marketing site (Next.js)
+  - package-ecosystem: npm
+    directory: "/marketing-site"
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  # Repo root tooling
+  - package-ecosystem: npm
+    directory: "/"
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  # Flutter app (pub)
+  - package-ecosystem: pub
+    directory: "/"
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
