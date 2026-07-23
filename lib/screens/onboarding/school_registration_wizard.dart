@@ -4,6 +4,7 @@ import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../core/theme/lumi_text_styles.dart';
+import '../../core/validation/password_policy.dart';
 import '../../core/theme/lumi_spacing.dart';
 import '../../core/theme/lumi_borders.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
@@ -456,7 +457,10 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
                   obscureText: true,
                   validator: FormBuilderValidators.compose([
                     FormBuilderValidators.required(),
-                    FormBuilderValidators.minLength(8),
+                    (val) {
+                      final issue = passwordIssue(val ?? '');
+                      return issue == null ? null : 'Password needs $issue';
+                    },
                   ]),
                 ),
                 LumiGap.s,
