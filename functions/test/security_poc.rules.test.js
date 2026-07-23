@@ -177,3 +177,41 @@ test('F-03 classes.update: a teacher cannot reassign class ownership', async () 
     classRef(authDb('teacher_1')).update({ teacherIds: ['attacker'] }),
   );
 });
+
+// ─── S4 positive assurance ───────────────────────────────────────────────
+// Not a bug — proves cross-tenant isolation holds. The rules review flagged the
+// collection-group case as untested: a school-A teacher must not read school-B
+// data directly, nor sweep it via an unconstrained collection-group query
+// (there is no client collectionGroup rule; nested per-school paths bind the
+// schoolId, so an unscoped group query cannot be authorised).
+test('S4 tenant isolation: school-A teacher cannot cross-tenant read or collection-group sweep', async () => {
+  await seedData(async (db) => {
+    for (const s of ['school_A', 'school_B']) {
+      await db.collection('schools').doc(s).set({ name: s, createdBy: `admin_${s}` });
+      await db.collection('schools').doc(s).collection('students').doc(`student_${s}`).set({
+        schoolId: s, classId: `class_${s}`, firstName: 'Kid', lastName: s,
+        isActive: true, createdAt: new Date(),
+      });
+      await db.collection('schools').doc(s).collection('readingLogs').doc(`log_${s}`).set({
+        schoolId: s, studentId: `student_${s}`, minutesRead: 20, createdAt: new Date(),
+      });
+    }
+    await db.collection('schools').doc('school_A').collection('users').doc('teacher_a')
+      .set({ role: 'teacher', schoolId: 'school_A' });
+    await db.collection('schools').doc('school_A').collection('classes').doc('class_school_A').set({
+      schoolId: 'school_A', teacherId: 'teacher_a', teacherIds: ['teacher_a'],
+      studentIds: ['student_school_A'],
+    });
+  });
+
+  const teacherA = authDb('teacher_a');
+
+  // Direct cross-tenant read of school-B data -> DENIED.
+  await assertFails(
+    teacherA.collection('schools').doc('school_B').collection('students').doc('student_school_B').get(),
+  );
+
+  // Unconstrained collection-group sweeps across tenants -> DENIED.
+  await assertFails(teacherA.collectionGroup('students').get());
+  await assertFails(teacherA.collectionGroup('readingLogs').get());
+});
