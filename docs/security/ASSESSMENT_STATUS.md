@@ -93,6 +93,15 @@ Owner tags: **[SEC]** this security orchestration · **[DOC]** separate document
 
 **YOURS — real-world tasks [NIC]:** WWCC/screening (HR1), MFA on privileged accounts (A5), Mac/device settings (A10/S7), booking the external pen test (0.2), signing the officer letters (GO1/GO2). These can't be automated; the ST4S plan Phases 0 and 2 list them.
 
+### Sequencing — docs follow the code they assert (truthfulness rule)
+
+A control-assertion document may only be written once the control is **true and ☑ on this board** — writing it earlier repeats the ST4S *honesty-list* mistake (claiming 14-char passwords while code enforces 6; asserting "entitlement enforced server-side at a single point" while F-01 shows `create` bypasses it). So the [DOC] pack splits by dependency, and the security orchestration **leads**:
+
+- **Tranche A — code-independent, may start now (genuinely parallel):** HR pack (HR1/2/3), GO1/GO2 letters, BCP/DR/IRP (EV7/EV8/EV9), device standard (A10), and the privacy/vendor docs that describe *existing data flows* — PR2 content, PR17 sub-processor table, PR10 data-sharing audit, INT7 agreements. These assert facts about org process and current architecture, not the controls under change. *(Caveat: the consent-mechanism claim in PR2 and the single re-acceptance version bump (6.5) are sequenced behind the portal consent-gate code in [SEC] 1.2.)*
+- **Tranche B — must follow the [SEC] item it asserts:** EV6 InfoSec policy, access-control policy (A6/A7/A13), crypto profile (S1/S3 — needs Wave 3 scan results), EV11 vuln-assessment + monitoring plan (T1/AP1 — need Wave 5 scans running), EV12 patch process (T2 — needs Dependabot/scans), EV13 SSDLC (needs the CI gates in place), the **A2** answer, and the **Privacy/T&C consent** answer. Each is written against the *fixed* state and cites this board's ☑ + evidence.
+
+**Rule:** the [DOC] workstream reads its truth from this board and the merged `sec/security-assessment` fixes; it never asserts a control still marked ☐/◐/🔍. This mirrors the ST4S plan's own phase order (Phase 1 code → Phase 3 crypto scan → Phase 4 docs → Phase 5 scans → Phase 6 privacy → Phase 7 re-run) and its golden rule.
+
 ---
 
 ## Change log
@@ -100,3 +109,4 @@ Owner tags: **[SEC]** this security orchestration · **[DOC]** separate document
 | Date | Update |
 |---|---|
 | 2026-07-23 | Board created. Wave 0 complete (5 Opus agents + Fable triage); F-01 source-verified. Awaiting Wave 1/2 go-ahead. |
+| 2026-07-23 | Clarified doc↔code sequencing: control-assertion docs (Tranche B) gated on their [SEC] item being ☑; only code-independent docs (Tranche A) run truly in parallel. Corrects the earlier "fully parallel" framing. |
