@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../theme/section_theme.dart';
 import '../../core/theme/lumi_borders.dart';
 import '../../core/theme/lumi_spacing.dart';
@@ -64,15 +65,15 @@ class _ParentNotificationsScreenState extends State<ParentNotificationsScreen> {
         title: Text('Clear all notifications?', style: LumiType.subhead),
         content: Text("This can't be undone.", style: LumiType.body),
         actions: [
-          TextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('Cancel',
-                style: LumiType.button.copyWith(color: LumiTokens.muted)),
+            label: 'Cancel',
+            variant: LumiDialogActionVariant.cancel,
           ),
-          TextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text('Clear all',
-                style: LumiType.button.copyWith(color: LumiTokens.red)),
+            label: 'Clear all',
+            variant: LumiDialogActionVariant.destructive,
           ),
         ],
       ),

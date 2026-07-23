@@ -116,6 +116,8 @@ class DashboardWidgetRegistry {
       builder: (ctx) => DashboardTopReadersCard(
         weeklyLogs: ctx.weeklyLogs,
         students: ctx.students,
+        teacher: ctx.teacher,
+        classModel: ctx.classModel,
       ),
     ),
     'reading_sentiment': DashboardWidgetDefinition(
@@ -162,6 +164,7 @@ class DashboardWidgetRegistry {
         classModel: ctx.classModel,
         schoolId: ctx.schoolId,
         students: ctx.students,
+        teacher: ctx.teacher,
       ),
     ),
     'group_comparison': DashboardWidgetDefinition(

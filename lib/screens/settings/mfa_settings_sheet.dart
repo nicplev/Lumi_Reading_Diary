@@ -233,22 +233,15 @@ class _MfaSettingsSheetState extends State<_MfaSettingsSheet> {
           style: LumiType.body,
         ),
         actions: [
-          TextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(
-              'Cancel',
-              style: LumiType.body.copyWith(color: LumiTokens.muted),
-            ),
+            label: 'Cancel',
+            variant: LumiDialogActionVariant.cancel,
           ),
-          TextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(
-              'Turn off',
-              style: LumiType.body.copyWith(
-                color: LumiTokens.red,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            label: 'Turn off',
+            variant: LumiDialogActionVariant.destructive,
           ),
         ],
       ),
@@ -286,13 +279,16 @@ class _MfaSettingsSheetState extends State<_MfaSettingsSheet> {
 
   @override
   Widget build(BuildContext context) {
+    // Keyboard height (viewInsets) lifts the fields above the keyboard;
+    // padding.bottom clears the home indicator. No SafeArea wrapper — that would
+    // apply padding.bottom a SECOND time, floating the whole sheet off the
+    // bottom edge and exposing the scrim underneath.
     final bottom = MediaQuery.of(context).viewInsets.bottom +
         MediaQuery.of(context).padding.bottom;
 
-    return SafeArea(
-      top: false,
-      child: SingleChildScrollView(
-        child: Container(
+    return SingleChildScrollView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      child: Container(
           decoration: const BoxDecoration(
             color: LumiTokens.paper,
             borderRadius: BorderRadius.vertical(
@@ -348,7 +344,6 @@ class _MfaSettingsSheetState extends State<_MfaSettingsSheet> {
             ],
           ),
         ),
-      ),
     );
   }
 

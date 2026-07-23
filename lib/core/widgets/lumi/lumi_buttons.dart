@@ -306,6 +306,68 @@ class LumiTextButton extends StatelessWidget {
   }
 }
 
+/// Variant for a dialog action button.
+enum LumiDialogActionVariant {
+  /// Neutral dismiss (Cancel / Not now). Muted foreground.
+  cancel,
+
+  /// Affirmative, non-destructive action (Save / Continue). Green foreground.
+  confirm,
+
+  /// Destructive action (Delete / Remove / Sign out). Red foreground.
+  destructive,
+}
+
+/// Lumi Design System - Dialog Action
+///
+/// Bordered pill for use in `AlertDialog.actions` (and confirmation dialogs).
+/// Dialogs across the app hand-rolled bare Material `TextButton`s with no border,
+/// which read inconsistently and — via [LumiTextButton]'s red default — could
+/// render a Cancel button in red. This gives every dialog the same outlined
+/// treatment, with the foreground driven by an explicit [variant] rather than an
+/// inherited default.
+class LumiDialogAction extends StatelessWidget {
+  final VoidCallback? onPressed;
+  final String label;
+  final LumiDialogActionVariant variant;
+
+  const LumiDialogAction({
+    super.key,
+    required this.onPressed,
+    required this.label,
+    this.variant = LumiDialogActionVariant.confirm,
+  });
+
+  Color get _foreground {
+    switch (variant) {
+      case LumiDialogActionVariant.cancel:
+        return LumiTokens.muted;
+      case LumiDialogActionVariant.confirm:
+        return LumiTokens.green;
+      case LumiDialogActionVariant.destructive:
+        return LumiTokens.red;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = _foreground;
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: foreground,
+        side: const BorderSide(color: LumiTokens.rule),
+        minimumSize: const Size(0, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+        ),
+      ),
+      child: Text(label, style: LumiTextStyles.button(color: foreground)),
+    );
+  }
+}
+
 /// Lumi Design System - Icon Button
 ///
 /// Circular button with icon only.

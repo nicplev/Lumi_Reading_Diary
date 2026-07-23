@@ -1241,8 +1241,12 @@ export const getComprehensionAudioUrl = onCall(
       );
     }
     if (logData.comprehensionAudioUploaded !== true) {
+      // `not-found`, not `failed-precondition`: a missing recording is a
+      // distinct client state (hide the player) from policy/validation failures
+      // (which stay `failed-precondition` and show a message). The client keys on
+      // this code to tell "deleted" apart from "temporarily unavailable".
       throw new HttpsError(
-        "failed-precondition",
+        "not-found",
         "This log has no recording."
       );
     }

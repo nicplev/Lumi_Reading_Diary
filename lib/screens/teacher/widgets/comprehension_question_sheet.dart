@@ -118,6 +118,7 @@ class _ComprehensionQuestionSheetState
         bottomInset + LumiTokens.space4,
       ),
       child: SingleChildScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,

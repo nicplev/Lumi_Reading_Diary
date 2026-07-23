@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/sign_out_flow.dart';
+import '../../core/widgets/force_update_gate.dart' show appVersionLabelProvider;
 import '../../core/config/dev_access.dart';
 import '../../core/services/app_icon_service.dart';
 import '../../core/services/dev_access_service.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/feedback_widget.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/teacher_settings_section.dart';
 import '../../core/widgets/lumi/teacher_settings_item.dart';
 import '../../core/widgets/lumi/legal_links_row.dart';
@@ -260,46 +263,48 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen>
   }
 
   void _showAboutDialog() {
+    // Centred layout matching the parent About dialog — the old AlertDialog
+    // mixed a left-aligned title/body, a centred links row and a bottom-right
+    // Close, which read as misaligned.
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => Dialog(
+        backgroundColor: LumiTokens.paper,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
         ),
-        title: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              alignment: Alignment.center,
-              child: Image.asset(
+        child: Padding(
+          padding: const EdgeInsets.all(LumiTokens.space5),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
                 'assets/staff_characters/la_green.png',
+                height: 96,
                 fit: BoxFit.contain,
               ),
-            ),
-            const SizedBox(width: 12),
-            Text('Lumi', style: LumiType.subhead),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Version 1.0.0',
-                style: LumiType.body.copyWith(color: LumiTokens.muted)),
-            const SizedBox(height: 8),
-            Text('Reading Tracker for Schools', style: LumiType.body),
-            const SizedBox(height: LumiTokens.space4),
-            const LegalLinksRow(accent: LumiTokens.red),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Close',
-                style: LumiType.button.copyWith(color: LumiTokens.red)),
+              const SizedBox(height: LumiTokens.space4),
+              Text('Lumi', style: LumiType.subhead),
+              const SizedBox(height: LumiTokens.space1),
+              Consumer(
+                builder: (context, ref, _) => Text(
+                    ref.watch(appVersionLabelProvider),
+                    style: LumiType.caption),
+              ),
+              const SizedBox(height: LumiTokens.space3),
+              Text('Reading Tracker for Schools',
+                  textAlign: TextAlign.center, style: LumiType.body),
+              const SizedBox(height: LumiTokens.space4),
+              const LegalLinksRow(accent: LumiTokens.red),
+              const SizedBox(height: LumiTokens.space2),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Close',
+                    style: LumiType.button.copyWith(color: LumiTokens.red)),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -317,15 +322,15 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen>
           style: LumiType.body,
         ),
         actions: [
-          TextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel',
-                style: LumiType.button.copyWith(color: LumiTokens.muted)),
+            label: 'Cancel',
+            variant: LumiDialogActionVariant.cancel,
           ),
-          TextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Sign Out',
-                style: LumiType.button.copyWith(color: LumiTokens.red)),
+            label: 'Sign Out',
+            variant: LumiDialogActionVariant.destructive,
           ),
         ],
       ),

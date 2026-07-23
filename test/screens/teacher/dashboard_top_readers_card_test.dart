@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lumi_reading_tracker/data/models/class_model.dart';
 import 'package:lumi_reading_tracker/screens/teacher/dashboard/widgets/dashboard_top_readers_card.dart';
 
 import '../../helpers/test_data_factory.dart';
@@ -23,11 +24,23 @@ void main() {
       minutesRead: 100,
     );
 
+    final classModel = ClassModel(
+      id: 'class_a',
+      schoolId: 'school_a',
+      name: '3A',
+      teacherId: 'teacher-1',
+      studentIds: [student.id],
+      createdAt: DateTime(2026, 1, 1),
+      createdBy: 'teacher-1',
+    );
+
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
         body: DashboardTopReadersCard(
           weeklyLogs: [ghostLog, validLog],
           students: [student],
+          teacher: TestDataFactory.teacherUser(),
+          classModel: classModel,
         ),
       ),
     ));

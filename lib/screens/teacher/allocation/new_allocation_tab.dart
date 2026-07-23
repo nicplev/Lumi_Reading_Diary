@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
-import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../core/widgets/lumi/lumi_card.dart';
 import '../../../core/widgets/lumi/lumi_toast.dart';
 import '../../../data/models/user_model.dart';
@@ -760,7 +759,13 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
       child: Stack(
         children: [
           SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 104),
+            // Dragging dismisses the keyboard (Flutter's default is manual).
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            // Bottom padding clears the floating action. In edit mode that stack
+            // is taller (primary pill + "Cancel edit"), so reserve more room or
+            // the last of the form sits under the buttons and is unreachable.
+            padding: EdgeInsets.fromLTRB(
+                16, 16, 16, widget.editingAllocation != null ? 150 : 104),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -904,11 +909,32 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
           valid: valid,
         ),
         if (isEditing) ...[
-          const SizedBox(height: 4),
-          LumiTextButton(
-            onPressed: widget.onEditCancelled,
-            text: 'Cancel edit',
-            color: LumiTokens.muted,
+          const SizedBox(height: 8),
+          // Opaque pill, not bare text: this floats over scrolling content, and
+          // muted text on an arbitrary background was unreadable.
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: LumiTokens.paper,
+              borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+              border: Border.all(color: LumiTokens.rule),
+              boxShadow: LumiTokens.shadowCard,
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: widget.onEditCancelled,
+                style: TextButton.styleFrom(
+                  foregroundColor: LumiTokens.muted,
+                  minimumSize: const Size(0, 44),
+                  shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(LumiTokens.radiusPill),
+                  ),
+                ),
+                child: Text('Cancel edit',
+                    style: LumiType.button.copyWith(color: LumiTokens.muted)),
+              ),
+            ),
           ),
         ],
       ],

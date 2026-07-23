@@ -219,6 +219,8 @@ class _TeacherLogReadingSheetState extends State<TeacherLogReadingSheet> {
               _buildHeader(),
               Flexible(
                 child: SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,

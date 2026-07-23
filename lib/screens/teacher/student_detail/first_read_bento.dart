@@ -104,7 +104,6 @@ class StudentDetailFirstReadBento extends StatelessWidget {
                 child: StudentDetailBentoActionTile(
                   icon: Icons.qr_code_scanner_rounded,
                   title: 'Scan a book',
-                  description: 'Use an ISBN.',
                   onTap: onScanIsbn,
                 ),
               ),
@@ -113,7 +112,6 @@ class StudentDetailFirstReadBento extends StatelessWidget {
                 child: StudentDetailBentoActionTile(
                   icon: Icons.edit_note_rounded,
                   title: 'Log a read',
-                  description: 'Start without a book.',
                   onTap: onLogReading,
                 ),
               ),
@@ -191,7 +189,7 @@ class _HeroTile extends StatelessWidget {
 class StudentDetailBentoActionTile extends StatelessWidget {
   final IconData icon;
   final String title;
-  final String description;
+  final String? description;
   final VoidCallback onTap;
   final bool primary;
 
@@ -199,7 +197,7 @@ class StudentDetailBentoActionTile extends StatelessWidget {
     super.key,
     required this.icon,
     required this.title,
-    required this.description,
+    this.description,
     required this.onTap,
     this.primary = false,
   });
@@ -212,7 +210,7 @@ class StudentDetailBentoActionTile extends StatelessWidget {
 
     return Semantics(
       button: true,
-      label: '$title. $description',
+      label: description == null ? title : '$title. $description',
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -255,16 +253,18 @@ class StudentDetailBentoActionTile extends StatelessWidget {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            description,
-                            style: LumiType.caption.copyWith(
-                              color: secondary,
-                              height: 1.2,
+                          if (description != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              description!,
+                              style: LumiType.caption.copyWith(
+                                color: secondary,
+                                height: 1.2,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          ],
                         ],
                       ),
                     ),
@@ -373,7 +373,6 @@ class StudentDetailNextReadBento extends StatelessWidget {
                 child: StudentDetailBentoActionTile(
                   icon: Icons.qr_code_scanner_rounded,
                   title: 'Scan a book',
-                  description: 'Use an ISBN.',
                   onTap: onScanIsbn,
                 ),
               ),
@@ -382,7 +381,6 @@ class StudentDetailNextReadBento extends StatelessWidget {
                 child: StudentDetailBentoActionTile(
                   icon: Icons.edit_note_rounded,
                   title: 'Log a read',
-                  description: 'Start without a book.',
                   onTap: onLogReading,
                 ),
               ),

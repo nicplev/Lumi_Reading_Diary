@@ -101,8 +101,10 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
 
   // Group filtering
   List<ReadingGroupModel> _groups = [];
-  String?
-      _selectedGroupFilter; // null = all, 'ungrouped' = ungrouped, else groupId
+  // Multi-select group filter. Empty = All Groups. Contains group ids and/or the
+  // reserved pseudo-id 'ungrouped'. A student matches if they are in ANY selected
+  // group (union), so several groups can be combined.
+  final Set<String> _selectedGroupIds = <String>{};
 
   @override
   void initState() {
@@ -124,7 +126,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     }
     if (oldWidget.selectedClass?.id != widget.selectedClass?.id) {
       _loadGroups();
-      _selectedGroupFilter = null;
+      _selectedGroupIds.clear();
       _searchQuery = '';
       _searchController.clear();
     }
@@ -189,18 +191,45 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
   }
 
   List<StudentModel> _filterByGroup(List<StudentModel> students) {
-    if (_selectedGroupFilter == null) return students;
-    if (_selectedGroupFilter == 'ungrouped') {
-      final allGroupedIds = <String>{};
-      for (final group in _groups) {
-        allGroupedIds.addAll(group.studentIds);
+    // Prune ids for groups that no longer exist so a deleted group can't
+    // silently widen the filter.
+    final liveGroupIds = _groups.map((g) => g.id).toSet();
+    _selectedGroupIds.removeWhere(
+        (id) => id != 'ungrouped' && !liveGroupIds.contains(id));
+
+    if (_selectedGroupIds.isEmpty) return students; // All Groups
+
+    // Union of every selected group's members (plus ungrouped students if that
+    // pseudo-group is selected).
+    final allowed = <String>{};
+    var includeUngrouped = false;
+    for (final id in _selectedGroupIds) {
+      if (id == 'ungrouped') {
+        includeUngrouped = true;
+        continue;
       }
-      return students.where((s) => !allGroupedIds.contains(s.id)).toList();
+      final group = _groups.where((g) => g.id == id).firstOrNull;
+      if (group != null) allowed.addAll(group.studentIds);
     }
-    final group =
-        _groups.where((g) => g.id == _selectedGroupFilter).firstOrNull;
-    if (group == null) return students;
-    return students.where((s) => group.studentIds.contains(s.id)).toList();
+    final Set<String> groupedIds = includeUngrouped
+        ? {for (final g in _groups) ...g.studentIds}
+        : const {};
+    return students.where((s) {
+      if (allowed.contains(s.id)) return true;
+      if (includeUngrouped && !groupedIds.contains(s.id)) return true;
+      return false;
+    }).toList();
+  }
+
+  void _toggleGroupFilter(String id) {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      if (_selectedGroupIds.contains(id)) {
+        _selectedGroupIds.remove(id);
+      } else {
+        _selectedGroupIds.add(id);
+      }
+    });
   }
 
   Future<void> _loadReadingLevelOptions({bool forceRefresh = false}) async {
@@ -864,10 +893,11 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
         children: [
           _ClassroomToolChip(
             label: 'All Groups',
-            selected: _selectedGroupFilter == null,
+            // Selected when nothing else is — clears any chosen groups.
+            selected: _selectedGroupIds.isEmpty,
             onTap: () {
               FocusScope.of(context).unfocus();
-              setState(() => _selectedGroupFilter = null);
+              setState(() => _selectedGroupIds.clear());
             },
           ),
           const SizedBox(width: 8),
@@ -875,21 +905,15 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                 padding: const EdgeInsets.only(right: 8),
                 child: _ClassroomToolChip(
                   label: group.name,
-                  selected: _selectedGroupFilter == group.id,
+                  selected: _selectedGroupIds.contains(group.id),
                   dotColor: _parseGroupColor(group.color),
-                  onTap: () {
-                    FocusScope.of(context).unfocus();
-                    setState(() => _selectedGroupFilter = group.id);
-                  },
+                  onTap: () => _toggleGroupFilter(group.id),
                 ),
               )),
           _ClassroomToolChip(
             label: 'Ungrouped',
-            selected: _selectedGroupFilter == 'ungrouped',
-            onTap: () {
-              FocusScope.of(context).unfocus();
-              setState(() => _selectedGroupFilter = 'ungrouped');
-            },
+            selected: _selectedGroupIds.contains('ungrouped'),
+            onTap: () => _toggleGroupFilter('ungrouped'),
           ),
         ],
       ),
@@ -1170,7 +1194,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
               'No students match the current group filter. Reset to see the full class.',
           actionLabel: 'Show All Students',
           onAction: () => setState(() {
-            _selectedGroupFilter = null;
+            _selectedGroupIds.clear();
           }),
           icon: Container(
             width: 72,
@@ -1267,7 +1291,10 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
 
     // Group (with its colour dot) shown when viewing all groups — redundant
     // once a group filter is active.
-    final showGroup = _groups.isNotEmpty && _selectedGroupFilter == null;
+    // Show each student's group label when unfiltered OR when several groups are
+    // selected (so you can tell which student belongs to which).
+    final showGroup = _groups.isNotEmpty &&
+        (_selectedGroupIds.isEmpty || _selectedGroupIds.length > 1);
     final group = showGroup ? _studentGroup(student) : null;
     final groupName = showGroup ? (group?.name ?? 'Ungrouped') : null;
     final groupColor = group != null

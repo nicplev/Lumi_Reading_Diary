@@ -82,7 +82,7 @@ class StatsRowSection extends StatelessWidget {
                     const SizedBox(height: 10),
                     _SnapshotMiniTile(
                       value: '$streak',
-                      label: streak == 0 ? 'Ready to restart' : 'Day streak',
+                      label: streak == 0 ? 'Start today' : 'Day streak',
                       icon: Icons.local_fire_department_outlined,
                       color: LumiTokens.orange,
                       background: LumiTokens.tintOrange,
@@ -198,11 +198,21 @@ class _SnapshotMiniTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 1),
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: LumiType.caption.copyWith(color: LumiTokens.muted),
+                // Degrade gracefully on narrow phones / large text: allow a
+                // second line and scale down rather than truncating the label
+                // (e.g. the empty-state streak label used to clip to "Ready
+                // to re…").
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      label,
+                      maxLines: 2,
+                      style:
+                          LumiType.caption.copyWith(color: LumiTokens.muted),
+                    ),
+                  ),
                 ),
               ],
             ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import '../../theme/lumi_tokens.dart';
 import 'lumi/lumi_toast.dart';
+import 'lumi/lumi_buttons.dart';
 
 /// Common reusable UI components for consistent design across the app
 class CommonWidgets {
@@ -294,19 +296,24 @@ class CommonWidgets {
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: LumiTokens.paper,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+        ),
         title: Text(title),
         content: Text(message),
         actions: [
-          TextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(cancelText),
+            label: cancelText,
+            variant: LumiDialogActionVariant.cancel,
           ),
-          TextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.pop(context, true),
-            style: isDangerous
-                ? TextButton.styleFrom(foregroundColor: AppColors.error)
-                : null,
-            child: Text(confirmText),
+            label: confirmText,
+            variant: isDangerous
+                ? LumiDialogActionVariant.destructive
+                : LumiDialogActionVariant.confirm,
           ),
         ],
       ),

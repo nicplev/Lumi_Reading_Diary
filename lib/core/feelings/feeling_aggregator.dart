@@ -14,11 +14,16 @@ extension FeelingPeriodLabel on FeelingPeriod {
 
 /// One point on the x-axis of the feelings chart.
 ///
-/// [value] is the average feeling (1.0–5.0) for the bucket, or `null` when no
+/// [value] is the feeling score (1.0–5.0) for the bucket, or `null` when no
 /// feeling was recorded in this window — this covers BOTH "no reading log at
 /// all" and "log(s) exist but `childFeeling` is null" (e.g. quick logs from the
 /// home-screen widget or the parent dashboard). A null bucket is rendered as a
 /// gap in the line and a neutral placeholder tile — never as zero.
+///
+/// The score is the LOWEST feeling of each day, averaged across the days in the
+/// bucket (see [_bucketFromLogs]). For the week view a bucket is a single day,
+/// so it is simply that day's lowest feeling — a hard session is surfaced rather
+/// than averaged away behind a good one.
 class FeelingBucket {
   /// Start of the bucket (a day for week view, week-start for month, month for
   /// all-time).
@@ -82,9 +87,10 @@ const _allTimeMonths = 12;
 /// Logs are bucketed by their reading [ReadingLogModel.date] (not `createdAt`),
 /// so a back-dated offline log lands in the week it was actually read.
 ///
-/// Multiple logs in the same bucket are AVERAGED (a child may read more than
-/// once a day). Logs without a feeling are excluded from the average but still
-/// counted in [FeelingBucket.logCount].
+/// Within a day, the LOWEST feeling wins (so a struggle isn't hidden behind a
+/// good session); across days in a coarser bucket those daily lows are averaged.
+/// Logs without a feeling are excluded from the score but still counted in
+/// [FeelingBucket.logCount].
 ///
 /// [now] is injectable for deterministic tests.
 FeelingSeries aggregateFeelings(
@@ -155,10 +161,22 @@ FeelingBucket _bucketFromLogs(
   List<ReadingLogModel> logs,
 ) {
   final feelings = logs.where((l) => l.childFeeling != null).toList();
+
+  // Reduce each day to its lowest feeling, then average those daily lows. In the
+  // week view a bucket is one day, so this is just that day's lowest feeling; in
+  // month / all-time it prevents one hard day from defining the whole bucket.
   double? value;
   if (feelings.isNotEmpty) {
-    final sum = feelings.fold<int>(0, (a, l) => a + l.childFeeling!.value);
-    value = sum / feelings.length;
+    final lowestByDay = <String, int>{};
+    for (final l in feelings) {
+      final d = _dateOnly(l.date);
+      final key = '${d.year}-${d.month}-${d.day}';
+      final v = l.childFeeling!.value;
+      final existing = lowestByDay[key];
+      if (existing == null || v < existing) lowestByDay[key] = v;
+    }
+    final lows = lowestByDay.values;
+    value = lows.reduce((a, b) => a + b) / lows.length;
   }
   return FeelingBucket(
     start: start,

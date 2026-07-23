@@ -178,26 +178,23 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: Text('Weekly Reading Activity', style: LumiType.subhead),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _weekChip('This week', 0),
-                  const SizedBox(width: 6),
-                  _weekChip('Last week', -1),
-                ],
-              ),
-            ],
-          ),
+          // Title + subtitle on their own full-width rows, week chips beneath —
+          // stacked so the title never gets squeezed to 3 lines competing with
+          // the fixed-width chips on narrow phones. Also shortened from "Weekly
+          // Reading Activity" (the toggle + subtitle already establish "weekly").
+          Text('Reading Activity', style: LumiType.subhead),
           const SizedBox(height: 2),
           Text(
             'Students who logged reading each day',
             style: LumiType.caption.copyWith(color: LumiTokens.muted),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _weekChip('This week', 0),
+              const SizedBox(width: 6),
+              _weekChip('Last week', -1),
+            ],
           ),
           const SizedBox(height: 16),
           StreamBuilder<List<ClassDailyReadingSummary>>(

@@ -291,13 +291,15 @@ class _CacheCard extends StatelessWidget {
           style: LumiTextStyles.body(),
         ),
         actions: [
-          LumiTextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.of(context).pop(false),
-            text: 'Cancel',
+            label: 'Cancel',
+            variant: LumiDialogActionVariant.cancel,
           ),
-          LumiTextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.of(context).pop(true),
-            text: 'Clear',
+            label: 'Clear',
+            variant: LumiDialogActionVariant.destructive,
           ),
         ],
       ),

@@ -359,6 +359,29 @@ export async function applyStudentStatsDelta(
     dropBeforeDate = others.data().count === 0;
   }
 
+  // If this write removes the student's most-recent counted log (a delete, or a
+  // counted→uncounted flip on the newest log), `stats.lastReadingDate` would go
+  // stale. Resolve the next-most-recent counted log now (pre-transaction, since
+  // it is a collection query), so the transaction can correct the field instead
+  // of leaving it for the weekly reconciler. `undefined` = "leave it alone";
+  // `null` = "no counted logs remain". Only queried when the write drops a
+  // counted log, keeping the common create/update path at zero extra reads.
+  let replacementLastReadingDate:
+    admin.firestore.Timestamp | null | undefined = undefined;
+  if (beforeCounted && !afterCounted) {
+    const newest = await db
+      .collection(`schools/${schoolId}/readingLogs`)
+      .where("studentId", "==", studentId)
+      .where("status", "in", COUNTED_STATUSES)
+      .where(admin.firestore.FieldPath.documentId(), "!=", change.before.id)
+      .orderBy("date", "desc")
+      .limit(1)
+      .get();
+    replacementLastReadingDate = newest.empty ?
+      null :
+      (newest.docs[0].data().date as admin.firestore.Timestamp);
+  }
+
   // View-aggregate inputs that need I/O. Which one the transaction actually
   // uses depends on the stored `latestParentComment`, which isn't known until
   // the transactional read — so resolve whichever branch could apply. The two
@@ -469,9 +492,10 @@ export async function applyStudentStatsDelta(
     const averageMinutesPerDay =
       totalReadingDays > 0 ? newTotalMinutes / totalReadingDays : 0;
 
-    // lastReadingDate: max(prior, after). On deletes we leave it alone — the
-    // weekly reconciler will correct any drift if a delete trimmed the
-    // most-recent log.
+    // lastReadingDate: on a counted create/update it is max(prior, after). On a
+    // delete (no counted `after`) it becomes the newest remaining counted log's
+    // date, resolved pre-transaction above — `null` when none remain. Correct
+    // immediately rather than waiting for the weekly reconciler.
     let lastReadingDate = stats.lastReadingDate ?? null;
     if (afterCounted) {
       if (
@@ -480,6 +504,8 @@ export async function applyStudentStatsDelta(
       ) {
         lastReadingDate = afterCounted.date;
       }
+    } else if (replacementLastReadingDate !== undefined) {
+      lastReadingDate = replacementLastReadingDate;
     }
 
     tx.update(studentRef, {

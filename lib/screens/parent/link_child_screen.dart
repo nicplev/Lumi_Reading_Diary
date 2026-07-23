@@ -172,6 +172,7 @@ class _LinkChildScreenState extends ConsumerState<LinkChildScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: LumiPadding.allM,
           child: switch (_stage) {
             _LinkStage.code => _buildCodeStage(),

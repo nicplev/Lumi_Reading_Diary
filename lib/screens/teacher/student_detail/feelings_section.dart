@@ -41,7 +41,8 @@ class FeelingsSection extends ConsumerWidget {
 
   /// Expands the per-day feeling counts into stub logs. The tracker's
   /// aggregator reads only `date` and `childFeeling`, so N stubs per
-  /// (day, feeling) reproduce its per-day averages exactly.
+  /// (day, feeling) reproduce its per-day scores exactly (every feeling for the
+  /// day is present, so the lowest-per-day reduction is faithful).
   List<ReadingLogModel> _logsFromAggregate(
     Map<String, Map<String, int>> byDay,
   ) {
