@@ -241,18 +241,18 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
                       ),
                     ),
                   ),
-                  // Pending list (slides in from right)
+                  // Pending list (slides in from right). No list-wide tap
+                  // wrapper: it competed with the scroll gesture at the start of
+                  // every drag (making the scrollbar feel jumpy) and turned the
+                  // whole list into a flip-back target. Flip back via the header
+                  // chevron instead.
                   if (_flipController.value > 0)
                     Positioned.fill(
-                      child: GestureDetector(
-                        onTap: _togglePendingView,
-                        behavior: HitTestBehavior.opaque,
-                        child: SlideTransition(
-                          position: _listSlide,
-                          child: FadeTransition(
-                            opacity: _listFade,
-                            child: _buildPendingList(pendingStudents),
-                          ),
+                      child: SlideTransition(
+                        position: _listSlide,
+                        child: FadeTransition(
+                          opacity: _listFade,
+                          child: _buildPendingList(pendingStudents),
                         ),
                       ),
                     ),
@@ -301,8 +301,16 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
           child: Scrollbar(
             controller: _pendingScrollController,
             thumbVisibility: true,
+            // Let the thumb be dragged directly (off by default on mobile).
+            interactive: true,
             child: ListView.builder(
               controller: _pendingScrollController,
+              // Own the drag and don't hand it off: `primary: false` detaches
+              // from the PrimaryScrollController, and clamping physics stops the
+              // iOS bounce from leaking the drag to the parent dashboard near
+              // this short list's edges (which froze the thumb mid-scroll).
+              primary: false,
+              physics: const ClampingScrollPhysics(),
               padding: const EdgeInsets.only(right: 8),
               itemCount: pendingStudents.length,
               itemBuilder: (context, index) {
