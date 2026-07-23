@@ -50,3 +50,4 @@ Semgrep SAST baseline (`p/typescript`,`p/javascript`,`p/secrets`,`p/owasp-top-te
 |---|---|
 | 2026-07-23 | Register created. F-01/F-02/F-03 fixed+verified; AP2 review folded in; SCA baseline (SCA-01) recorded; Dependabot + osv-scanner + semgrep added to watch dependencies/SAST going forward. |
 | 2026-07-23 (overnight) | F-06 reclassified accept-as-designed (`storage.rules.test.js:373`). Semgrep SAST baseline run — 1 finding (SAST-01, low), otherwise clean. S4 cross-tenant isolation assurance test added + passing (4/4 in `security_poc.rules.test.js`). |
+| 2026-07-24 | **F-01/F-02/F-03 DEPLOYED to production** (`firestore:rules` → `lumi-ninc-au`, PR #520 / `66339f0`) — now live-fixed. New hygiene note (HY-01, info): pre-existing unused `demoAdminReadOnly` function + invalid `request` var refs at `firestore.rules:186-190` (dead code, cleanup candidate; not a security issue). |

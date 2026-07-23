@@ -9,7 +9,7 @@ Status markers: ☐ not started · ◐ in progress · 🔍 under test / awaiting
 
 ## ▶ Where we're up to (one glance)
 
-- **Now:** Overnight autonomous run **complete — paused for your review.** Delivered: Wave 0 recon; **Wave 2 → F-01/F-02/F-03 confirmed in the emulator, fixed, and regression-tested (full rules suite 172/172 green); S4 cross-tenant isolation dynamically proven**; Wave 4 mobile AP2 review; Wave 5 CI scanning config (Dependabot/osv/semgrep) + SCA & SAST baselines + findings register. **8 commits on `sec/security-assessment`; working tree clean; nothing deployed, pushed, or merged.**
+- **Now:** F-01/F-02/F-03 **MERGED (PR #520, squash `66339f0`) and DEPLOYED to production** — `firestore:rules` released to `lumi-ninc-au` on 2026-07-24; the live entitlement-forgery gap (F-01) is now **closed in prod**. Also delivered this run: S4 isolation dynamically proven, Wave 4 mobile AP2 review, Wave 5 CI scanning config (Dependabot/osv/semgrep) + SCA/SAST baselines + findings register.
 - **Boundary held despite the blanket OK:** no active production testing, no deploys, no PRs/merges — everything is in the isolated emulator + this branch. Wave 3 (passive prod TLS scan) stays parked for an explicit hostname go-ahead.
 - **Left for a reviewed daytime pass:** portal fixes F-07/F-09 (need `pnpm install` + tsc to verify safely); F-04 server-ops defense-in-depth (needs the server-ops test harness); cross-tenant collection-group sweep + callable App-Check-off PoCs; the documents workstream (Tranche A). (F-06 reclassified accept-as-designed.)
 
@@ -128,3 +128,4 @@ A control-assertion document may only be written once the control is **true and 
 | 2026-07-23 | Board created. Wave 0 complete (5 Opus agents + Fable triage); F-01 source-verified. Awaiting Wave 1/2 go-ahead. |
 | 2026-07-23 | Clarified doc↔code sequencing: control-assertion docs (Tranche B) gated on their [SEC] item being ☑; only code-independent docs (Tranche A) run truly in parallel. Corrects the earlier "fully parallel" framing. |
 | 2026-07-23 (overnight) | Wave 2: F-01/F-02/F-03 confirmed in emulator, fixed in `firestore.rules`, regression-tested (`security_poc.rules.test.js`, wired into `test:rules`); full suite 172/172 green (commit `0d31809`). Wave 4 mobile AP2 static review completed (M-01..M-08). |
+| 2026-07-24 | F-01/F-02/F-03 **merged (PR #520 → `66339f0`, regression-gate green) and DEPLOYED to prod** (`firestore:rules` → `lumi-ninc-au`). Client-flow safety verified pre-deploy. Rules compiled with only pre-existing warnings (unused `demoAdminReadOnly`, lines 186-190 — hygiene, not from this change). |
