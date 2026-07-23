@@ -7,6 +7,7 @@ import { Select } from '@/components/lumi/select';
 import { Button } from '@/components/lumi/button';
 import { useToast } from '@/components/lumi/toast';
 import { useCreateUser } from '@/lib/hooks/use-users';
+import { isStrongPassword, passwordIssue, PASSWORD_MIN_LENGTH } from '@/lib/utils/password-policy';
 
 interface CreateUserModalProps {
   open: boolean;
@@ -44,7 +45,7 @@ export function CreateUserModal({ open, onClose }: CreateUserModalProps) {
     }
   };
 
-  const isValid = email.includes('@') && fullName.trim().length > 0 && password.length >= 6;
+  const isValid = email.includes('@') && fullName.trim().length > 0 && isStrongPassword(password);
 
   return (
     <Modal
@@ -97,9 +98,9 @@ export function CreateUserModal({ open, onClose }: CreateUserModalProps) {
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Min 6 characters"
+          placeholder={`Min ${PASSWORD_MIN_LENGTH} chars incl. upper, lower, number & symbol`}
           required
-          error={password.length > 0 && password.length < 6 ? 'Password must be at least 6 characters' : undefined}
+          error={password.length > 0 && passwordIssue(password) ? `Needs ${passwordIssue(password)}` : undefined}
         />
 
         <p className="text-xs text-muted">

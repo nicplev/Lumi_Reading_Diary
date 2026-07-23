@@ -6,20 +6,26 @@ import {randomInt} from "crypto";
 const UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 const LOWER = "abcdefghijkmnpqrstuvwxyz";
 const DIGITS = "23456789";
-const ALL = UPPER + LOWER + DIGITS;
+// Small, email-safe symbol set (no quotes/backslash/space) that still counts as
+// a "special character" for the Firebase Auth password policy.
+const SYMBOLS = "!@#$%*-_?";
+const ALL = UPPER + LOWER + DIGITS + SYMBOLS;
 
 /**
  * Generate a readable temporary password for an admin-created staff account.
- * 12 chars (well above Firebase Auth's 6-char minimum), guaranteed to include
- * at least one upper, lower, and digit.
- * @param {number} length password length (default 12)
+ * 16 chars, guaranteed to include at least one upper, lower, digit AND symbol,
+ * so it satisfies the 14+/complexity policy (A2) by construction. Passwords set
+ * through the Admin SDK bypass the Firebase console policy, so compliance must
+ * be guaranteed here.
+ * @param {number} length password length (default 16)
  * @return {string} the generated password
  */
-export function generateTempPassword(length = 12): string {
+export function generateTempPassword(length = 16): string {
   const chars: string[] = [
     UPPER[randomInt(UPPER.length)],
     LOWER[randomInt(LOWER.length)],
     DIGITS[randomInt(DIGITS.length)],
+    SYMBOLS[randomInt(SYMBOLS.length)],
   ];
   for (let i = chars.length; i < length; i++) {
     chars.push(ALL[randomInt(ALL.length)]);
