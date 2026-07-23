@@ -11,13 +11,15 @@ import 'feelings_line_chart.dart';
 /// over time, using the blob feeling characters.
 ///
 /// Renders two stacked cards:
-///  1. A 1–5 line chart of average daily feeling, with a period selector.
+///  1. A 1–5 line chart of daily feeling, with a period selector.
 ///  2. A per-day "at a glance" blob row (week view only).
 ///
 /// Edge cases handled by [aggregateFeelings]:
 ///  - Quick logs (home-screen widget / parent dashboard) with no feeling, and
 ///    days with no log at all, render as gaps / neutral tiles — never zero.
-///  - Multiple logs in a day are averaged.
+///  - Multiple logs in a day take that day's LOWEST feeling (a struggle is not
+///    hidden behind a good session); a multi-session day is marked in the blob
+///    row. Coarser buckets average the daily lows.
 ///  - A whole-history with no feelings shows a friendly empty state.
 class FeelingsTrackerCard extends StatefulWidget {
   final List<ReadingLogModel> logs;

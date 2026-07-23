@@ -36,10 +36,20 @@ class _AllocationScreenState extends State<AllocationScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(_onTabChanged);
+  }
+
+  // Release focus on every tab change so a text field on the New tab does not
+  // keep the keyboard up over the Active tab (TabBarView keeps both alive).
+  void _onTabChanged() {
+    if (_tabController.indexIsChanging) {
+      FocusScope.of(context).unfocus();
+    }
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -101,6 +111,7 @@ class _AllocationScreenState extends State<AllocationScreen>
             teacher: widget.teacher,
             selectedClass: widget.selectedClass,
             onEditAllocation: _onEditAllocation,
+            tabController: _tabController,
           ),
         ],
       ),
@@ -138,7 +149,13 @@ class _AllocationScreenState extends State<AllocationScreen>
           duration: const Duration(milliseconds: 200),
           margin: const EdgeInsets.all(3),
           decoration: BoxDecoration(
-            color: isSelected ? LumiTokens.paper : Colors.transparent,
+            // Animate to a fully-transparent PAPER, not Colors.transparent
+            // (transparent black): ColorTween interpolates RGB too, so paper →
+            // transparent-black passes through grey at the midpoint, flashing
+            // both pills on every switch.
+            color: isSelected
+                ? LumiTokens.paper
+                : LumiTokens.paper.withValues(alpha: 0),
             borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
             boxShadow: isSelected
                 ? [

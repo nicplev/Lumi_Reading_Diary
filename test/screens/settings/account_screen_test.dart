@@ -174,7 +174,9 @@ void main() {
 
     expect(find.byKey(const Key('delete-account-button')), findsOneWidget);
     expect(find.byKey(const Key('delete-student-button')), findsNothing);
-    expect(find.textContaining("does not delete your child's school record"),
+    expect(
+        find.textContaining(
+            "Your child's school record is held and managed by the school"),
         findsOneWidget);
   });
 

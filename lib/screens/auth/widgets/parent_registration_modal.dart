@@ -1314,6 +1314,8 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
                 // the footer so the button below is always reachable.
                 Flexible(
                   child: SingleChildScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                     child: AnimatedSize(
                       duration: const Duration(milliseconds: 350),

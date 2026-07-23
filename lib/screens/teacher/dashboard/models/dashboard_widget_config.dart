@@ -45,6 +45,16 @@ class DashboardWidgetConfig {
     );
   }
 
+  /// Re-inserts [id] at [index] (used by undo so a removed widget returns to its
+  /// original position, not the end). No-op if already present.
+  DashboardWidgetConfig addWidgetAt(String id, int index) {
+    if (activeWidgetIds.contains(id)) return this;
+    final list = List<String>.from(activeWidgetIds);
+    final clamped = index.clamp(0, list.length);
+    list.insert(clamped, id);
+    return DashboardWidgetConfig(activeWidgetIds: list, version: version);
+  }
+
   DashboardWidgetConfig removeWidget(String id) {
     return DashboardWidgetConfig(
       activeWidgetIds: activeWidgetIds.where((w) => w != id).toList(),

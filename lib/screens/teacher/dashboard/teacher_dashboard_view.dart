@@ -12,6 +12,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/teacher_constants.dart';
 import '../../../core/tour/lumi_app_tour.dart';
 import '../../../core/widgets/inline_stream_error.dart';
+import '../../../core/widgets/lumi/lumi_toast.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
 import '../../../theme/section_theme.dart';
@@ -202,18 +203,46 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
         messagingEnabled: _messagingEnabled,
       );
 
+  // Snapshot of the layout when edit mode opened, so Cancel can discard the
+  // whole session's changes (the only other exit, Done, saves).
+  DashboardWidgetConfig? _configBeforeEdit;
+
   void _enterEditMode() {
     HapticFeedback.mediumImpact();
-    setState(() => _isEditMode = true);
+    setState(() {
+      _configBeforeEdit = _widgetConfig;
+      _isEditMode = true;
+    });
   }
 
   void _exitEditMode() {
-    setState(() => _isEditMode = false);
+    setState(() {
+      _isEditMode = false;
+      _configBeforeEdit = null;
+    });
     _saveWidgetConfig();
+  }
+
+  void _cancelEdit() {
+    final snapshot = _configBeforeEdit;
+    // No changes → nothing to discard, just leave.
+    if (snapshot == null || snapshot.activeWidgetIds == _widgetConfig.activeWidgetIds) {
+      _exitEditMode();
+      return;
+    }
+    HapticFeedback.lightImpact();
+    setState(() {
+      _widgetConfig = snapshot;
+      _isEditMode = false;
+      _configBeforeEdit = null;
+    });
+    // A restored widget may need data a mid-session delete tore down.
+    _ensureDataForActiveWidgets();
   }
 
   void _removeWidget(String id) {
     HapticFeedback.lightImpact();
+    final index = _widgetConfig.activeWidgetIds.indexOf(id);
     setState(() {
       _widgetConfig = _widgetConfig.removeWidget(id);
     });
@@ -222,6 +251,39 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
       _readingGroupsSubscription?.cancel();
       _readingGroupsSubscription = null;
       _readingGroups = [];
+    }
+    final def = DashboardWidgetRegistry.get(id);
+    final name = def?.displayName ?? 'Widget';
+    showLumiToast(
+      message: '$name removed',
+      actionLabel: 'Undo',
+      onAction: () {
+        if (!mounted) return;
+        // Restore at its original position (not appended), routing through the
+        // add path so any torn-down data subscriptions are re-established.
+        setState(() {
+          _widgetConfig = _widgetConfig.addWidgetAt(id, index < 0 ? 0 : index);
+        });
+        _ensureDataForActiveWidgets();
+      },
+    );
+  }
+
+  /// Re-fetches any data the currently-active widgets need but that isn't
+  /// loaded — used after undo / cancel restores widgets whose dependencies were
+  /// dropped during the edit session.
+  void _ensureDataForActiveWidgets() {
+    if (_anyWidgetNeedsStudents && !_studentsLoaded) {
+      _studentsLoaded = false;
+      _studentsLoadError = null;
+      _fetchStudents();
+    }
+    if (_anyWidgetNeedsWeeklyLogs && !_weeklyLogsLoaded) {
+      _weeklyLogsLoaded = false;
+      _fetchWeeklyLogs();
+    }
+    if (_anyWidgetNeedsReadingGroups && _readingGroupsSubscription == null) {
+      _fetchReadingGroups();
     }
   }
 
@@ -676,7 +738,9 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
               },
             ),
         },
-        child: CustomScrollView(
+        child: Stack(
+          children: [
+            CustomScrollView(
           controller: _scrollController,
           slivers: [
             SliverToBoxAdapter(child: SizedBox(height: topPadding + 12)),
@@ -737,8 +801,74 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
             // ── Bottom padding (clears floating nav pill) ──
             const SliverToBoxAdapter(child: SizedBox(height: 200)),
           ],
+            ),
+            // Floating Done / Cancel bar — always reachable in edit mode, so the
+            // teacher never has to scroll to the bottom to confirm.
+            if (_isEditMode)
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 0,
+                child: SafeArea(
+                  top: false,
+                  minimum: const EdgeInsets.only(bottom: 12),
+                  child: _buildEditActionBar(),
+                ),
+              ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildEditActionBar() {
+    return Row(
+      children: [
+        Expanded(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: LumiTokens.paper,
+              borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+              border: Border.all(color: LumiTokens.rule),
+              boxShadow: LumiTokens.shadowCard,
+            ),
+            child: TextButton(
+              onPressed: _cancelEdit,
+              style: TextButton.styleFrom(
+                foregroundColor: LumiTokens.muted,
+                minimumSize: const Size(0, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+                ),
+              ),
+              child: Text('Cancel',
+                  style: LumiType.button.copyWith(color: LumiTokens.muted)),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: LumiTokens.green,
+              borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+              boxShadow: LumiTokens.shadowCard,
+            ),
+            child: TextButton(
+              onPressed: _exitEditMode,
+              style: TextButton.styleFrom(
+                foregroundColor: LumiTokens.paper,
+                minimumSize: const Size(0, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+                ),
+              ),
+              child: Text('Done',
+                  style: LumiType.button.copyWith(color: LumiTokens.paper)),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -862,8 +992,9 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
             ),
             const SizedBox(height: 4),
             _buildAddWidgetButton(),
-            const SizedBox(height: 16),
-            _buildDoneButton(),
+            // Room for the floating Done / Cancel bar so it never covers the
+            // Add button.
+            const SizedBox(height: 96),
           ],
         ),
       ),
@@ -991,25 +1122,6 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildDoneButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: _exitEditMode,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.teacherPrimary,
-          foregroundColor: AppColors.white,
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
-          ),
-          elevation: 0,
-        ),
-        child: Text('Done', style: TeacherTypography.buttonText),
       ),
     );
   }

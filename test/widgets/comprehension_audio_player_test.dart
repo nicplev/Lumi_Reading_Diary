@@ -87,7 +87,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Delete recording?'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(TextButton, 'Delete'));
+    // The confirm dialog's actions are LumiDialogAction (OutlinedButton).
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Delete'));
     await tester.pumpAndSettle();
 
     expect(deleteCalls, 1);

@@ -5,7 +5,9 @@ import '../../../../theme/lumi_tokens.dart';
 import '../../../../theme/lumi_typography.dart';
 import '../../../../data/models/class_model.dart';
 import '../../../../data/models/student_model.dart';
+import '../../../../data/models/user_model.dart';
 import '../../../../services/class_daily_reading_service.dart';
+import 'calendar_day_detail_sheet.dart';
 
 /// Dashboard widget: a GitHub-style heatmap of daily reading across the class
 /// over the last 12 weeks. Each cell is one day; its green intensity reflects
@@ -14,12 +16,14 @@ class DashboardReadingCalendarCard extends StatefulWidget {
   final ClassModel classModel;
   final String schoolId;
   final List<StudentModel> students;
+  final UserModel teacher;
 
   const DashboardReadingCalendarCard({
     super.key,
     required this.classModel,
     required this.schoolId,
     required this.students,
+    required this.teacher,
   });
 
   @override
@@ -76,10 +80,14 @@ class _DashboardReadingCalendarCardState
     return StreamBuilder<List<ClassDailyReadingSummary>>(
       stream: _summariesStream,
       builder: (context, snapshot) {
+        // Keep the full per-day summary (not just a count) so a tapped day can
+        // list exactly who read — the per-student map is already streamed here.
+        final summaryByDay = <DateTime, ClassDailyReadingSummary>{};
         final byDay = <DateTime, int>{};
         for (final summary in snapshot.data ?? const []) {
           final day = _dayOnly(summary.date);
           if (day.isBefore(startDay)) continue;
+          summaryByDay[day] = summary;
           byDay[day] = summary.activeStudentCount;
         }
 
@@ -104,7 +112,7 @@ class _DashboardReadingCalendarCardState
               const SizedBox(height: 16),
               _buildGrid(byDay, startDay, classSize),
               const SizedBox(height: 12),
-              _buildSelectionOrLegend(byDay, classSize),
+              _buildSelectionOrLegend(byDay, summaryByDay, classSize),
             ],
           ),
         );
@@ -142,17 +150,20 @@ class _DashboardReadingCalendarCardState
             if (i >= totalDays) break;
             final day = startDay.add(Duration(days: i));
             final count = byDay[day] ?? 0;
-            final selected = _selectedDay == day;
+            final isSelected = _selectedDay == day;
             if (c > 0) cells.add(SizedBox(width: gap));
             cells.add(GestureDetector(
-              onTap: () => setState(() => _selectedDay = day),
+              // Toggle: tapping the selected day clears it (restoring the
+              // legend), matching every other selection in the app.
+              onTap: () => setState(
+                  () => _selectedDay = isSelected ? null : day),
               child: Container(
                 width: cell,
                 height: cell,
                 decoration: BoxDecoration(
                   color: _cellColor(count, classSize),
                   borderRadius: BorderRadius.circular(3),
-                  border: selected
+                  border: isSelected
                       ? Border.all(color: LumiTokens.ink, width: 1.4)
                       : null,
                 ),
@@ -235,31 +246,52 @@ class _DashboardReadingCalendarCardState
 
   Widget _buildSelectionOrLegend(
     Map<DateTime, int> byDay,
+    Map<DateTime, ClassDailyReadingSummary> summaryByDay,
     int classSize,
   ) {
     if (_selectedDay != null) {
-      final count = byDay[_selectedDay] ?? 0;
-      final label = DateFormat('EEE d MMM').format(_selectedDay!);
-      return Row(
-        children: [
-          Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(
-              color: _cellColor(count, classSize),
-              borderRadius: BorderRadius.circular(3),
-            ),
+      final selectedDay = _selectedDay!;
+      final count = byDay[selectedDay] ?? 0;
+      final label = DateFormat('EEE d MMM').format(selectedDay);
+      // Tapping the footer opens the day breakdown (who read / who didn't).
+      // Single-tap on the cell stays the select/deselect toggle.
+      return InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => showCalendarDayDetailSheet(
+          context,
+          day: selectedDay,
+          summary: summaryByDay[selectedDay],
+          roster: widget.students,
+          teacher: widget.teacher,
+          classModel: widget.classModel,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: [
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: _cellColor(count, classSize),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  count == 0
+                      ? '$label · no reading logged'
+                      : '$label · $count of $classSize read',
+                  style: LumiType.caption.copyWith(color: LumiTokens.ink),
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded,
+                  size: 18,
+                  color: LumiTokens.muted.withValues(alpha: 0.6)),
+            ],
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              count == 0
-                  ? '$label · no reading logged'
-                  : '$label · $count of $classSize read',
-              style: LumiType.caption.copyWith(color: LumiTokens.ink),
-            ),
-          ),
-        ],
+        ),
       );
     }
 

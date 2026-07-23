@@ -18,6 +18,7 @@ import '../../data/providers/user_provider.dart';
 import '../../data/providers/student_by_id_provider.dart';
 import '../../services/firebase_service.dart';
 import '../services/navigation_state_service.dart';
+import 'unfocus_on_route_change_observer.dart';
 import '../exceptions/session_exceptions.dart';
 import '../../screens/auth/splash_screen.dart';
 import '../../screens/auth/login_screen.dart';
@@ -82,6 +83,11 @@ class AppRouter {
     navigatorKey: rootNavigatorKey,
     debugLogDiagnostics: true,
     initialLocation: '/splash',
+
+    // Release keyboard focus on every route push (including bottom sheets and
+    // dialogs, which push routes). Stops a stale keyboard surviving navigation
+    // into a screen whose focused field is gone or hidden.
+    observers: [UnfocusOnRouteChangeObserver()],
 
     // Global redirect handler for authentication and authorization
     redirect: (context, state) async {

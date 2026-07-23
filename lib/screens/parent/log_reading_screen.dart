@@ -261,19 +261,15 @@ class _LogReadingScreenState extends State<LogReadingScreen>
           style: LumiTextStyles.bodyMedium(color: LumiTokens.muted),
         ),
         actions: [
-          TextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.pop(ctx, 'keep'),
-            child: Text(
-              'Keep draft',
-              style: LumiTextStyles.button().copyWith(color: LumiTokens.muted),
-            ),
+            label: 'Keep draft',
+            variant: LumiDialogActionVariant.cancel,
           ),
-          TextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.pop(ctx, 'discard'),
-            child: Text(
-              'Discard',
-              style: LumiTextStyles.button().copyWith(color: LumiTokens.red),
-            ),
+            label: 'Discard',
+            variant: LumiDialogActionVariant.destructive,
           ),
         ],
       ),

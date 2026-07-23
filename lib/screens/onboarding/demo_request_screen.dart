@@ -131,6 +131,7 @@ class _DemoRequestScreenState extends State<DemoRequestScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: LumiPadding.allM,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

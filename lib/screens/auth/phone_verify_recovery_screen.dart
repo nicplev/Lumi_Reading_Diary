@@ -671,6 +671,7 @@ class _PhoneVerifyRecoveryCard extends StatelessWidget {
           ],
         ),
         child: SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,

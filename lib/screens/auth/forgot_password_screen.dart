@@ -95,6 +95,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

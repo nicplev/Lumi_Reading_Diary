@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/force_update_gate.dart' show appVersionLabelProvider;
 import '../../core/theme/teacher_constants.dart';
 import '../../core/widgets/lumi/teacher_profile_card.dart';
 import '../../core/widgets/lumi/teacher_settings_section.dart';
@@ -295,9 +297,11 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
             const SizedBox(height: 16),
 
             // Version info
-            Text(
-              'Version 1.0.0',
-              style: TeacherTypography.bodySmall,
+            Consumer(
+              builder: (context, ref, _) => Text(
+                ref.watch(appVersionLabelProvider),
+                style: TeacherTypography.bodySmall,
+              ),
             ),
 
             const SizedBox(height: 20),

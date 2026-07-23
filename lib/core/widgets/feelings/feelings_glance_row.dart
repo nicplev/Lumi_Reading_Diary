@@ -49,7 +49,23 @@ class _Tile extends StatelessWidget {
           const SizedBox(height: 6),
           AspectRatio(
             aspectRatio: 1,
-            child: feeling == null ? _placeholder() : _blob(context, feeling),
+            child: feeling == null
+                ? _placeholder()
+                : Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned.fill(child: _blob(context, feeling)),
+                      // Multiple sessions that day: the blob shows the LOWEST
+                      // feeling, so mark that it's one of several rather than the
+                      // whole story.
+                      if (bucket.feelingCount > 1)
+                        Positioned(
+                          top: -2,
+                          right: -2,
+                          child: _multiSessionBadge(bucket.feelingCount),
+                        ),
+                    ],
+                  ),
           ),
           const SizedBox(height: 6),
           // Feeling word (e.g. "Good") rather than its 1–5 number. scaleDown
@@ -90,6 +106,31 @@ class _Tile extends StatelessWidget {
               fontWeight: FontWeight.w800,
               color: feeling.color,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Small count badge shown on a day with more than one logged feeling.
+  Widget _multiSessionBadge(int count) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 3),
+      decoration: BoxDecoration(
+        color: LumiTokens.paper,
+        shape: BoxShape.rectangle,
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(color: LumiTokens.rule),
+      ),
+      child: Center(
+        child: Text(
+          '$count',
+          style: LumiType.caption.copyWith(
+            fontSize: 9,
+            height: 1,
+            fontWeight: FontWeight.w800,
+            color: LumiTokens.muted,
           ),
         ),
       ),

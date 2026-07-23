@@ -10,6 +10,7 @@ import '../../../../data/models/class_model.dart';
 import '../../../../data/models/reading_log_model.dart';
 import '../../../../data/models/student_model.dart';
 import '../../../../data/models/user_model.dart';
+import 'dashboard_student_nav.dart';
 import '../../../../services/firebase_service.dart';
 import '../../../../core/utils/image_decode.dart';
 
@@ -308,6 +309,10 @@ class _RecentLogRow extends StatelessWidget {
                 fit: BoxFit.contain,
                 errorBuilder: (_, __, ___) => const SizedBox.shrink(),
               ),
+            ],
+            if (onTap != null) ...[
+              const SizedBox(width: 6),
+              const DashboardRowChevron(),
             ],
           ],
         ),

@@ -3,18 +3,25 @@ import 'package:flutter/material.dart';
 import '../../../../theme/lumi_tokens.dart';
 import '../../../../theme/lumi_typography.dart';
 import '../../../../core/widgets/lumi/student_avatar.dart';
+import '../../../../data/models/class_model.dart';
 import '../../../../data/models/reading_log_model.dart';
 import '../../../../data/models/student_model.dart';
+import '../../../../data/models/user_model.dart';
+import 'dashboard_student_nav.dart';
 
 /// Mini leaderboard showing the top 5 students by total minutes read this week.
 class DashboardTopReadersCard extends StatelessWidget {
   final List<ReadingLogModel> weeklyLogs;
   final List<StudentModel> students;
+  final UserModel teacher;
+  final ClassModel classModel;
 
   const DashboardTopReadersCard({
     super.key,
     required this.weeklyLogs,
     required this.students,
+    required this.teacher,
+    required this.classModel,
   });
 
   @override
@@ -56,7 +63,12 @@ class DashboardTopReadersCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Top Readers', style: LumiType.subhead),
+              // Flexible so a longer title degrades gracefully instead of the
+              // Row overflowing (two unconstrained Texts can't wrap).
+              Flexible(
+                child: Text('Top Readers', style: LumiType.subhead),
+              ),
+              const SizedBox(width: 8),
               Text('This week',
                   style: LumiType.caption.copyWith(color: LumiTokens.muted)),
             ],
@@ -73,6 +85,7 @@ class DashboardTopReadersCard extends StatelessWidget {
               final entry = top[i];
               final student = studentMap[entry.key];
               return _buildRow(
+                context: context,
                 rank: i + 1,
                 student: student,
                 minutes: entry.value,
@@ -85,6 +98,7 @@ class DashboardTopReadersCard extends StatelessWidget {
   }
 
   Widget _buildRow({
+    required BuildContext context,
     required int rank,
     required StudentModel? student,
     required int minutes,
@@ -99,8 +113,8 @@ class DashboardTopReadersCard extends StatelessWidget {
     final isTopThree = rank <= 3;
     final name = student?.firstNameWithLastInitial ?? 'Student unavailable';
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+    final row = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
       child: Row(
         children: [
           // Rank as plain bold text — no circle, no clutter
@@ -170,8 +184,25 @@ class DashboardTopReadersCard extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(width: 6),
+          const DashboardRowChevron(),
         ],
       ),
+    );
+
+    // Null-student rows (a legacy log with no resolvable student) stay inert,
+    // matching Recent Reading.
+    if (student == null) return row;
+    final resolved = student;
+    return InkWell(
+      onTap: () => pushStudentDetail(
+        context,
+        teacher: teacher,
+        student: resolved,
+        classModel: classModel,
+      ),
+      borderRadius: BorderRadius.circular(12),
+      child: row,
     );
   }
 

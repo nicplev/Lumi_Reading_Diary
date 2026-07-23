@@ -111,6 +111,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
       setState(() {
         _currentStep++;
       });
+      FocusScope.of(context).unfocus();
       _pageController.animateToPage(
         _currentStep,
         duration: const Duration(milliseconds: 300),
@@ -191,6 +192,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
       setState(() {
         _currentStep = 3;
       });
+      FocusScope.of(context).unfocus();
       _pageController.animateToPage(
         _currentStep,
         duration: const Duration(milliseconds: 300),
@@ -224,6 +226,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
       setState(() {
         _currentStep--;
       });
+      FocusScope.of(context).unfocus();
       _pageController.animateToPage(
         _currentStep,
         duration: const Duration(milliseconds: 300),
@@ -298,6 +301,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
 
   Widget _buildSchoolInfoStep() {
     return SingleChildScrollView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: LumiPadding.allM,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -376,6 +380,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
 
   Widget _buildAdminAccountStep() {
     return SingleChildScrollView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: LumiPadding.allM,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -481,6 +486,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
 
   Widget _buildReadingLevelsStep() {
     return SingleChildScrollView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: LumiPadding.allM,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

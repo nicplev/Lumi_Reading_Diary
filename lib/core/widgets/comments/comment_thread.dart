@@ -160,6 +160,11 @@ class _CommentThreadState extends ConsumerState<CommentThread> {
               );
             }
             return Column(
+              // Stretch so each bubble gets full width and its own end/start
+              // alignment (mine → right, theirs → left) actually takes effect.
+              // Without this the Column defaults to center and shrink-wraps each
+              // bubble, so the bubble's alignment has nothing to align within.
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 for (final comment in comments)
                   _CommentBubble(

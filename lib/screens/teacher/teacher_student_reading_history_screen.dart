@@ -250,6 +250,7 @@ class _TeacherStudentReadingHistoryScreenState
         : <_BookSummary>[];
 
     return CustomScrollView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       slivers: [
         SliverToBoxAdapter(
           child: _buildStatsBar(
@@ -370,10 +371,16 @@ class _TeacherStudentReadingHistoryScreenState
 
   Widget _buildPaginationFooter() {
     if (!_historyHasMore && _historyError == null) {
+      // Reuse the header's filter condition so the two can't disagree. When a
+      // filter is active the visible rows are a subset, so "All N loaded" (N =
+      // fetched, not shown) would contradict the list — say it differently.
+      final message = _hasActiveFilters
+          ? 'All matching sessions shown'
+          : 'All ${_history.length} sessions loaded';
       return Padding(
         padding: const EdgeInsets.only(top: 16),
         child: Text(
-          'All ${_history.length} sessions loaded',
+          message,
           textAlign: TextAlign.center,
           style: LumiType.caption.copyWith(color: LumiTokens.muted),
         ),

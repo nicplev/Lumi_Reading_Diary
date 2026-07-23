@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/auth/sign_out_flow.dart';
 import '../../core/services/app_icon_service.dart';
 import '../../core/tour/lumi_app_tour.dart';
+import '../../core/widgets/force_update_gate.dart' show appVersionLabelProvider;
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
@@ -221,16 +222,15 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen>
         content:
             Text('Are you sure you want to sign out?', style: LumiType.body),
         actions: [
-          TextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel',
-                style: LumiType.body.copyWith(color: LumiTokens.muted)),
+            label: 'Cancel',
+            variant: LumiDialogActionVariant.cancel,
           ),
-          TextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Sign out',
-                style: LumiType.body.copyWith(
-                    color: LumiTokens.red, fontWeight: FontWeight.w700)),
+            label: 'Sign out',
+            variant: LumiDialogActionVariant.destructive,
           ),
         ],
       ),
@@ -285,7 +285,11 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen>
             _buildSignOut(),
             const SizedBox(height: LumiTokens.space3),
             Center(
-              child: Text('Version 1.0.0', style: LumiType.caption),
+              child: Consumer(
+                builder: (context, ref, _) => Text(
+                    ref.watch(appVersionLabelProvider),
+                    style: LumiType.caption),
+              ),
             ),
           ],
         ),
@@ -870,7 +874,11 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen>
               const SizedBox(height: LumiTokens.space4),
               Text('Lumi Reading Diary', style: LumiType.subhead),
               const SizedBox(height: LumiTokens.space1),
-              Text('Version 1.0.0', style: LumiType.caption),
+              Consumer(
+                builder: (context, ref, _) => Text(
+                    ref.watch(appVersionLabelProvider),
+                    style: LumiType.caption),
+              ),
               const SizedBox(height: LumiTokens.space3),
               Text(
                 'Making reading fun and trackable for every child. Lumi helps '

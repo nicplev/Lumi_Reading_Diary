@@ -81,7 +81,12 @@ class DashboardReadingSentimentCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Reading Sentiment', style: LumiType.subhead),
+              // Flexible so a longer title degrades instead of overflowing the
+              // Row (two unconstrained Texts cannot wrap).
+              Flexible(
+                child: Text('Reading Sentiment', style: LumiType.subhead),
+              ),
+              const SizedBox(width: 8),
               Text('This week', style: LumiType.caption),
             ],
           ),

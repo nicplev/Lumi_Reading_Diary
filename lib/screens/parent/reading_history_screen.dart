@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -136,6 +138,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
 
   @override
   void dispose() {
+    _teardownActivityStream();
     _disposeMetadataResolver();
     _searchController.dispose();
     super.dispose();
@@ -202,55 +205,82 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
       .collection('readingLogs')
       .where('studentId', isEqualTo: widget.studentId);
 
-  // Memoized per (student, range, month) so ordinary rebuilds (tab switches,
-  // parent setState) reuse the live Firestore subscription instead of tearing
-  // it down and re-subscribing. Retry clears the cache explicitly.
-  Stream<QuerySnapshot>? _activityStreamCache;
-  String? _activityStreamStudentId;
-  _Range? _activityStreamRange;
-  DateTime? _activityStreamMonth;
+  // Activity stream, owned by the State rather than handed out via
+  // `.asBroadcastStream()`. A broadcast stream from `.snapshots()` cancels its
+  // source subscription when its last listener leaves — which happened every
+  // time the user switched to the Bookshelf tab (the ternary unmounts the
+  // Activity StreamBuilder) — and never resubscribed, so returning to Activity
+  // yielded a stream stuck in `waiting` forever. Keeping one long-lived
+  // subscription per (student, range, month) in a controller the State owns
+  // survives arbitrary listener churn.
+  StreamController<QuerySnapshot>? _activityController;
+  StreamSubscription<QuerySnapshot>? _activitySub;
+  QuerySnapshot? _activityLatest; // seeds late listeners so they don't spin
+  String? _activityKeyStudentId;
+  _Range? _activityKeyRange;
+  DateTime? _activityKeyMonth;
 
-  void _invalidateActivityStream() {
-    _activityStreamCache = null;
+  void _teardownActivityStream() {
+    _activitySub?.cancel();
+    _activitySub = null;
+    _activityController?.close();
+    _activityController = null;
+    _activityLatest = null;
+    _activityKeyStudentId = null;
+    _activityKeyRange = null;
+    _activityKeyMonth = null;
   }
 
-  Stream<QuerySnapshot> _activityStream() {
-    final cached = _activityStreamCache;
-    if (cached != null &&
-        _activityStreamStudentId == widget.studentId &&
-        _activityStreamRange == _range &&
-        _activityStreamMonth == _selectedMonth) {
-      return cached;
-    }
+  /// Retry after an error: rebuild the subscription from scratch.
+  void _invalidateActivityStream() {
+    _teardownActivityStream();
+  }
 
-    final Stream<QuerySnapshot> stream;
+  Query<Map<String, dynamic>> _activityQuery() {
     switch (_range) {
       case _Range.week:
         final start = ReadingHistoryDateRange.startOfWeek(DateTime.now());
         final end = start.add(const Duration(days: 7));
-        stream = _logsCollection
+        return _logsCollection
             .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
             .where('date', isLessThan: Timestamp.fromDate(end))
-            .orderBy('date', descending: true)
-            .snapshots()
-            .asBroadcastStream();
+            .orderBy('date', descending: true);
       case _Range.month:
         final start = ReadingHistoryDateRange.startOfMonth(_selectedMonth);
         final end = ReadingHistoryDateRange.startOfNextMonth(_selectedMonth);
-        stream = _logsCollection
+        return _logsCollection
             .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
             .where('date', isLessThan: Timestamp.fromDate(end))
-            .orderBy('date', descending: true)
-            .snapshots()
-            .asBroadcastStream();
+            .orderBy('date', descending: true);
       case _Range.all:
         throw StateError('All-time history uses bounded cursor pagination.');
     }
-    _activityStreamCache = stream;
-    _activityStreamStudentId = widget.studentId;
-    _activityStreamRange = _range;
-    _activityStreamMonth = _selectedMonth;
-    return stream;
+  }
+
+  Stream<QuerySnapshot> _activityStream() {
+    final keyMatches = _activityController != null &&
+        _activityKeyStudentId == widget.studentId &&
+        _activityKeyRange == _range &&
+        _activityKeyMonth == _selectedMonth;
+    if (keyMatches) return _activityController!.stream;
+
+    // Key changed (or first build) — rewire onto a fresh query.
+    _teardownActivityStream();
+    final controller = StreamController<QuerySnapshot>.broadcast();
+    _activityController = controller;
+    _activityKeyStudentId = widget.studentId;
+    _activityKeyRange = _range;
+    _activityKeyMonth = _selectedMonth;
+    _activitySub = _activityQuery().snapshots().listen(
+      (snap) {
+        _activityLatest = snap; // cache so a late listener is seeded, not spun
+        if (!controller.isClosed) controller.add(snap);
+      },
+      onError: (Object e, StackTrace st) {
+        if (!controller.isClosed) controller.addError(e, st);
+      },
+    );
+    return controller.stream;
   }
 
   @override
@@ -323,13 +353,18 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
               ? _buildPagedActivity()
               : StreamBuilder<QuerySnapshot>(
                   stream: _activityStream(),
+                  // Seed a re-mounted listener (e.g. after tabbing away and
+                  // back) with the last snapshot so it renders immediately
+                  // instead of showing a spinner until the next Firestore event.
+                  initialData: _activityLatest,
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
                       return _ErrorState(
                         onRetry: () => setState(_invalidateActivityStream),
                       );
                     }
-                    if (snapshot.connectionState == ConnectionState.waiting) {
+                    if (snapshot.connectionState == ConnectionState.waiting &&
+                        !snapshot.hasData) {
                       return const Center(
                         child:
                             CircularProgressIndicator(color: LumiTokens.yellow),

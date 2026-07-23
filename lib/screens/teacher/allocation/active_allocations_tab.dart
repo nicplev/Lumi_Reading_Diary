@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
 import '../../../core/widgets/lumi/lumi_card.dart';
+import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../core/widgets/lumi/lumi_toast.dart';
 import '../../../data/models/user_model.dart';
 import '../../../data/models/class_model.dart';
@@ -19,11 +20,17 @@ class ActiveAllocationsTab extends StatefulWidget {
   final ClassModel? selectedClass;
   final ValueChanged<AllocationModel> onEditAllocation;
 
+  /// The parent tab controller. Used to reset this list to the top each time the
+  /// Active tab becomes visible (a list should start at the top on return; the
+  /// New tab is a form and is deliberately left where it was).
+  final TabController? tabController;
+
   const ActiveAllocationsTab({
     super.key,
     required this.teacher,
     this.selectedClass,
     required this.onEditAllocation,
+    this.tabController,
   });
 
   @override
@@ -34,12 +41,31 @@ class _ActiveAllocationsTabState extends State<ActiveAllocationsTab> {
   final _firebaseService = FirebaseService.instance;
   final _allocationCrudService = AllocationCrudService();
   final _readingLevelService = ReadingLevelService();
+  final _scrollController = ScrollController();
   List<ReadingLevelOption> _readingLevelOptions = const [];
 
   @override
   void initState() {
     super.initState();
     _loadReadingLevelOptions();
+    widget.tabController?.addListener(_onTabChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.tabController?.removeListener(_onTabChanged);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  // Active is tab index 1. When it settles as the selected tab, jump the list
+  // back to the top.
+  void _onTabChanged() {
+    final controller = widget.tabController;
+    if (controller == null || controller.indexIsChanging) return;
+    if (controller.index == 1 && _scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
   }
 
   Future<void> _loadReadingLevelOptions() async {
@@ -80,19 +106,19 @@ class _ActiveAllocationsTabState extends State<ActiveAllocationsTab> {
         ),
         title: Text('Delete Allocation', style: LumiType.subhead),
         content: Text(
-          'Are you sure you want to delete this allocation? This cannot be undone.',
+          'Are you sure you want to delete this allocation?',
           style: LumiType.body.copyWith(color: LumiTokens.ink),
         ),
         actions: [
-          TextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel',
-                style: LumiType.button.copyWith(color: LumiTokens.muted)),
+            label: 'Cancel',
+            variant: LumiDialogActionVariant.cancel,
           ),
-          TextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Delete',
-                style: LumiType.button.copyWith(color: LumiTokens.red)),
+            label: 'Delete',
+            variant: LumiDialogActionVariant.destructive,
           ),
         ],
       ),
@@ -190,6 +216,7 @@ class _ActiveAllocationsTabState extends State<ActiveAllocationsTab> {
         }
 
         return ListView.builder(
+          controller: _scrollController,
           padding: const EdgeInsets.all(16),
           itemCount: allocations.length,
           itemBuilder: (context, index) {

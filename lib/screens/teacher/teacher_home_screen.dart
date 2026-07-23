@@ -10,6 +10,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/tour/lumi_app_tour.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_skeleton.dart';
 import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../data/models/user_model.dart';
@@ -181,16 +182,15 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
           style: LumiType.body,
         ),
         actions: [
-          TextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            label: 'Cancel',
+            variant: LumiDialogActionVariant.cancel,
           ),
-          TextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              'Sign Out',
-              style: LumiType.button.copyWith(color: LumiTokens.red),
-            ),
+            label: 'Sign Out',
+            variant: LumiDialogActionVariant.destructive,
           ),
         ],
       ),

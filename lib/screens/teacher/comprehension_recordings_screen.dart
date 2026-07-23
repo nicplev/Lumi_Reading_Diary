@@ -764,20 +764,39 @@ class _ReviewStatusAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+    );
+    final textStyle = LumiType.caption.copyWith(fontWeight: FontWeight.w700);
+
+    // Disabled → a faint ghost outline (no fill), so it reads clearly as
+    // "unavailable" rather than as a secondary solid button. The old pale-solid
+    // treatment nearly matched the selection panel behind it.
+    if (!enabled) {
+      return OutlinedButton.icon(
+        onPressed: null,
+        icon: Icon(icon, size: 18),
+        label: Text(label),
+        style: OutlinedButton.styleFrom(
+          disabledForegroundColor: LumiTokens.muted.withValues(alpha: 0.45),
+          side: BorderSide(color: LumiTokens.rule.withValues(alpha: 0.8)),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          shape: shape,
+          textStyle: textStyle,
+        ),
+      );
+    }
+
     return FilledButton.icon(
-      onPressed: enabled ? onPressed : null,
+      onPressed: onPressed,
       icon: Icon(icon, size: 18),
       label: Text(label),
       style: FilledButton.styleFrom(
         backgroundColor: color,
         foregroundColor: foregroundColor,
-        disabledBackgroundColor: LumiTokens.paper.withValues(alpha: 0.72),
-        disabledForegroundColor: LumiTokens.muted.withValues(alpha: 0.58),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
-        ),
-        textStyle: LumiType.caption.copyWith(fontWeight: FontWeight.w700),
+        shape: shape,
+        textStyle: textStyle,
       ),
     );
   }

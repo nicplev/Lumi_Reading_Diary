@@ -72,7 +72,13 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
-      if (!_tabController.indexIsChanging) setState(() {});
+      // Release focus on tab change so the Compose tab's text fields don't keep
+      // the keyboard up over the History tab (TabBarView keeps both alive).
+      if (_tabController.indexIsChanging) {
+        FocusScope.of(context).unfocus();
+      } else {
+        setState(() {});
+      }
     });
 
     if (widget.preFilledTitle != null) {
@@ -1176,6 +1182,42 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
     }
   }
 
+  /// Content-card caption that confirms the chosen audience at the moment of
+  /// writing, so a teacher can see who a message is going to before sending.
+  /// Falls back to a plain description when nothing is selected yet.
+  String _contentAudienceCaption() {
+    const fallback = 'Sent as a push notification and an inbox item.';
+    if (_audienceType == 'school') {
+      return 'The whole school will receive this as a push notification and an inbox item.';
+    }
+    if (_audienceType == 'students') {
+      final n = _selectedStudentIds.length;
+      if (n == 0) return fallback;
+      return "$n student${n == 1 ? "'s" : "s'"} parents will receive this as a push notification and an inbox item.";
+    }
+    // classes
+    if (_selectedClassIds.isEmpty) return fallback;
+    final names = _classes
+        .where((c) => _selectedClassIds.contains(c.id))
+        .map((c) => c.name)
+        .toList();
+    final who = _joinCapped(names);
+    return '$who will receive this as a push notification and an inbox item.';
+  }
+
+  /// Joins names for display, capping the list so the caption cannot overflow
+  /// the card (e.g. "3A, 3B and 2 more").
+  String _joinCapped(List<String> names, {int max = 2}) {
+    if (names.isEmpty) return 'The selected classes';
+    if (names.length == 1) return names.first;
+    if (names.length <= max) {
+      return '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
+    }
+    final shown = names.sublist(0, max).join(', ');
+    final rest = names.length - max;
+    return '$shown and $rest more';
+  }
+
   String _campaignSubtitle(NotificationCampaignModel campaign) {
     final format = DateFormat('EEE d MMM, h:mm a');
     if (campaign.status == 'scheduled' && campaign.scheduledFor != null) {
@@ -1501,17 +1543,24 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
   // ─── Compose Tab ────────────────────────────────────────────────
 
   /// In-card bento header — a soft blue icon chip + normal-case title.
-  Widget _cardHeader(IconData icon, String title) {
+  Widget _cardHeader(IconData icon, String title, {int? step}) {
     return Row(
       children: [
         Container(
           width: 30,
           height: 30,
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             color: LumiTokens.blue.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(LumiTokens.radiusSmall),
           ),
-          child: Icon(icon, size: 17, color: LumiTokens.blue),
+          // Numbered step badge (Audience → Content → Schedule) gives the compose
+          // flow the same clear "path of action" as the Assign Books wizard.
+          child: step != null
+              ? Text('$step',
+                  style: LumiType.subhead
+                      .copyWith(fontSize: 15, color: LumiTokens.blue))
+              : Icon(icon, size: 17, color: LumiTokens.blue),
         ),
         const SizedBox(width: 10),
         Text(title, style: LumiType.subhead.copyWith(fontSize: 16)),
@@ -1556,45 +1605,10 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+      // Dragging the list dismisses the keyboard (Flutter's default is manual).
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: [
-        // ── Content ──
-        Container(
-          decoration: _lumiCard(),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _cardHeader(Icons.edit_note_rounded, 'Content'),
-              const SizedBox(height: 12),
-              Text(
-                'Parents receive this as a push notification and inbox item.',
-                style: LumiType.caption,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _titleController,
-                maxLength: _maxTitleLength,
-                style: LumiType.body,
-                decoration: _inputDecoration('Notification title'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _bodyController,
-                minLines: 4,
-                maxLines: 6,
-                maxLength: _maxBodyLength,
-                style: LumiType.body,
-                decoration: _inputDecoration(
-                  'Write your message...',
-                  multiline: true,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // ── Audience ──
+        // ── 1 · Audience (choose recipients before writing) ──
         Container(
           decoration: _lumiCard(),
           clipBehavior: Clip.antiAlias,
@@ -1606,7 +1620,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _cardHeader(Icons.groups_rounded, 'Audience'),
+                    _cardHeader(Icons.groups_rounded, 'Audience', step: 1),
                     const SizedBox(height: 14),
                     Row(
                       children: [
@@ -1701,7 +1715,44 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
         ),
         const SizedBox(height: 20),
 
-        // ── Schedule & send ──
+        // ── 2 · Content (dynamic caption confirms who it goes to) ──
+        Container(
+          decoration: _lumiCard(),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _cardHeader(Icons.edit_note_rounded, 'Content', step: 2),
+              const SizedBox(height: 12),
+              Text(
+                _contentAudienceCaption(),
+                style: LumiType.caption,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _titleController,
+                maxLength: _maxTitleLength,
+                style: LumiType.body,
+                decoration: _inputDecoration('Notification title'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _bodyController,
+                minLines: 4,
+                maxLines: 6,
+                maxLength: _maxBodyLength,
+                style: LumiType.body,
+                decoration: _inputDecoration(
+                  'Write your message...',
+                  multiline: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // ── 3 · Schedule ──
         Container(
           decoration: _lumiCard(),
           clipBehavior: Clip.antiAlias,
@@ -1710,7 +1761,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                child: _cardHeader(Icons.send_rounded, 'Schedule & send'),
+                child: _cardHeader(Icons.schedule_rounded, 'Schedule', step: 3),
               ),
               TeacherSettingsItem(
                 icon: Icons.schedule,

@@ -45,6 +45,19 @@ async function createLogChange(logsRef, id, data) {
   return {before: beforeSnap, after: afterSnap};
 }
 
+/**
+ * Deletes a log and returns the {before, after} Change a delete trigger sees:
+ * a real pre-delete snapshot as `before`, and a post-delete not-exists snapshot
+ * (same doc id) as `after`.
+ */
+async function deleteLogChange(logsRef, id) {
+  const ref = logsRef.doc(id);
+  const beforeSnap = await ref.get();
+  await ref.delete();
+  const afterSnap = await ref.get();
+  return {before: beforeSnap, after: afterSnap};
+}
+
 function logDoc(studentId, classId, isoDate, minutes) {
   return {
     studentId,
@@ -132,6 +145,50 @@ test('concurrent class-stat deltas do not lose increments', async () => {
     `expected ${expected} minutes, got ${stats.totalMinutesRead}`);
   assert.equal(stats.totalBooksRead, changes.length);
   assert.equal(stats.activeStudents, students.length);
+});
+
+test('deleting the most-recent log recomputes lastReadingDate immediately', async () => {
+  const school = db.doc('schools/school_del');
+  await school.set({timezone: 'Australia/Melbourne'});
+  const logs = school.collection('readingLogs');
+
+  const studentRef = school.collection('students').doc('student_del');
+  await studentRef.set({
+    classId: 'class_del',
+    stats: {totalMinutesRead: 0, totalBooksRead: 0, readingDates: []},
+  });
+
+  // Three logs on three days; newest is the 20th.
+  const days = ['2026-07-10', '2026-07-15', '2026-07-20'];
+  for (let i = 0; i < days.length; i++) {
+    const c = await createLogChange(
+      logs, `del_log_${i}`,
+      logDoc('student_del', 'class_del', `${days[i]}T08:00:00.000Z`, 20),
+    );
+    await applyStudentStatsDelta(c, 'school_del');
+  }
+
+  let stats = (await studentRef.get()).data().stats;
+  assert.equal(stats.lastReadingDate.toDate().toISOString().slice(0, 10),
+    '2026-07-20', 'lastReadingDate should be the newest log before delete');
+
+  // Delete the newest — lastReadingDate must fall back to the next-most-recent.
+  const del = await deleteLogChange(logs, 'del_log_2');
+  await applyStudentStatsDelta(del, 'school_del');
+
+  stats = (await studentRef.get()).data().stats;
+  assert.equal(stats.lastReadingDate.toDate().toISOString().slice(0, 10),
+    '2026-07-15',
+    `expected 2026-07-15 after deleting newest, got ${stats.lastReadingDate && stats.lastReadingDate.toDate().toISOString().slice(0, 10)}`);
+  assert.equal(stats.totalReadingDays, 2);
+
+  // Delete the remaining two — lastReadingDate must become null.
+  await applyStudentStatsDelta(await deleteLogChange(logs, 'del_log_1'), 'school_del');
+  await applyStudentStatsDelta(await deleteLogChange(logs, 'del_log_0'), 'school_del');
+  stats = (await studentRef.get()).data().stats;
+  assert.equal(stats.lastReadingDate, null,
+    'lastReadingDate should be null once no counted logs remain');
+  assert.equal(stats.totalReadingDays, 0);
 });
 
 after(async () => {

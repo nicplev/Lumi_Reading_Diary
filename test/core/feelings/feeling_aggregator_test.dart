@@ -61,7 +61,7 @@ void main() {
       expect(s.buckets[0].value, isNull);
     });
 
-    test('multiple logs same day are averaged', () {
+    test('multiple logs same day take the LOWEST feeling (not the average)', () {
       final s = aggregateFeelings(
         [
           _log(weekStart, feeling: ReadingFeeling.great), // 5
@@ -70,11 +70,12 @@ void main() {
         period: FeelingPeriod.week,
         now: now,
       );
-      expect(s.buckets[0].value, 3.0); // (5 + 1) / 2
+      // A hard session is surfaced, not averaged away behind the great one.
+      expect(s.buckets[0].value, 1.0);
       expect(s.buckets[0].feelingCount, 2);
     });
 
-    test('mixed null + non-null same day averages only the recorded ones', () {
+    test('mixed null + non-null same day scores only the recorded feeling', () {
       final s = aggregateFeelings(
         [
           _log(weekStart, feeling: ReadingFeeling.good), // 4
@@ -115,6 +116,24 @@ void main() {
       // 3 June is in the first week bucket.
       expect(s.buckets.first.value, 3.0);
       expect(s.buckets.first.label, 'W1');
+    });
+
+    test('a weekly bucket averages the DAILY LOWS, not all logs', () {
+      final s = aggregateFeelings(
+        [
+          // Day 1: great + hard → daily low = 1
+          _log(DateTime(2025, 6, 2), feeling: ReadingFeeling.great),
+          _log(DateTime(2025, 6, 2), feeling: ReadingFeeling.hard),
+          // Day 2: great → daily low = 5
+          _log(DateTime(2025, 6, 3), feeling: ReadingFeeling.great),
+        ],
+        period: FeelingPeriod.month,
+        now: now,
+      );
+      // (1 + 5) / 2 = 3.0 — one hard day doesn't sink the whole week, and one
+      // great session doesn't hide the hard day.
+      expect(s.buckets.first.value, 3.0);
+      expect(s.buckets.first.feelingCount, 3);
     });
   });
 

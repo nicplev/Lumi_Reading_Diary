@@ -887,6 +887,8 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
                 // the footer so the button below is always reachable.
                 Flexible(
                   child: SingleChildScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                     child: AnimatedSize(
                       duration: const Duration(milliseconds: 350),

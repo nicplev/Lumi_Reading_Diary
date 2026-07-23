@@ -385,9 +385,9 @@ class _AccountScreenState extends State<AccountScreen> {
 
   String get _accountDeletionExplanation {
     if (widget.user.role == UserRole.parent) {
-      return 'This removes your Lumi login, profile, preferences and content you created. '
-          'A school must retain and manage its student records, so deleting your account '
-          'does not delete your child\'s school record. Contact the school to request that.';
+      return 'This removes your Lumi login, profile, preferences and the content you created. '
+          'Your child\'s school record is held and managed by the school, so it is not '
+          'affected. To request its removal, please contact the school directly.';
     }
     return 'This removes your Lumi login, staff profile, preferences and content you created. '
         'It does not delete student records or other staff accounts.';
@@ -623,7 +623,7 @@ class _AccountScreenState extends State<AccountScreen> {
             const SizedBox(height: LumiTokens.space3),
           ],
           _DangerCard(
-            icon: Icons.person_remove_outlined,
+            icon: Icons.no_accounts_outlined,
             title: 'Delete my account',
             body: _accountDeletionExplanation,
             buttonKey: const Key('delete-account-button'),

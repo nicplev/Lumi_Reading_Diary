@@ -9,6 +9,7 @@ import '../../services/reading_level_service.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_toast.dart';
 
 /// Neutral Lumi card surface shared by this screen's sections + dialogs.
@@ -698,18 +699,15 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
           style: LumiType.body.copyWith(color: LumiTokens.ink),
         ),
         actions: [
-          TextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text('Cancel',
-                style: LumiType.body
-                    .copyWith(color: LumiTokens.muted)),
+            label: 'Cancel',
+            variant: LumiDialogActionVariant.cancel,
           ),
-          TextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: LumiTokens.red),
-            child: Text('Delete',
-                style: LumiType.body
-                    .copyWith(color: LumiTokens.red)),
+            label: 'Delete',
+            variant: LumiDialogActionVariant.destructive,
           ),
         ],
       ),

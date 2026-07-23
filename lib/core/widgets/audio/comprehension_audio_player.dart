@@ -7,6 +7,7 @@ import 'package:just_audio/just_audio.dart';
 import '../../../services/comprehension_audio_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/lumi_text_styles.dart';
+import '../lumi/lumi_buttons.dart';
 import '../lumi/lumi_toast.dart';
 
 /// Compact inline player for a child's comprehension recording, shown on the
@@ -86,6 +87,10 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer>
 
   bool _loading = false;
   bool _failed = false;
+  // Set when the failure is a permanent, non-retryable state (e.g. playback
+  // turned off for the school). Shows a message with NO retry button. Null means
+  // a transient failure → generic "Audio unavailable" + retry.
+  String? _failureMessage;
   bool _isPlaying = false;
   bool _deleting = false;
   bool _deleted = false;
@@ -141,7 +146,7 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer>
       });
       setState(() => _loading = false);
       if (playWhenReady) await player.play();
-    } catch (_) {
+    } catch (err) {
       await candidate?.dispose();
       if (identical(_player, candidate)) {
         _player = null;
@@ -151,9 +156,36 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer>
         _positionSub = null;
       }
       if (!mounted) return;
+
+      // Distinguish the failure so the UI stops showing a generic error with a
+      // retry that can never succeed:
+      //  - not-found → the recording is gone; hide the player (like a delete).
+      //  - failed-precondition → a policy/state problem (e.g. playback disabled
+      //    for the school); show the server message with NO retry.
+      //  - anything else (network, App Check, unknown) → generic + retry.
+      if (err is FirebaseFunctionsException) {
+        if (err.code == 'not-found') {
+          setState(() {
+            _loading = false;
+            _deleted = true;
+          });
+          return;
+        }
+        if (err.code == 'failed-precondition') {
+          setState(() {
+            _loading = false;
+            _failed = true;
+            _failureMessage =
+                err.message ?? 'Recording is unavailable.';
+          });
+          return;
+        }
+      }
+
       setState(() {
         _loading = false;
         _failed = true;
+        _failureMessage = null;
       });
     }
   }
@@ -177,6 +209,7 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer>
       setState(() {
         _loading = true;
         _failed = false;
+        _failureMessage = null;
       });
       await _initPlayer(playWhenReady: true);
       return;
@@ -211,6 +244,7 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer>
     setState(() {
       _loading = true;
       _failed = false;
+      _failureMessage = null;
     });
     await _stateSub?.cancel();
     await _positionSub?.cancel();
@@ -233,14 +267,15 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer>
           'is kept. This action cannot be undone.',
         ),
         actions: [
-          TextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            label: 'Cancel',
+            variant: LumiDialogActionVariant.cancel,
           ),
-          TextButton(
+          LumiDialogAction(
             onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.warmOrange),
-            child: const Text('Delete'),
+            label: 'Delete',
+            variant: LumiDialogActionVariant.destructive,
           ),
         ],
       ),
@@ -321,6 +356,9 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer>
       );
     }
     if (_failed) {
+      // A policy/state failure shows the server's explanation and no retry
+      // (retrying can't change it). A transient failure keeps the retry button.
+      final isPolicyFailure = _failureMessage != null;
       return Row(
         children: [
           const Icon(Icons.error_outline_rounded,
@@ -328,16 +366,17 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer>
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Audio unavailable',
+              _failureMessage ?? 'Audio unavailable',
               style: LumiTextStyles.bodySmall(color: AppColors.charcoal),
             ),
           ),
-          IconButton(
-            onPressed: _retry,
-            icon: const Icon(Icons.refresh_rounded,
-                color: AppColors.charcoal, size: 20),
-            tooltip: 'Try again',
-          ),
+          if (!isPolicyFailure)
+            IconButton(
+              onPressed: _retry,
+              icon: const Icon(Icons.refresh_rounded,
+                  color: AppColors.charcoal, size: 20),
+              tooltip: 'Try again',
+            ),
         ],
       );
     }

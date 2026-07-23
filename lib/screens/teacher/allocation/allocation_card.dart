@@ -159,14 +159,21 @@ class AllocationCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: TextButton.icon(
+                  child: OutlinedButton.icon(
                     onPressed: onDelete,
                     icon: const Icon(Icons.delete_outline, size: 16),
                     label: const Text('Delete'),
-                    style: TextButton.styleFrom(
+                    // Match Edit's bordered pill (neutral border, red text marks
+                    // it destructive) so the two actions read as a pair.
+                    style: OutlinedButton.styleFrom(
                       foregroundColor: LumiTokens.red,
+                      side: const BorderSide(color: LumiTokens.rule),
                       minimumSize: const Size(0, 40),
                       padding: const EdgeInsets.symmetric(horizontal: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(LumiTokens.radiusMedium),
+                      ),
                     ),
                   ),
                 ),

@@ -32,6 +32,19 @@ final packageInfoProvider = FutureProvider<PackageInfo?>((ref) async {
   }
 });
 
+/// Display version for About screens, e.g. "Version 1.0.0 (5)". Includes the
+/// build number so a TestFlight/tester report maps to an exact build. Falls back
+/// to just the semantic version if the build number is unavailable, and to the
+/// pubspec value while package info is still resolving (it resolves once, fast).
+final appVersionLabelProvider = Provider<String>((ref) {
+  const fallback = 'Version 1.0.0';
+  final info = ref.watch(packageInfoProvider).value;
+  if (info == null) return fallback;
+  final version = info.version.isEmpty ? '1.0.0' : info.version;
+  final build = info.buildNumber.trim();
+  return build.isEmpty ? 'Version $version' : 'Version $version ($build)';
+});
+
 String get _platformKey {
   if (kIsWeb) return 'web';
   return switch (defaultTargetPlatform) {

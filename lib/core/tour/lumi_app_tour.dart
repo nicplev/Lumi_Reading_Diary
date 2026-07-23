@@ -141,6 +141,9 @@ class LumiTourDefinitions {
       LumiTourStep(
         id: 'widget',
         targetId: 'parent.home',
+        // End on the home tab (the widget is a home-screen concept), not
+        // whatever tab the previous step left selected.
+        tabIndex: 0,
         title: 'Home Screen Widget',
         body:
             "Add the Lumi widget to your phone's home screen to see your child's reading streak and progress at a glance — without opening the app.",
@@ -263,6 +266,10 @@ class LumiTourDefinitions {
       LumiTourStep(
         id: 'widget',
         targetId: 'teacher.home',
+        // Return to the dashboard for the final card — the widget content is a
+        // dashboard concept, and the tour should end on the dashboard, not the
+        // Settings tab the previous step left us on.
+        tabIndex: 0,
         title: 'Home Screen Widgets',
         body:
             "Add Lumi widgets to your device's home screen for an at-a-glance view — today's reading, top readers, and the class calendar — without opening the app.",
@@ -577,8 +584,12 @@ class _LumiTourOverlayContent extends StatelessWidget {
     final target = _useTargetSpotlight(rawTarget, media.size)
         ? rawTarget!.inflate(8).intersect(fullRect)
         : null;
-    final placeCardAtTop =
-        target != null && target.center.dy > media.size.height * 0.56;
+    // Place the card in whichever gap (above vs below the spotlight) is larger,
+    // rather than off the target's centre — a tall target whose centre sits just
+    // above the midpoint would otherwise send the card to the bottom and overlap
+    // the target's lower half.
+    final placeCardAtTop = target != null &&
+        target.top > (media.size.height - target.bottom);
 
     return Material(
       color: Colors.transparent,
