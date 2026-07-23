@@ -105,7 +105,7 @@ export async function provisionDemoAccess(
     existing.scrambledAt == null &&
     typeof existing.password === "string";
 
-  const password = reusing ? existing.password : generateTempPassword(12);
+  const password = reusing ? existing.password : generateTempPassword();
 
   const specs: AccountSpec[] = [
     { role: "admin", email: adminEmail, collection: "users", ensure: true },

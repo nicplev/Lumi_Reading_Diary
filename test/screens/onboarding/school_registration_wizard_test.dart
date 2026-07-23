@@ -102,11 +102,11 @@ void main() {
     );
     await tester.enterText(
       fieldByName('adminPassword'),
-      'StrongPass123',
+      'StrongPass123!',
     );
     await tester.enterText(
       fieldByName('adminPasswordConfirm'),
-      'StrongPass123',
+      'StrongPass123!',
     );
     await tester.tap(find.text('Continue'));
     await tester.pump();

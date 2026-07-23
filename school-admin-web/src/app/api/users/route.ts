@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
 import { getUsers, createUser } from '@/lib/firestore/users';
+import { isStrongPassword, PASSWORD_REQUIREMENT_TEXT } from '@/lib/utils/password-policy';
 import { z } from 'zod';
 
 function serializeUser(u: Record<string, unknown>) {
@@ -37,7 +38,7 @@ const createUserSchema = z.object({
   email: z.string().email('Valid email is required'),
   fullName: z.string().min(1, 'Name is required'),
   role: z.enum(['teacher', 'schoolAdmin']),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().refine(isStrongPassword, { message: PASSWORD_REQUIREMENT_TEXT }),
 });
 
 export async function POST(request: NextRequest) {

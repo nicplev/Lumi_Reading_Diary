@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/exceptions/linking_exceptions.dart';
 import '../../../core/routing/app_router.dart';
 import '../../../core/services/user_school_index_service.dart';
+import '../../../core/validation/password_policy.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
 import '../../../core/theme/lumi_text_styles.dart';
@@ -303,13 +304,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         r'^[\w.+-]+@([\w-]+\.)+[\w-]{2,}$',
       ).hasMatch(_emailController.text.trim());
 
-  bool get _passwordValid {
-    final v = _passwordController.text;
-    return v.length >= 8 &&
-        RegExp(r'[A-Z]').hasMatch(v) &&
-        RegExp(r'[a-z]').hasMatch(v) &&
-        RegExp(r'[0-9]').hasMatch(v);
-  }
+  bool get _passwordValid => isPasswordCompliant(_passwordController.text);
 
   bool get _confirmValid =>
       _confirmController.text.isNotEmpty &&
@@ -1129,7 +1124,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       case 'invalid-email':
         return 'Please enter a valid email address.';
       case 'weak-password':
-        return 'Password is too weak. Please use at least 8 characters.';
+        return 'Password does not meet the requirements. $kPasswordRequirementText';
       default:
         return 'An error occurred. Please try again.';
     }
@@ -1754,7 +1749,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
                     controller: _passwordController,
                     focusNode: _passwordPeekFocusNode,
                     autofillHints: const [AutofillHints.newPassword],
-                    hintText: 'Password (at least 8 characters)',
+                    hintText: 'Password (min 14 characters)',
                   )
                       .animate()
                       .fadeIn(duration: 220.ms, curve: Curves.easeOut)
@@ -1805,10 +1800,10 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
           focusNode: _passwordFocusNode,
           autofocus: true,
           autofillHints: const [AutofillHints.newPassword],
-          hintText: 'At least 8 characters',
-          helperText: 'Include uppercase, lowercase, and a number.',
+          hintText: 'At least 14 characters',
+          helperText: 'Include upper & lower case, a number and a symbol.',
           errorText: _passwordController.text.isNotEmpty && !_passwordValid
-              ? 'Must be 8+ chars with upper, lower, and a number'
+              ? 'Must be 14+ chars with upper, lower, a number and a symbol'
               : null,
         ),
         AnimatedSize(
