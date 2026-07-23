@@ -62,7 +62,7 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   # Keychain/Keystore-backed store for the Hive encryption key (3.1).
-  flutter_secure_storage: ^9.2.2
+  flutter_secure_storage: ^10.3.1
   connectivity_plus: ^7.0.0
 
   # Utilities
