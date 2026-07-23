@@ -11,7 +11,7 @@ Status markers: ☐ not started · ◐ in progress · 🔍 under test / awaiting
 
 - **Now:** Authorised overnight autonomous run in progress. Wave 0 done. **Wave 2 executed for F-01/F-02/F-03 — each dynamically confirmed in the emulator, fixed in `firestore.rules`, and regression-tested; full rules suite 172/172 green (commit `0d31809`).** Wave 4 (mobile AP2) done. Wave 5 (CI scanning config) in progress.
 - **Boundary held despite the blanket OK:** no active production testing, no deploys, no PRs/merges — everything is in the isolated emulator + this branch. Wave 3 (passive prod TLS scan) stays parked for an explicit hostname go-ahead.
-- **Left for a reviewed daytime pass:** F-06 storage PoC; portal fixes F-07/F-09 (need `pnpm install` + tsc to verify safely); F-04 server-ops defense-in-depth (needs the server-ops test harness); the documents workstream (Tranche A).
+- **Left for a reviewed daytime pass:** portal fixes F-07/F-09 (need `pnpm install` + tsc to verify safely); F-04 server-ops defense-in-depth (needs the server-ops test harness); cross-tenant collection-group sweep + callable App-Check-off PoCs; the documents workstream (Tranche A). (F-06 reclassified accept-as-designed.)
 
 ## How to track progress (3 ways)
 
@@ -26,8 +26,8 @@ Status markers: ☐ not started · ◐ in progress · 🔍 under test / awaiting
 | Wave | What | Environment | Status | Output |
 |---|---|---|---|---|
 | 0 — Source recon | 5 Opus agents map authz / rules / portals / vendor / env; Fable triage | Repo (read-only) | ☑ | 9 candidate findings (F-01…F-09), deduped vs closed list |
-| 1 — Deep source analysis | Per-target Opus agents + local SCA/SAST | Repo (read-only) | ◐ | SCA run; findings register started |
-| 2 — Emulator dynamic PoC | Client-SDK exploit tests in the emulator; each becomes a regression test | Emulator (`demo-lumi-secpoc`), synthetic only | ◐ | **F-01/F-02/F-03 ☑ confirmed+fixed+regression**; F-06 pending |
+| 1 — Deep source analysis | Per-target Opus agents + local SCA/SAST | Repo (read-only) | ◐ | SCA (npm audit) + SAST (semgrep) run; register updated (SCA-01, SAST-01) |
+| 2 — Emulator dynamic PoC | Client-SDK exploit tests in the emulator; each becomes a regression test | Emulator (`demo-lumi-secpoc`), synthetic only | ◐ | **F-01/F-02/F-03 ☑ confirmed+fixed+regression**; F-06 → accept-as-designed; cross-tenant CG sweep + callable-abuse PoCs remaining |
 | 3 — Passive prod config | TLS/header profile of Lumi's own hostnames (read-only) | Prod hostnames | ☐ parked (needs written exception) | S1/S3/S5 evidence |
 | 4 — Mobile static (AP2) | MASVS/MASTG static review | Repo (read-only) | ☑ | AP2 findings (below); MobSF/build left for tester |
 | 5 — Continuous automation | Dependabot, osv-scanner, semgrep; findings register (ZAP deferred to prod-scan exception) | CI config | ◐ | AP1/T1/T2/EV11 controls |
@@ -43,7 +43,7 @@ Status markers: ☐ not started · ◐ in progress · 🔍 under test / awaiting
 | F-03 | Class `update` authz off pre-image only → teacher reassigns ownership | Med-Low | ☑ **confirmed + fixed + regression-tested** (`0d31809`) | S4 | `security_poc.rules.test.js` F-03 |
 | F-04 | `server-ops` single-layer authz (gate currently present) | Med (def-in-depth) | ◐ prove gate completeness in W1 | A5, S4, A13 | Route-gate proof |
 | F-05 | App Check OFF on all callables | Low-Med | ☐ known launch gate | A13, S7 | Staged-rollout evidence |
-| F-06 | Storage cover first-claim open to any authed user | Low-Med | 🔍 | S4, PF51 | PoC + fix |
+| F-06 | Storage cover first-claim open to any authed non-demo user | Low | ⓘ accept-as-designed (`storage.rules.test.js:373`) | S4, PF51 | Intended tradeoff; enforced: uploaderUid=caller, no overwrite of others |
 | F-07 | `books/lookup` external-API amplification + param injection | Low | ☐ verify W1 | Q5 | Rate-limit fix |
 | F-08 | CSRF on portal mutations rests on SameSite=Lax | Low | ☐ note | A13 | Decision note |
 | F-09 | `createUser` password min-6 | Low | ☐ fold into ST4S 1.1 | **A2** | Fix + evidence |
