@@ -42,9 +42,9 @@ jobs:
       NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '0'
       NEXT_PUBLIC_FIREBASE_APP_ID: ci
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: pnpm
