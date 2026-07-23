@@ -1,0 +1,41 @@
+# OSV-Scanner — Software Composition Analysis over every lockfile (npm + pub).
+# Fills the ST4S AP1 ("scan every deployment + monthly") / EV11 gap that the
+# weekly `npm/pnpm audit` (prod-deps, high-only) doesn't cover.
+#
+# Triggers: PRs into main, a monthly schedule, and manual dispatch.
+# NOT `on: push` — a feature-branch push must not spin up CI unexpectedly.
+# Report-only (continue-on-error + SARIF upload) while the register is triaged.
+# NOTE: confirm the action ref/inputs on first enablement.
+name: SCA (osv-scanner)
+
+on:
+  # NOTE: per-PR trigger disabled until the osv-scanner action ref/inputs are
+  # verified on enablement (it failed on PR #520's first run). Runs monthly +
+  # on demand for now; re-add `pull_request: { branches: [main] }` once confirmed.
+  schedule:
+    - cron: "17 3 1 * *" # 03:17 UTC on the 1st of each month
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  security-events: write # upload SARIF to the Security tab
+
+jobs:
+  osv-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run osv-scanner
+        uses: google/osv-scanner-action/osv-scanner-action@v2
+        continue-on-error: true
+        with:
+          scan-args: |-
+            --recursive
+            --format=sarif
+            --output=osv-results.sarif
+            ./
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: osv-results.sarif

@@ -337,6 +337,16 @@ service cloud.firestore {
             oldData.get('createdBy', null) == newData.get('createdBy', null);
       }
 
+      // The same server-owned commercial/provisioning fields must be ABSENT when
+      // a client first creates the school doc. The guard above only runs on
+      // update; create previously omitted it (finding F-02), letting a creator
+      // self-grant `access`/`subscription`. createdBy is required on create and
+      // validated separately, so it is not blocked here.
+      function schoolCommercialFieldsAbsentOnCreate() {
+        return !request.resource.data.keys()
+            .hasAny(['subscription', 'access', 'accessMode', 'isDemo']);
+      }
+
       // No client `list`. A collection query returns full documents, and the
       // school doc holds cross-tenant org/billing data (address, contactEmail,
       // contactPhone, subscription, access). Any signed-in user could otherwise
@@ -353,6 +363,7 @@ service cloud.firestore {
           request.resource.data.createdBy == request.auth.uid &&
           aiEvaluationSettingsAbsentOnCreate() &&
           comprehensionRecordingSettingsAbsentOnCreate() &&
+          schoolCommercialFieldsAbsentOnCreate() &&
           writeAllowedForDev();
 
       allow update: if isSchoolAdmin(schoolId) &&
@@ -519,6 +530,16 @@ service cloud.firestore {
       }
 
       match /students/{studentId} {
+        // Server-owned fields a client must never set directly — written only by
+        // Cloud Functions (Admin SDK, which bypasses rules). Single source of
+        // truth so the create-guard and update-guard cannot drift apart: the
+        // create path previously omitted this list entirely (finding F-01),
+        // letting staff mint a student with a forged live `access` entitlement.
+        function studentServerOwnedFields() {
+          return ['access', 'parentIds', 'autoAward', 'pendingDeletion',
+              'pendingDeletionAt', 'feelingsByDay', 'latestParentComment'];
+        }
+
         allow get, list: if isSchoolAdmin(schoolId) ||
             isDevImpersonatingSchool(schoolId);
 
@@ -533,7 +554,8 @@ service cloud.firestore {
               (isTeacher(schoolId) &&
                 teacherTeachesClass(schoolId, request.resource.data.classId))) &&
             writeAllowedForDev() &&
-            request.resource.data.schoolId == schoolId;
+            request.resource.data.schoolId == schoolId &&
+            !request.resource.data.keys().hasAny(studentServerOwnedFields());
 
         // Staff may edit student profile / reading-level fields, but NOT the
         // server-owned `access` entitlement map (writing access.status='active'
@@ -556,15 +578,7 @@ service cloud.firestore {
                 teacherTeachesClass(schoolId, request.resource.data.classId))) &&
             writeAllowedForDev() &&
             !request.resource.data.diff(resource.data).affectedKeys()
-                .hasAny([
-                  'access',
-                  'parentIds',
-                  'autoAward',
-                  'pendingDeletion',
-                  'pendingDeletionAt',
-                  'feelingsByDay',
-                  'latestParentComment'
-                ]);
+                .hasAny(studentServerOwnedFields());
 
         // Deletion is intentionally server-only. The requestStudentDeletion
         // callable re-checks role/class scope, requires recent authentication
@@ -623,13 +637,25 @@ service cloud.firestore {
 
         allow create, delete: if isSchoolAdmin(schoolId) && writeAllowedForDev();
 
+        // A teacher of the class may edit its content/settings but must NOT
+        // reassign ownership (teacherId/teacherIds) — that would let a teacher
+        // hand the class to an attacker uid or remove themselves (finding F-03).
+        // schoolAdmins retain full control, including legitimate reassignment.
+        function classOwnershipUnchanged() {
+          return request.resource.data.get('teacherId', null) ==
+                  resource.data.get('teacherId', null) &&
+              request.resource.data.get('teacherIds', null) ==
+                  resource.data.get('teacherIds', null);
+        }
+
         allow update: if writeAllowedForSchoolContent(schoolId) &&
             (
               isSchoolAdmin(schoolId) ||
               (isTeacher(schoolId) &&
                   (resource.data.teacherId == request.auth.uid ||
                       (resource.data.teacherIds != null &&
-                          request.auth.uid in resource.data.teacherIds)))
+                          request.auth.uid in resource.data.teacherIds)) &&
+                  classOwnershipUnchanged())
             );
       }
 
