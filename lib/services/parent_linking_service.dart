@@ -9,6 +9,7 @@ import '../data/models/user_model.dart';
 import '../core/exceptions/linking_exceptions.dart';
 import '../core/services/assert_writable.dart';
 import '../core/services/functions_instance.dart';
+import 'offline_service.dart';
 
 /// Invokes a Cloud Function and returns its `result.data` payload.
 ///
@@ -412,6 +413,10 @@ class ParentLinkingService {
         if (reason != null) 'reason': reason,
       },
     );
+    // Child-scoped cache hygiene (§7.4): after the relationship ends, this
+    // device must not retain the child's logs, drafts or queued writes
+    // (which the rules would now reject anyway).
+    await OfflineService.instance.purgeChildData(studentId);
   }
 
   // ── Callable plumbing ──

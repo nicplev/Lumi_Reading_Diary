@@ -72,6 +72,21 @@ class RowClassroomOnly extends ChildLogRowState {
   final int classroomMinutes;
 }
 
+/// A session is saved on this phone but hasn't reached the school yet
+/// (offline outbox). Explicit, per-row — never inferred from snapshot
+/// metadata. Review offers Edit pending / Cancel pending.
+class RowOfflinePending extends ChildLogRowState {
+  const RowOfflinePending({required this.pending});
+  final ReadingLogModel pending;
+}
+
+/// A queued quick log collided with another guardian's session while this
+/// device was offline — only the guardian can resolve it (§7.2).
+class RowConflict extends ChildLogRowState {
+  const RowConflict({required this.pendingLogId});
+  final String pendingLogId;
+}
+
 /// Child access is not live: neutral, no affordance, no local write.
 class RowAccessUnavailable extends ChildLogRowState {
   const RowAccessUnavailable();
@@ -100,9 +115,19 @@ ChildLogRowState deriveChildLogRowState({
   required String myUid,
   String? justCreatedLogId,
   int? goalMinutes,
+  List<ReadingLogModel> pendingLogs = const [],
+  String? conflictLogId,
 }) {
   if (!student.hasActiveAccess) return const RowAccessUnavailable();
   if (submitting) return const RowSubmitting();
+  // A parked slot conflict outranks everything else the guardian could do:
+  // it's their decision, and no further quick logging makes sense until made.
+  if (conflictLogId != null) return RowConflict(pendingLogId: conflictLogId);
+  // Saved-on-this-phone sessions outrank Ready: the row must say the log
+  // exists but hasn't been shared, not invite a duplicate.
+  if (pendingLogs.isNotEmpty && todayLogs.where((l) => l.isHomeContext).isEmpty) {
+    return RowOfflinePending(pending: pendingLogs.first);
+  }
 
   final homeLogs = todayLogs.where((l) => l.isHomeContext).toList();
   final classroomLogs = todayLogs.where((l) => l.isClassroomContext).toList();
@@ -298,6 +323,10 @@ class _RowInfo extends StatelessWidget {
             ParentLoggingCopy.multiStatus(s.sessions, s.totalMinutes);
       case RowClassroomOnly():
         status = ParentLoggingCopy.classroomStatus(s.classroomMinutes);
+      case RowOfflinePending():
+        status = ParentLoggingCopy.pendingStatus;
+      case RowConflict():
+        status = ParentLoggingCopy.conflictStatus;
       case RowAccessUnavailable():
         status = ParentLoggingCopy.accessPaused;
       case RowQuickLogDisabled():
@@ -468,6 +497,24 @@ class _TrailingAction extends StatelessWidget {
           onChooseBook: onChooseBook,
           onReview: onReview,
           fixedWidth: fixedWidth,
+        );
+      case RowOfflinePending():
+        child = _button(
+          label: ParentLoggingCopy.reviewAction,
+          semanticsLabel:
+              '${student.firstName}, ${ParentLoggingCopy.pendingStatus}. '
+              '${ParentLoggingCopy.reviewAction}.',
+          onPressed: onReview,
+          filled: false,
+        );
+      case RowConflict():
+        child = _button(
+          label: ParentLoggingCopy.resolveAction,
+          semanticsLabel:
+              '${student.firstName}, ${ParentLoggingCopy.conflictStatus}. '
+              '${ParentLoggingCopy.resolveAction}.',
+          onPressed: onReview,
+          filled: true,
         );
       case RowAccessUnavailable():
       case RowQuickLogDisabled():

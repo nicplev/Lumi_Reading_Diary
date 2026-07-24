@@ -1063,6 +1063,70 @@ class OfflineService with WidgetsBindingObserver {
     await _persistItem(item);
   }
 
+  /// Edits a QUEUED (not-yet-synced) reading log in place — same log ID, so
+  /// the eventual replay still writes one session. Powers "Edit pending"
+  /// (§7.1); "Cancel pending" is [cancelPendingReadingLog].
+  Future<ReadingLogModel?> editPendingReadingLog(
+    String logId, {
+    int? minutesRead,
+    List<String>? bookTitles,
+    String? notes,
+  }) async {
+    final matches = _syncQueue
+        .where((it) =>
+            it.id == logId &&
+            it.type == SyncType.readingLog &&
+            it.action == SyncAction.create)
+        .toList();
+    if (matches.isEmpty) return null;
+    final item = matches.first;
+
+    final log = ReadingLogModel.fromLocal(item.data);
+    final cleanedTitles = bookTitles
+        ?.map((t) => t.trim())
+        .where((t) => t.isNotEmpty)
+        .toList();
+    final trimmedNotes = notes?.trim();
+    final updated = log.copyWith(
+      minutesRead: minutesRead,
+      bookTitles: cleanedTitles,
+      notes: notes == null
+          ? null
+          : (trimmedNotes!.isEmpty ? null : trimmedNotes),
+    );
+
+    // Rewrite the payload but PRESERVE queue-control keys (the quick-slot
+    // claim rides in data, not in the model).
+    final claim = item.data[quickSlotClaimKey];
+    item.data
+      ..clear()
+      ..addAll(updated.toLocal());
+    if (claim == true) item.data[quickSlotClaimKey] = true;
+    item.contentHash = PendingSync.computeContentHash(item.data);
+    await _persistItem(item);
+    await _readingLogsBox.put(logId, updated.toLocal());
+    _broadcastQueue();
+    return updated;
+  }
+
+  /// Cancels a QUEUED reading log entirely — nothing ever reaches the
+  /// server. Removes the outbox entry and the optimistic local copy.
+  Future<void> cancelPendingReadingLog(String logId) async {
+    await dismissPending(logId);
+    await _readingLogsBox.delete(logId);
+  }
+
+  /// The caller's queued reading-log creates for [studentId], as models —
+  /// feeds the Home row's Offline-pending state.
+  List<ReadingLogModel> pendingReadingLogsFor(String studentId) => _syncQueue
+      .where((it) =>
+          it.type == SyncType.readingLog &&
+          it.action == SyncAction.create &&
+          it.lastError != quickSlotConflictError &&
+          it.data['studentId'] == studentId)
+      .map((it) => ReadingLogModel.fromLocal(it.data))
+      .toList(growable: false);
+
   /// Pending quick logs parked on a slot conflict, for the reconnect prompt
   /// ("{name} logged reading while you were offline. Was yours the same
   /// session?"). Each item's `data[quickSlotConflictKey]` carries the
