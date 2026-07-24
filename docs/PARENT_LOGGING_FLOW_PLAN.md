@@ -1,6 +1,6 @@
 # Parent/Guardian Logging Flow — Implementation Plan & UI/UX Spec
 
-**Status:** DRAFT v1 — awaiting product sign-off on the Open Decisions (§9)
+**Status:** APPROVED v2 — Open Decisions answered by Nic 2026-07-24 (§9); Phase 0 skipped, implementation in progress
 **Date:** 2026-07-24
 **Inputs:** Persona simulation findings (Mia / Alex & Jordan / Riley), 4-agent codebase audit (2026-07-24), `docs/parent-ux-research.md`, `docs/CLASSROOM_BETA_READINESS_REVIEW.md` §5.2, `docs/LUMI_SCALE_TEST_PLAN.md`, `functions/test/reading_log_rush.integration.test.js`
 **Convention:** Claude keeps the workstream status tables and the change log at the bottom current as PRs merge, same as `docs/ST4S_REMEDIATION_PLAN_2026-07-22.md`.
@@ -85,9 +85,8 @@ State is derived per child from: today's home-context sessions stream (school-lo
 
 | State | Status line | Trailing slot | Behaviour |
 |---|---|---|---|
-| **Ready** | `The Bad Guys · usual 15 min` | `[ Log 15 min ]` | Tap → §3.3 submit. Body opens detailed flow. |
+| **Ready** | `The Bad Guys · usual 15 min` (multiple assigned: `The Bad Guys +1 more · usual 15 min`) | `[ Log 15 min ]` | Tap → §3.3 submit. Body opens detailed flow. Multiple assigned books log as the union (D3). |
 | **Needs book** | `No current book` | `[ Choose book ]` | Opens picker (§4). **No write happens.** After choosing/pinning, returns to Ready. |
-| **Ambiguous book** | `2 assigned books` | `[ Choose book ]` | Multiple effective current books → chooser. Query order never picks. |
 | **Submitting** | `Logging…` | `[ Logging… ]` disabled | Locked synchronously on tap, before any async. Row body inert too (cannot open a second flow). |
 | **Offline pending** | `Saved on this phone · not yet shared` | `[ Review ]` | Review sheet shows the pending entry with `Edit pending` / `Cancel pending` (§7.2). |
 | **Just created by me** | `15 min logged · The Bad Guys` + inline text buttons `Undo my quick log · Edit this log` | `15 min ✓-less static chip` (non-interactive) | Undo/Edit live on the status line, **away from the trailing rect** (§3.3). |
@@ -100,7 +99,7 @@ State is derived per child from: today's home-context sessions stream (school-lo
 
 ### 3.3 Tap → save lifecycle (the trust-critical path)
 
-1. **On tap:** synchronously set `Submitting` (button + row inert), generate the log ID (`generateLogId()` — this *is* the mutation ID), snapshot the exact payload the button described: child, resolved single book, minutes, `occurredOn` (school-local today), context `home`.
+1. **On tap:** synchronously set `Submitting` (button + row inert), generate the log ID (`generateLogId()` — this *is* the mutation ID), snapshot the exact payload the button described: child, resolved book set (§4.1), minutes, `occurredOn` (school-local today), context `home`.
 2. **Write:** one `WriteBatch` = log create + slot create (§6.2). 15s ack timeout → falls through to the offline queue as one atomic pending unit (row → Offline pending).
 3. **On receipt:** row → **Just created by me**. The trailing slot becomes a *static* summary chip — the button's screen region is inert for the rest of this state, so a rapid second tap on the same spot does nothing. `Undo my quick log` renders on the status line, ≥8pt from the former button rect. **Never morph the button into Undo in place.**
 4. **Slot taken (batch rejected):** row → **Logged by someone else** with a transient notice: `Jordan logged 20 min moments ago. No new session was added.` Actions: `Review` · `Add another session` (creates a fresh non-slot session). The loser's tap must produce **zero** writes.
@@ -120,6 +119,7 @@ Same state machine, larger canvas:
 | Key | String |
 |---|---|
 | ready.status | `{book} · usual {n} min` |
+| ready.status.multi | `{book} +{k} more · usual {n} min` |
 | ready.status.goal | `School goal: {n} min · {book}` (when guardian usual ≠ allocation target, show both: usual on the button, goal in the status line) |
 | ready.action | `Log {n} min` |
 | needsBook.status | `No current book` |
@@ -153,11 +153,11 @@ Same state machine, larger canvas:
 
 ## 4. Book resolution & picker
 
-### 4.1 Resolution rules
+### 4.1 Resolution rules (updated per D3: union behaviour retained)
 
-- **Quick log requires exactly one explicitly resolved book.** Resolution order: guardian-pinned current book → the single effective assigned book (union across active allocations via `effectiveAssignmentItemsForStudent`, deduped) → otherwise the row shows `Choose book` / `Ambiguous book`. `allocations.first` is never used as a tiebreak.
+- **Quick log requires at least one explicitly resolved book.** Resolution order: the union of effective assigned books across active allocations (`effectiveAssignmentItemsForStudent`, deduped — current behaviour, kept per D3) → else the guardian-pinned current book → otherwise the row shows `Choose book`. `allocations.first` is never used as a *duration* tiebreak (§6.4 governs duration).
 - **The `['Reading']` fabrication is deleted** (`_resolveBookTitles` fallback). No generic title string is ever persisted, from any path.
-- **Quick log writes exactly one title** (today it writes the union of all assigned titles, silently inflating books-read counts — see Open Decision D3).
+- **Union display honesty:** when the union has >1 title the status line says so (`The Bad Guys +1 more`) and the review/success surfaces list every credited title — the action still states exactly what will be saved.
 - **Pinning:** a guardian may set a current book for a child independent of school allocation (free-choice reader, library book, comic, audiobook). Stored per guardian×child (§6.4); pinning never writes a session.
 - **Unresolved title (detailed flow only):** `Title not known — add later` produces `bookTitles: []` + `titleUnresolved: true` — a structured state, never a placeholder string. Unresolved sessions count minutes/streaks but are excluded from books-completed analytics (automatic: empty `bookTitles` contributes 0 to `totalBooksRead`). The session row shows `Title to add` with an inline resolve affordance.
 
@@ -254,7 +254,7 @@ The log **ID remains the mutation ID** (client-generated, retained across retrie
 | **New** `onReadingLogDeleted` cascade | new `functions/src/reading_log_cleanup.ts` | Reuse `deletion.ts` helpers: `deleteStorageFile` ×2 audio paths, `deleteAiEvalArtifacts`, `recursiveDelete` comments, delete matching quickSlot. Idempotent; skip-guard when the student-cascade (`pendingDeletion`) already ran. **Closes G9 for the *existing* widget-undo path too.** |
 | Stats bucketing honours `occurredOn` | `stats_aggregation.ts` (`extractCountedFields`), `index.ts` legacy path, `class_daily_reading.ts` | `occurredOn ?? localDateString(date, tz)`. Reconciler + `streak_refresh` unchanged (they operate on the derived `readingDates` set). |
 | `validateReadingLog` consistency checks | `index.ts:2150` | `occurredOn` must equal school-local-day(`date`) or that day − 1 (Yesterday backdating window); flag `context`/`titleUnresolved` misuse; telemetry counter for any legacy `'Reading'` title still arriving (measures old-client tail). |
-| (Later, post-adoption hardening) rules require `occurredOn`+`context`; quick-log creates require `bookTitles.size() == 1` | `firestore.rules` | Same coordination pattern as prod-hardening 1.3/1.6 — needs app-release saturation first. |
+| (Later, post-adoption hardening) rules require `occurredOn`+`context`; quick-log creates require `bookTitles.size() >= 1 \|\| titleUnresolved == true` (no empty/fabricated titles) | `firestore.rules` | Same coordination pattern as prod-hardening 1.3/1.6 — needs app-release saturation first. |
 
 Streak semantics are **unchanged in Phase 1** (teacher/classroom logs keep counting toward streaks — Open Decision D2); only the *Home row/slot* distinguishes context.
 
@@ -269,7 +269,8 @@ Streak semantics are **unchanged in Phase 1** (teacher/classroom logs keep count
 - New `lib/core/utils/school_time.dart`: Dart port of `localDateString` / `localDateUtcRange` / next-school-midnight (use the already-bundled `timezone` package; `tz.initializeTimeZones()` already runs). Fix `SchoolModel.timezone` default `'UTC'` → `'Australia/Sydney'` to match `access.ts:16`.
 - A `schoolTodayProvider` recomputes on a timer armed for the next school-local midnight → Home queries, row states, and the slot date roll over without an app restart.
 - Quick log: always Today (school time), and *says* so when device date ≠ school date (`dateMismatch.note`).
-- Detailed flow: `Today / Yesterday` segmented control (default Today) — the **only** backdating window (Open Decision D1). Rules already allow it (`date` window is −366d..+1d; the constraint was purely client-side).
+- Detailed flow: `Today / Yesterday` segmented control (default Today) — the **only** backdating window (D1: approved). Rules already allow it (`date` window is −366d..+1d; the constraint was purely client-side).
+- **Backdating kill-switch (D1 condition):** the Yesterday option is gated on `platformConfig/parentBackdating` (absent ⇒ enabled, house convention) from the day it ships, so it can be turned off without an app release based on real-school evidence. **Follow-up for Nic:** add the on/off toggle to the super-admin portal Operations section (client + flag doc will already honour it) — reminder due when this plan's phases complete.
 - Today-stream: keep the timestamp-range query but compute the range with `localDateUtcRange(schoolToday)`, and bucket client-side by `occurredOn ?? derived` so legacy same-day logs from an old-client co-parent still appear during transition.
 - Index check before merge: review sheet query (`studentId ==`, `occurredOn ==`, orderBy `createdAt`) likely needs a composite — follow the dump-remote-first rule (`firebase firestore:indexes` → merge into `firestore.indexes.json`) so the deploy can't drop stray indexes.
 
@@ -328,15 +329,15 @@ Outbox drain, per pending quick log:
 
 | # | Item | Status |
 |---|---|---|
-| 0.1 | Product sign-off on §9 Open Decisions | ☐ |
-| 0.2 | Clickable prototype of the row state machine (multi-child, co-parent, offline, VoiceOver walkthrough) | ☐ |
-| 0.3 | Test with 5–8 real parents across the three household types (multi-child bedtime / separated co-parents / assistive tech + free-choice reader) | ☐ |
+| 0.1 | Product sign-off on §9 Open Decisions | ✅ 2026-07-24 (see §9 resolutions) |
+| 0.2 | Clickable prototype of the row state machine | ⏭️ SKIPPED per Nic — straight to Phase 1 |
+| 0.3 | Test with 5–8 real parents across the three household types | ⏭️ Deferred to TestFlight builds during first-round school testing |
 
 ### Phase 1 — P0 trust & correctness (PR-sized workstreams)
 
 | PR | Scope | Key files | Deploy | Status |
 |---|---|---|---|---|
-| A | Rules: `quickSlots`, optional log fields, access re-check on update/delete; rules tests + extend `reading_log_rush` with slot contention (two guardians, one slot, loser writes nothing) | `firestore.rules`, `functions/test/firestore.rules.test.js`, `functions/test/reading_log_rush.integration.test.js` | `firestore:rules` (manual, prod-confirm) | ☐ |
+| A | Rules: `quickSlots`, optional log fields, access re-check on update/delete; rules tests incl. slot contention (two guardians, one slot, loser writes nothing) in a **new** test file (`reading_log_rush.integration.test.js` is uncommitted work from a concurrent session — do not touch it) | `firestore.rules`, `functions/test/firestore.rules.test.js`, new `functions/test/quick_slot.rules.test.js` | `firestore:rules` (manual, prod-confirm) | ☐ |
 | B | Functions: `onReadingLogDeleted` cascade (+slot cleanup), `occurredOn` bucketing, `validateReadingLog` checks + legacy-title telemetry | new `reading_log_cleanup.ts`, `stats_aggregation.ts`, `class_daily_reading.ts`, `index.ts` | `functions` (manual; health-audit hook) | ☐ |
 | C | Client foundation: `school_time.dart` + TZ default fix + rollover provider; `ReadingLogService` — kill `'Reading'` fallback, single-book resolution, `occurredOn`/`context` stamping, slot batch + typed outcome (`created / slotTaken / offline`); outbox `SyncType.quickLog` atomic replay; revocation cache purge | `reading_log_service.dart`, `offline_service.dart`, `school_model.dart`, new `core/utils/school_time.dart` | app release | ☐ |
 | D | Home rows: shared state-machine component replacing `_LogCircle` + `_TodayCard` quick region; labelled button; no-morph undo; copy file; full a11y (§3.6) incl. Reduce Motion + 2.0-scale tests; double-tap and no-reorder widget tests | `parent_home_screen.dart`, new `widgets/child_log_row.dart`, `parent_logging_copy.dart`, `test/screens/parent/…` | app release | ☐ |
@@ -356,15 +357,15 @@ Canonical title matching + household aliases · optional barcode/voice title ent
 
 ---
 
-## 9. Open product decisions (need Nic's call before Phase 1 merges)
+## 9. Open product decisions — RESOLVED by Nic, 2026-07-24
 
-| # | Decision | Recommendation |
+| # | Decision | Resolution |
 |---|---|---|
-| D1 | **Yesterday backdating** reverses the recorded beta decision "No parent backdating" (`CLASSROOM_BETA_FIX_PLAN.md:25`). Personas + readiness review §5.2 both push the other way. | Ship it, bounded to Yesterday-only in the detailed flow. A 1-day window can't recreate Friday batch-logging, and it kills the predicted top support ticket together with Edit/Remove. |
-| D2 | Should classroom/teacher logs keep counting toward **streaks**? (They do today; personas only require they not satisfy the home slot.) | Keep counting in Phase 1 (no stats-behaviour change mid-redesign); revisit with data in Phase 2. The Home row/slot separation alone satisfies the acceptance scenario. |
-| D3 | Quick log writes **one** book instead of the union of all assigned titles → books-read counts will drop (become honest). | Accept; note in release comms to schools. |
-| D4 | Keep the old row widget behind `parentQuickLogV2` for one release as a kill-switch fallback? | Yes — cheap insurance on the most-used surface in the app. |
-| D5 | Usual-duration prompt threshold. | 3 consecutive divergent sessions. |
+| D1 | **Yesterday backdating** (reverses beta "No parent backdating", `CLASSROOM_BETA_FIX_PLAN.md:25`) | ✅ **Approved, Yesterday-only**, shipping ON for first-round school testing — **conditional on a platform kill-switch**: client honours `platformConfig/parentBackdating` from day one; Nic to add the super-admin portal Operations toggle later based on evidence gathered over the coming months. **Reminder owed to Nic at end of all phases.** |
+| D2 | Classroom/teacher logs and **streaks** | ✅ **Keep counting** in Phase 1; Home row/slot separation only. Revisit with data in Phase 2. |
+| D3 | Quick-log book attribution | ❌ Recommendation rejected — **keep union behaviour**: quick log continues crediting all effective assigned titles (books-read counts unchanged). Persona protections retained regardless: no fabricated `'Reading'` title ever; no assignments ⇒ `Choose book`, never a silent guess. The "ambiguous assignments open a chooser" rule is dropped (moot under union). |
+| D4 | Old row widget behind `parentQuickLogV2` for one release | ✅ Yes (default accepted). |
+| D5 | Usual-duration prompt threshold | ✅ 3 consecutive divergent sessions (default accepted). |
 
 ---
 
@@ -377,7 +378,7 @@ Canonical title matching + household aliases · optional barcode/voice title ent
 | 3 | Two guardians tap concurrently ⇒ one home-quick session; loser told nothing was added and wrote nothing | Rules test + extended `reading_log_rush` slot-contention case, PR-A |
 | 4 | Offline conflict never overwrites/silently duplicates another guardian's record | `offline_service` unit tests for §7.2 branches, PR-F |
 | 5 | Saved child/book/duration/date exactly match the preview | Single snapshot struct + widget test asserting serialisation equality, PR-D |
-| 6 | No-book quick log cannot persist `Reading` or any invented title | Service unit test + `validateReadingLog` telemetry, PR-C/B |
+| 6 | No-book quick log cannot persist `Reading` or any invented title (union of real assigned titles is fine per D3) | Service unit test + `validateReadingLog` telemetry, PR-C/B |
 | 7 | Manual text retained without tapping `+` | Widget test on commit-on-primary-action, Phase 2 picker PR (interim: existing `onSubmitted` covered) |
 | 8 | One 30-min two-book session contributes 30 minutes | Existing stats semantics locked by a functions test assertion, PR-B |
 | 9 | Undo/edit/remove affect exactly one session; dependents cleaned | Emulator integration test on `onReadingLogDeleted` (comments/audio/evals/slot gone), PR-B |
@@ -391,3 +392,4 @@ Canonical title matching + household aliases · optional barcode/voice title ent
 ## 11. Change log
 
 - **2026-07-24** — v1 drafted from persona findings + 4-agent codebase audit. Awaiting §9 sign-off.
+- **2026-07-24** — v2: §9 decisions resolved by Nic (D1 approved with platformConfig kill-switch condition + portal-toggle reminder; D3 rejected → union behaviour kept, §3.2/§4.1/§6.3 updated; D2/D4/D5 defaults accepted). Phase 0 prototype/testing skipped → straight to Phase 1. PR-A test plan moved to a new `quick_slot.rules.test.js` (concurrent session owns the uncommitted rush test).

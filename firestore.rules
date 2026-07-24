@@ -621,6 +621,64 @@ service cloud.firestore {
               writeAllowedForDev();
           allow update, delete: if false;
         }
+
+        // ── Home quick-log slot ─────────────────────────────────────
+        // One doc per school-local day (doc id = 'YYYY-MM-DD'): the
+        // canonical "default home quick session" marker that makes the
+        // one-tap quick log first-writer-wins across guardians and
+        // devices. It can be created ONLY in the same batch as a fresh
+        // reading log (getAfter + createdAt pinning below), so when two
+        // guardians race, the loser's whole batch is rejected and they
+        // wrote nothing at all. Deleting it (undo / remove-my-session)
+        // frees the day's slot again. It has no bearing on streaks or
+        // stats — it exists purely to stop duplicate *default* sessions;
+        // explicit "Add another session" writes never touch it.
+        match /quickSlots/{slotDate} {
+          function slotLogAfter() {
+            return getAfter(
+              /databases/$(database)/documents/schools/$(schoolId)/readingLogs/$(request.resource.data.logId)
+            ).data;
+          }
+
+          allow get, list: if isSchoolAdmin(schoolId) ||
+              isDevImpersonatingSchool(schoolId);
+
+          allow get, list: if isSignedIn() &&
+              getUserData(schoolId).linkedChildren != null &&
+              studentId in getUserData(schoolId).linkedChildren;
+
+          // Pinned shape, caller-owned, and atomically coupled to a
+          // reading log created in the SAME batch: the referenced log's
+          // createdAt must equal request.time, so an old log can't be
+          // referenced to squat the slot without creating a session.
+          // Classroom logs can never claim the home slot, and the log's
+          // occurredOn (school-local day) must match the slot's doc id.
+          // Student access is enforced transitively: the same-batch log
+          // create already requires studentAccessLive, and this rule is
+          // unsatisfiable without that create.
+          allow create: if isSignedIn() &&
+              writeAllowedForSchoolContent(schoolId) &&
+              slotDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+              request.resource.data.keys().hasAll(['logId', 'byUid', 'createdAt']) &&
+              request.resource.data.keys().hasOnly(['logId', 'byUid', 'createdAt']) &&
+              request.resource.data.byUid == request.auth.uid &&
+              request.resource.data.createdAt == request.time &&
+              request.resource.data.logId is string &&
+              request.resource.data.logId.size() > 0 &&
+              request.resource.data.logId.size() <= 200 &&
+              slotLogAfter().parentId == request.auth.uid &&
+              slotLogAfter().studentId == studentId &&
+              slotLogAfter().createdAt == request.time &&
+              slotLogAfter().get('context', 'home') == 'home' &&
+              slotLogAfter().get('occurredOn', '') == slotDate;
+
+          // Immutable while it lives; undo/remove deletes it.
+          allow update: if false;
+
+          allow delete: if writeAllowedForSchoolContent(schoolId) &&
+              (isSchoolAdmin(schoolId) ||
+                (isSignedIn() && resource.data.byUid == request.auth.uid));
+        }
       }
 
       match /classes/{classId} {
@@ -697,7 +755,7 @@ service cloud.firestore {
               'syncedAt', 'allocationId', 'metadata', 'childFeeling',
               'parentComment', 'parentCommentSelections',
               'parentCommentFreeText', 'loggedByName', 'loggedByLabel',
-              'loggedByRole'
+              'loggedByRole', 'occurredOn', 'context', 'titleUnresolved'
             ]) &&
             data.schoolId == schoolId &&
             data.studentId is string && data.studentId.size() > 0 &&
@@ -742,7 +800,25 @@ service cloud.firestore {
             (data.get('loggedByLabel', null) == null ||
               (data.loggedByLabel is string && data.loggedByLabel.size() <= 200)) &&
             (data.get('loggedByRole', null) == null ||
-              data.loggedByRole in ['parent', 'teacher']);
+              data.loggedByRole in ['parent', 'teacher']) &&
+            // New optional fields (parent-logging redesign). Optional until
+            // app adoption saturates — `hasAll` above must NOT list them or
+            // every pre-redesign client would be bricked.
+            // occurredOn: school-local occurrence day; the timezone-correct
+            // value can't be verified here (rules have no tz math) —
+            // validateReadingLog cross-checks it after the fact.
+            (data.get('occurredOn', null) == null ||
+              (data.occurredOn is string &&
+                data.occurredOn.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'))) &&
+            (data.get('context', null) == null ||
+              data.context in ['home', 'classroom']) &&
+            // titleUnresolved is the structured "title not known — add later"
+            // state: legal only alongside an EMPTY bookTitles list, so a
+            // fabricated placeholder title can never ride with it.
+            (data.get('titleUnresolved', null) == null ||
+              data.titleUnresolved is bool) &&
+            (data.get('titleUnresolved', false) == false ||
+              data.bookTitles.size() == 0);
         }
 
         function contentUpdateIsValid() {
@@ -752,7 +828,7 @@ service cloud.firestore {
               'minutesRead', 'targetMinutes', 'bookTitles', 'notes',
               'photoUrls', 'childFeeling', 'parentComment',
               'parentCommentSelections', 'parentCommentFreeText',
-              'syncedAt', 'isOfflineCreated'
+              'syncedAt', 'isOfflineCreated', 'titleUnresolved', 'editedAt'
             ]) &&
             minutesInBounds() &&
             data.targetMinutes is int &&
@@ -771,7 +847,17 @@ service cloud.firestore {
               (data.parentComment is string && data.parentComment.size() <= 2000)) &&
             (data.get('parentCommentFreeText', null) == null ||
               (data.parentCommentFreeText is string &&
-                data.parentCommentFreeText.size() <= 2000));
+                data.parentCommentFreeText.size() <= 2000)) &&
+            // Resolving a "title to add" later: titleUnresolved may only be
+            // true with an empty bookTitles list (post-state invariant, same
+            // as create). editedAt, when touched, is pinned to request.time
+            // so edit provenance can't be forged or backdated.
+            (data.get('titleUnresolved', null) == null ||
+              data.titleUnresolved is bool) &&
+            (data.get('titleUnresolved', false) == false ||
+              data.bookTitles.size() == 0) &&
+            (!changed.hasAny(['editedAt']) ||
+              data.editedAt == request.time);
         }
 
         function threadPreviewUpdateIsValid() {
@@ -901,7 +987,10 @@ service cloud.firestore {
                 (
                   request.resource.data.get('loggedByRole', null) == null ||
                   request.resource.data.loggedByRole == 'parent'
-                )
+                ) &&
+                // 'classroom' context is teacher-only vocabulary; a parent
+                // session is home reading by definition.
+                request.resource.data.get('context', 'home') == 'home'
               ) ||
               (
                 isTeacher(schoolId) &&
@@ -911,8 +1000,17 @@ service cloud.firestore {
               )
             );
 
+        // Content edits re-check live access (same fail-closed gate as
+        // create): a formerly linked or lapsed guardian must not be able to
+        // modify historical or queued data after revocation. Costs one get()
+        // on the low-volume edit path. Thread-preview / review-status /
+        // read-marker updates below are deliberately exempt — they are
+        // messaging/workflow surfaces, not child reading data.
         allow update: if writeAllowedForSchoolContent(schoolId) &&
             contentUpdateIsValid() &&
+            studentAccessLive(
+              get(/databases/$(database)/documents/schools/$(schoolId)/students/$(resource.data.studentId)).data
+            ) &&
             (
               (isSignedIn() && resource.data.parentId == request.auth.uid) ||
               isSchoolAdmin(schoolId) ||
@@ -945,10 +1043,18 @@ service cloud.firestore {
                 .diff(resource.data.get('commentsViewedAt', {}))
                 .affectedKeys().hasOnly([request.auth.uid]);
 
-        // Parent can delete a log they created (powers the widget-undo
-        // banner). Stats are reconciled by the aggregateStudentStats Cloud
-        // Function on log delete, so no client-side stats write is needed.
+        // Parent can delete a log they created (powers undo / remove-my-
+        // session and the legacy widget-undo banner). Stats are reconciled by
+        // the aggregateStudentStats Cloud Function on log delete, and the
+        // onReadingLogDeleted cascade cleans dependents (comments, audio, AI
+        // evals, quick slot), so no client-side cleanup is needed. Deletes
+        // re-check live access like create/update — revoked guardians cannot
+        // remove historical data. (Server-side cascades use the Admin SDK and
+        // bypass this rule, so deleted-student cleanup is unaffected.)
         allow delete: if writeAllowedForSchoolContent(schoolId) &&
+            studentAccessLive(
+              get(/databases/$(database)/documents/schools/$(schoolId)/students/$(resource.data.studentId)).data
+            ) &&
             (
               isSchoolAdmin(schoolId) ||
               (isSignedIn() && resource.data.parentId == request.auth.uid)
