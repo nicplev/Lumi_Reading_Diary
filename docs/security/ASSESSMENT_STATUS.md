@@ -11,7 +11,7 @@ Status markers: ☐ not started · ◐ in progress · 🔍 under test / awaiting
 
 - **Now:** **F-01/F-02/F-03 fixed + deployed** (rules live in prod, PR #520). **A2 passwords done + deployed** (PR #554, `2b29e9a`): the 3 temp-pw generators are 16-char/symbol, portal "Add Staff" enforces 14+/complexity (shared validator), and the Firebase console password policy is set to **Require / min 14 / all four classes** (confirmed by screenshot) — A2 is now true across every surface. Portal + `processStaffOnboardingEmail` deployed; app-side Dart validators ship with the next app release.
 - **Boundary held:** no active production testing; Wave 3 (passive prod TLS scan) stays parked for an explicit hostname exception. Prod deploys (rules, portal, function) were done under explicit user authorisation.
-- **Left:** callable App-Check-off PoC (low value — re-derives the known F-05 launch gate), Wave 3 prod TLS scan (needs your hostname exception), the documents workstream. **All code-security findings — F-01/02/03, A2/F-09, SAST-01, F-07, F-04 — are fixed AND deployed to prod.** (F-06 accept-as-designed; cross-tenant CG-sweep already proven in #520.)
+- **Left:** the documents/evidence-pack workstream (running in the `docs/st4s-evidence-pack` worktree; first 3 technical docs drafted); the independent external pen test (EV10 — needs booking, scoping pack ready); F-05 App Check (launch-gated). **All code-security findings fixed + deployed; Wave 3 TLS scan done (S1/S3/S5 ✔).** (F-06/F-08 accept-as-designed; cross-tenant CG-sweep proven in #520.)
 
 ## How to track progress (3 ways)
 
@@ -28,7 +28,7 @@ Status markers: ☐ not started · ◐ in progress · 🔍 under test / awaiting
 | 0 — Source recon | 5 Opus agents map authz / rules / portals / vendor / env; Fable triage | Repo (read-only) | ☑ | 9 candidate findings (F-01…F-09), deduped vs closed list |
 | 1 — Deep source analysis | Per-target Opus agents + local SCA/SAST | Repo (read-only) | ◐ | SCA (npm audit) + SAST (semgrep) run; register updated (SCA-01, SAST-01) |
 | 2 — Emulator dynamic PoC | Client-SDK exploit tests in the emulator; each becomes a regression test | Emulator (`demo-lumi-secpoc`), synthetic only | ◐ | **F-01/F-02/F-03 ☑ confirmed+fixed+regression**; F-06 → accept-as-designed; cross-tenant CG sweep + callable-abuse PoCs remaining |
-| 3 — Passive prod config | TLS/header profile of Lumi's own hostnames (read-only) | Prod hostnames | ☐ parked (needs written exception) | S1/S3/S5 evidence |
+| 3 — Passive prod config | TLS/header profile of Lumi's own hostnames (read-only) | Prod hostnames | ☑ done (authorised 2026-07-24) | S1/S3/S5 ✔ — TLS 1.2+ only, TLS 1.3, valid certs (`TLS_CRYPTO_PROFILE_2026-07-24.md`) |
 | 4 — Mobile static (AP2) | MASVS/MASTG static review | Repo (read-only) | ☑ | AP2 findings (below); MobSF/build left for tester |
 | 5 — Continuous automation | Dependabot, osv-scanner, semgrep; findings register (ZAP deferred to prod-scan exception) | CI config | ◐ | AP1/T1/T2/EV11 controls |
 
@@ -73,10 +73,10 @@ Owner tags: **[SEC]** this security orchestration · **[DOC]** separate document
 
 | ST4S | Topic | 22 Jul result | Owner | Assessment status | Remediation phase |
 |---|---|---|---|---|---|
-| S1 | TLS in transit | Not Ready | [SEC] | ☐ (Wave 3) | 3 |
-| S3 | Encryption on upload | Not Ready | [SEC] | ☐ (Wave 3) | 3 |
+| S1 | TLS in transit | Not Ready | [SEC] | ☑ TLS 1.2+ only verified (Wave 3) | 3 |
+| S3 | Encryption on upload | Not Ready | [SEC] | ☑ TLS 1.2+ only verified (Wave 3) | 3 |
 | S4 | Per-school data separation | Ready | [SEC] | 🔍 validating (W1/W2) | — |
-| S5 | Proper TLS certs | Ready | [SEC] | ☐ confirm (Wave 3) | — |
+| S5 | Proper TLS certs | Ready | [SEC] | ☑ confirmed (Google Trust Services / Let's Encrypt, valid, Wave 3) | — |
 | S7 | Server/endpoint protection | Not Ready | [NIC]+[SEC] | ☐ config statement | 2.3 |
 | A2 | Password strength & storage | Answered Yes, not true | [SEC]+[NIC] | ☑ **done + deployed** (code #554 + console policy Require/14/all-classes) | 1.1 |
 | A5 | MFA for privileged accounts | Not Ready | [NIC]+[SEC] | ☐ verify portal enforcement | 2.2 |
@@ -132,3 +132,4 @@ A control-assertion document may only be written once the control is **true and 
 | 2026-07-24 | **A2 passwords done + deployed** (PR #554 → `2b29e9a`, regression-gate green): 3 temp-pw generators 12→16+symbol; portal Add-Staff min-6→14/complexity (shared validator, API+modal); shared Dart validator in the 3 signup screens. Portal + `processStaffOnboardingEmail` deployed. Firebase console password policy set to Require / min 14 / all four classes (screenshot evidence → `~/lumi-security-evidence/A2-passwords/`, to be filed in the master pack). App validators ship next app release. A2 true across all surfaces. |
 | 2026-07-24 | **SAST-01 + F-07 done** (one sync). SAST-01 MFA-crypto `authTagLength` pin + truncated-tag test (PR #557, admin-ci + regression-gate green). F-07 books/lookup: strict ISBN validation + 60/min per-user rate limit (F-07 PR, portal tsc clean). Both merged; deploy with their portals. |
 | 2026-07-24 | **F-04 done + deployed** (PR #561 / `6d5b795`): fail-closed `assertSuperAdmin` on the 5 destructive super-admin server-ops (offboard/grantDevAccess/manageParent/bulkDeleteParents/manageSchoolUserAuth); `authority.parity.test.ts` green in admin-ci; auto-deployed via admin-deploy. **This closes the last code-security finding — all are now fixed and deployed.** |
+| 2026-07-24 | **Wave 3 (passive prod TLS scan) done** (authorised). All 6 Lumi endpoints: TLS 1.0/1.1 rejected, 1.2/1.3 supported, TLS 1.3 negotiated with AES-GCM, valid CA certs, HSTS present → S1/S3/S5 ✔. Evidence: `TLS_CRYPTO_PROFILE_2026-07-24.md`. Also: evidence-pack worktree stood up; first 3 technical docs (EV13 / monitoring / access-control) drafted. |

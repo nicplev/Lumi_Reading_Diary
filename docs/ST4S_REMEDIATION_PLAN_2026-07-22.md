@@ -57,8 +57,8 @@ This is the index. Each row points at the phase that fixes it. Claude keeps the 
 
 | ST4S | Topic in plain words | Result 22 Jul | Fix in | Status |
 |---|---|---|---|---|
-| S1 | Encryption of data in transit (TLS) | Not Ready | Phase 3 | ☐ |
-| S3 | Encryption when customer data is uploaded | Not Ready | Phase 3 | ☐ |
+| S1 | Encryption of data in transit (TLS) | Not Ready | Phase 3 | ☑ |
+| S3 | Encryption when customer data is uploaded | Not Ready | Phase 3 | ☑ |
 | S4 | Keeping each school's data separated | Ready | — | ☑ |
 | S5 | Proper TLS certificates | Ready | — | ☑ |
 | S7 | Protection on production servers (HIPS/AV/firewall) | Not Ready | Phase 2.3 | ☐ |
@@ -374,6 +374,7 @@ Not needed for a Ready outcome; each removes a "medium risk" note in the Full As
 | 2026-07-24 | Q5 | Low-severity hardening: SAST-01 (super-admin MFA-crypto GCM `authTagLength` pin + truncated-tag rejection) and F-07 (books/lookup strict ISBN validation + per-user rate limit) fixed. Each deploys with its portal. | #557 + F-07 | ☑ |
 | 2026-07-24 | A5/S4/A13 | F-04 defence-in-depth: fail-closed `assertSuperAdmin` guard added inside the 5 destructive super-admin server-ops (were single-layer, gated only by the portal route). Deployed via admin-deploy. | #561 | ☑ |
 | 2026-07-24 | EV11 / EV10 | Vulnerability Assessment Report produced (`docs/security/VULNERABILITY_ASSESSMENT_REPORT_2026-07-24.md`) — full findings, remediation + verification, ST4S mapping. Satisfies EV11; interim input to EV10 (independent external pen test still outstanding). | — | ☑ (EV11) |
+| 2026-07-24 | S1/S3/S5 (Phase 3) | Authorised passive TLS scan of all 6 public endpoints: TLS 1.2+ only (1.0/1.1 rejected), TLS 1.3 + AES-GCM, valid CA certs (Google Trust Services / Let's Encrypt), HSTS. Crypto profile: `docs/security/TLS_CRYPTO_PROFILE_2026-07-24.md`. S1/S3/S5 can take the strong TLS option. | — | ☑ |
 
 ---
 
