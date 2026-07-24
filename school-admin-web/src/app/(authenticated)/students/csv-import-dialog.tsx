@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Modal } from '@/components/lumi/modal';
 import { Button } from '@/components/lumi/button';
 import { Badge } from '@/components/lumi/badge';
 import { Icon } from '@/components/lumi/icon';
 import { useImportStudents } from '@/lib/hooks/use-students';
 import { useToast } from '@/components/lumi/toast';
-import { parseCSV, matchHeader } from '@/lib/csv';
+import { SisImportInput, SisDetectionSummary } from '@/components/sis-import-input';
+import { CASES21KitPanel } from '@/components/cases21-kit-panel';
+import type { SisParseResult } from '@/lib/sis/detect';
 
 interface CSVImportDialogProps {
   open: boolean;
@@ -21,6 +23,7 @@ interface ParsedRow {
   firstName: string;
   lastName: string;
   className: string;
+  yearLevel?: string;
   parentEmail?: string;
   readingLevel?: string;
   error?: string;
@@ -31,67 +34,39 @@ type Step = 'upload' | 'preview' | 'importing' | 'done';
 export function CSVImportDialog({ open, onClose, embedded }: CSVImportDialogProps) {
   const { toast } = useToast();
   const importStudents = useImportStudents();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<Step>('upload');
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
-  const [headerMapping, setHeaderMapping] = useState<Record<string, string>>({});
+  const [parseResult, setParseResult] = useState<SisParseResult | null>(null);
   const [result, setResult] = useState<{ successCount: number; errorCount: number; errors: { row: number; message: string }[]; createdClassNames: string[] } | null>(null);
 
   const handleClose = () => {
     setStep('upload');
     setParsedRows([]);
-    setHeaderMapping({});
+    setParseResult(null);
     setResult(null);
     onClose();
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const text = ev.target?.result as string;
-      const { headers, rows } = parseCSV(text);
-
-      // Map headers
-      const mapping: Record<string, string> = {};
-      headers.forEach((h, i) => {
-        const field = matchHeader(h);
-        if (field) mapping[String(i)] = field;
-      });
-      setHeaderMapping(mapping);
-
-      // Parse rows
-      const parsed: ParsedRow[] = rows.map((row) => {
-        const obj: Record<string, string> = {};
-        headers.forEach((_, i) => {
-          const field = mapping[String(i)];
-          if (field) obj[field] = row[i] ?? '';
-        });
-
-        const parsed: ParsedRow = {
-          studentId: obj.studentId || undefined,
-          firstName: obj.firstName ?? '',
-          lastName: obj.lastName ?? '',
-          className: obj.className ?? '',
-          parentEmail: obj.parentEmail || undefined,
-          readingLevel: obj.readingLevel || undefined,
-        };
-
-        // Validate
-        if (!parsed.firstName || !parsed.lastName || !parsed.className) {
-          parsed.error = 'Missing required fields';
-        }
-
-        return parsed;
-      });
-
-      setParsedRows(parsed);
-      setStep('preview');
-    };
-    reader.readAsText(file);
+  const handleParsed = (result: SisParseResult) => {
+    // Mirrors the API's cap — a whole-school roster belongs in the rollover
+    // wizard, which is reviewable and undoable.
+    if (result.rows.length > 500) {
+      throw new Error(
+        `Import at most 500 students at a time — that file has ${result.rows.length}. Split it, or use School Year Transition for a whole-school roster.`
+      );
+    }
+    setParsedRows(
+      result.rows.map((row) => ({
+        ...row,
+        error:
+          !row.firstName || !row.lastName || !row.className
+            ? 'Missing required fields'
+            : undefined,
+      }))
+    );
+    setParseResult(result);
+    setStep('preview');
   };
 
   const handleImport = async () => {
@@ -122,7 +97,7 @@ export function CSVImportDialog({ open, onClose, embedded }: CSVImportDialogProp
       <Button variant="outline" onClick={handleClose}>Cancel</Button>
     ) : step === 'preview' ? (
       <>
-        <Button variant="outline" onClick={() => { setStep('upload'); setParsedRows([]); }}>Back</Button>
+        <Button variant="outline" onClick={() => { setStep('upload'); setParsedRows([]); setParseResult(null); }}>Back</Button>
         <Button onClick={handleImport} disabled={validCount === 0}>
           Import {validCount} Student{validCount !== 1 ? 's' : ''}
         </Button>
@@ -134,51 +109,56 @@ export function CSVImportDialog({ open, onClose, embedded }: CSVImportDialogProp
   const body = (
     <>
       {step === 'upload' && (
-        <div className="text-center py-8">
-          <div className="flex justify-center mb-4 text-muted/50"><Icon name="upload_file" size={48} /></div>
+        <div className="py-2">
           <p className="text-sm text-muted mb-3">
-            Upload a CSV file with columns: Student ID, First Name, Last Name, Class Name, Parent Email, Reading Level.
+            Upload the export from your school system, or paste it straight out of Excel. Lumi reads
+            these columns: Student ID, First Name, Last Name, Class Name, Year Level, Parent Email,
+            Reading Level.
           </p>
           <div className="bg-lumi-blue/10 border border-lumi-blue/20 rounded-[var(--radius-md)] px-4 py-3 mb-4 text-sm text-ink">
             <p className="mb-1"><strong>Required columns:</strong> First Name, Last Name, Class Name</p>
             <p><strong>Reading Level</strong> is optional and can match any format your school uses (e.g. A-Z, PM Benchmark, colours, numbered levels).</p>
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,.tsv,.txt"
-            onChange={handleFileSelect}
-            className="hidden"
-          />
-          <div className="flex flex-col items-center gap-3">
-            <Button onClick={() => fileInputRef.current?.click()}>Choose File</Button>
-            <button
-              type="button"
-              onClick={() => {
-                const csv = [
-                  'Student ID,First Name,Last Name,Class Name,Parent Email,Reading Level',
-                  'S10001,Jane,Smith,3A,jane.parent@email.com,Level 12',
-                  'S10002,Tom,Brown,3A,tom.parent@email.com,',
-                  'S10003,Mia,Johnson,3B,mia.parent@email.com,Gold',
-                ].join('\n');
-                const blob = new Blob([csv], { type: 'text/csv' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'lumi_student_import_template.csv';
-                a.click();
-                URL.revokeObjectURL(url);
-              }}
-              className="text-sm text-section hover:underline font-semibold"
-            >
-              Download CSV Template
-            </button>
+
+          <SisImportInput onParsed={handleParsed} fileButtonLabel="Choose file">
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  const csv = [
+                    'Student ID,First Name,Last Name,Class Name,Year Level,Parent Email,Reading Level',
+                    'S10001,Jane,Smith,3A,3,jane.parent@email.com,Level 12',
+                    'S10002,Tom,Brown,3A,3,tom.parent@email.com,',
+                    'S10003,Mia,Johnson,Prep B,Prep,mia.parent@email.com,Gold',
+                  ].join('\n');
+                  const blob = new Blob([csv], { type: 'text/csv' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'lumi_student_import_template.csv';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="text-sm text-section hover:underline font-semibold"
+              >
+                Download CSV template
+              </button>
+            </div>
+          </SisImportInput>
+
+          <div className="mt-5 pt-5 border-t border-rule">
+            <CASES21KitPanel />
           </div>
         </div>
       )}
 
       {step === 'preview' && (
         <div>
+          {parseResult && (
+            <div className="mb-4">
+              <SisDetectionSummary result={parseResult} />
+            </div>
+          )}
           <div className="flex items-center gap-3 mb-4">
             <Badge variant="success">{validCount} valid</Badge>
             {errorCount > 0 && <Badge variant="error">{errorCount} errors</Badge>}
@@ -191,6 +171,7 @@ export function CSVImportDialog({ open, onClose, embedded }: CSVImportDialogProp
                   <th className="px-2 py-2 text-left text-xs text-muted">First Name</th>
                   <th className="px-2 py-2 text-left text-xs text-muted">Last Name</th>
                   <th className="px-2 py-2 text-left text-xs text-muted">Class</th>
+                  <th className="px-2 py-2 text-left text-xs text-muted">Year</th>
                   <th className="px-2 py-2 text-left text-xs text-muted">ID</th>
                   <th className="px-2 py-2 text-left text-xs text-muted">Level</th>
                   <th className="px-2 py-2 text-left text-xs text-muted">Status</th>
@@ -203,6 +184,7 @@ export function CSVImportDialog({ open, onClose, embedded }: CSVImportDialogProp
                     <td className="px-2 py-1.5">{row.firstName || <span className="text-error">missing</span>}</td>
                     <td className="px-2 py-1.5">{row.lastName || <span className="text-error">missing</span>}</td>
                     <td className="px-2 py-1.5">{row.className || <span className="text-error">missing</span>}</td>
+                    <td className="px-2 py-1.5 text-muted">{row.yearLevel || '-'}</td>
                     <td className="px-2 py-1.5 text-muted">{row.studentId || '-'}</td>
                     <td className="px-2 py-1.5 text-muted">{row.readingLevel || '-'}</td>
                     <td className="px-2 py-1.5">

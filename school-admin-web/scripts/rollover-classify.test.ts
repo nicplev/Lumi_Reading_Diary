@@ -101,6 +101,38 @@ test('off-ladder year level (repeat) is trusted but flagged', () => {
   assert.equal(c.yearLevelChanged, undefined); // same level, no change
 });
 
+// ── SIS year levels ──────────────────────────────────────────────────────────
+// A CASES21 export arrives with `ROUND(SCHOOL_YEAR,0)` values ("1.0", "2.0")
+// and Foundation as year 0. lib/sis normalises these before classification, but
+// the classifier must also treat them as ladder rungs when a row bypasses the
+// adapter (a hand-built file, or an older saved plan).
+test('CASES21 rounded year levels count as ladder rungs, not unknown labels', () => {
+  const r = classifyRollover(
+    [row({ studentId: 'S1002', firstName: 'Tom', lastName: 'Brown', className: '2A', yearLevel: '2.0' })],
+    students,
+    classes
+  );
+  const c = r.rows[0];
+  assert.equal(c.bucket, 'match');
+  assert.equal(c.unknownYearLevel, undefined);
+  assert.equal(c.offLadder, undefined); // 1 → 2.0 is still the expected step
+  assert.deepEqual(c.yearLevelChanged, { from: '1', to: '2.0' });
+});
+
+test('a CASES21 Prep (year 0) creates a class labelled Prep', () => {
+  const r = classifyRollover(
+    [
+      row({ studentId: 'N1', firstName: 'Ada', lastName: 'New', className: '00A', yearLevel: '0.0' }),
+      row({ studentId: 'N2', firstName: 'Bo', lastName: 'New', className: '00A', yearLevel: '0.0' }),
+    ],
+    students,
+    classes
+  );
+  const created = r.classes.toCreate.find((c) => c.name === '00A');
+  assert.equal(created?.yearLevel, 'Prep');
+  assert.equal(created?.yearLevelConflict, false);
+});
+
 test('ID hit on archived student → match_archived', () => {
   const r = classifyRollover(
     [row({ studentId: 'S9999', firstName: 'Ari', lastName: 'Stone', className: '1A', yearLevel: '1' })],

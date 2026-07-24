@@ -723,6 +723,8 @@ export interface CSVRow {
   firstName: string;
   lastName: string;
   className: string;
+  /** SIS year level, already ladder-normalised by lib/sis before it gets here. */
+  yearLevel?: string;
   parentEmail?: string;
   readingLevel?: string;
 }
@@ -762,6 +764,36 @@ export async function importStudents(
     if (typeof sid === 'string' && sid.trim() !== '') studentIdMap.set(sid.trim(), doc.id);
   });
 
+  // Year level a NEW class should carry: the modal level across its rows, the
+  // same rule the rollover import uses. Computed up front because classes are
+  // created lazily inside the row loop. Without this, a school onboarded from a
+  // SIS export has classes with no year level, and next year's rollover can't
+  // work out which year graduates.
+  const classYearLevels = new Map<string, string>();
+  {
+    const tally = new Map<string, Map<string, number>>();
+    for (const row of rows) {
+      const yl = row.yearLevel?.trim();
+      if (!yl || !row.className) continue;
+      const key = row.className.toLowerCase();
+      const counts = tally.get(key) ?? new Map<string, number>();
+      counts.set(yl, (counts.get(yl) ?? 0) + 1);
+      tally.set(key, counts);
+    }
+    for (const [key, counts] of tally) {
+      let modal: string | null = null;
+      let modalCount = 0;
+      for (const [yl, count] of counts) {
+        if (count > modalCount) { modal = yl; modalCount = count; }
+      }
+      if (modal) classYearLevels.set(key, modal);
+    }
+  }
+
+  // Stamps the same authority marker the rollover import writes, so a renewal
+  // into this academic year doesn't bump an imported level a second time.
+  const academicYear = await getCurrentAcademicYear();
+
   const BATCH_SIZE = 400;
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const chunk = rows.slice(i, i + BATCH_SIZE);
@@ -792,6 +824,7 @@ export async function importStudents(
           teacherIds: [],
           studentIds: [],
           defaultMinutesTarget: 15,
+          yearLevel: classYearLevels.get(classKey) ?? null,
           isActive: true,
           createdAt: new Date(),
           createdBy,
@@ -815,6 +848,16 @@ export async function importStudents(
             classId,
             currentReadingLevel: row.readingLevel || null,
             parentEmail: row.parentEmail || null,
+            // Only written when the file supplies one — a re-import without a
+            // Year Level column must not wipe a level already on the student.
+            ...(row.yearLevel?.trim()
+              ? {
+                  additionalInfo: {
+                    yearLevel: row.yearLevel.trim(),
+                    yearLevelSetForYear: academicYear,
+                  },
+                }
+              : {}),
             updatedAt: new Date(),
           },
           { merge: true }
@@ -839,7 +882,12 @@ export async function importStudents(
           createdAt: new Date(),
           enrolledAt: new Date(),
           createdBy,
-          additionalInfo: row.parentEmail ? { pendingParentEmail: row.parentEmail } : {},
+          additionalInfo: {
+            ...(row.parentEmail ? { pendingParentEmail: row.parentEmail } : {}),
+            ...(row.yearLevel?.trim()
+              ? { yearLevel: row.yearLevel.trim(), yearLevelSetForYear: academicYear }
+              : {}),
+          },
           levelHistory: [],
           stats: {
             totalMinutesRead: 0,

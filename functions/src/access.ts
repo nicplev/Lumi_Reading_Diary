@@ -213,6 +213,43 @@ export const YEAR_LADDER = ["Prep", "1", "2", "3", "4", "5", "6"];
 
 const PREP_SYNONYMS = ["prep", "foundation", "kindergarten", "kinder", "k", "f"];
 
+/** "Year 4" / "Yr4" / "Y 4" / "Grade 4" / "Gr.4" → the bare rung. */
+const YEAR_WORD_PREFIX = /^(?:year|yr|grade|gr|y)[\s._-]*/i;
+
+/** A whole number, optionally zero-padded and/or with a zero decimal tail. */
+const NUMERIC_LEVEL = /^(\d+)(?:\.0+)?$/;
+
+/**
+ * Normalise a year-level label onto the ladder. Mirrors normalizeYearLevel in
+ * school-admin-web/src/lib/year-ladder.ts — keep the two in sync.
+ *
+ * Does more than a synonym lookup because SIS exports carry numeric levels:
+ * CASES21 emits `ROUND(SCHOOL_YEAR,0)` (renders as `0.0`…`6.0`) and its
+ * Foundation year is **0**, so a roster imported from a raw export would
+ * otherwise carry no recognised rung and never bump on renewal.
+ * @param {string} raw The label as stored/imported.
+ * @return {string} A ladder rung, or the trimmed input when unrecognised.
+ */
+export function normalizeYearLevel(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed === "") return trimmed;
+  if (PREP_SYNONYMS.includes(trimmed.toLowerCase())) return "Prep";
+
+  const bare = trimmed.replace(YEAR_WORD_PREFIX, "").trim();
+  if (bare !== trimmed && PREP_SYNONYMS.includes(bare.toLowerCase())) {
+    return "Prep";
+  }
+
+  const numeric = NUMERIC_LEVEL.exec(bare);
+  if (numeric) {
+    const value = Number(numeric[1]);
+    // CASES21/Victorian convention: year 0 is Foundation (Prep).
+    return value === 0 ? "Prep" : String(value);
+  }
+
+  return trimmed;
+}
+
 /**
  * Advance a student's year level by one on renewal. Returns the next level and
  * whether the student has graduated past the top of the ladder. Unknown values
@@ -229,9 +266,7 @@ export function nextYearLevel(current: string | null | undefined): {
   if (current == null || current === "") {
     return {next: current ?? null, graduated: false, changed: false};
   }
-  const normalised = PREP_SYNONYMS.includes(current.trim().toLowerCase()) ?
-    "Prep" :
-    current.trim();
+  const normalised = normalizeYearLevel(current);
   const idx = YEAR_LADDER.indexOf(normalised);
   if (idx === -1) {
     // Not a recognised ladder rung — leave untouched.
