@@ -4,8 +4,8 @@
 HR3 (offboarding / access revocation)
 **Related:** A7 (access review/revocation), A10 (device standard), child-safety
 obligations
-**Version:** 0.1 DRAFT · **Date:** 2026-07-24
-**Status:** Draft for review — not yet signed
+**Version:** 1.0 · **Date:** 2026-07-24
+**Status:** HR1 (WWCC held) + HR2 (training done) + HR3 (dry-run done) evidenced 2026-07-24 · pending signature
 
 ---
 
@@ -64,6 +64,10 @@ number, and personal details are held in a restricted HR file (e.g. password
 manager / encrypted store), consistent with data-minimisation and with §5 of the
 device standard (no PII in the repo).
 
+**Current outcome (HR1):** Nic holds a **current WWCC — verified 2026-07-24**. The
+type/reference/date/expiry are stored in Nic's off-git encrypted store and backed
+up outside Git.
+
 ### 2.3 Cadence
 
 - **Before access:** no student-data access is granted until a current WWCC is
@@ -116,7 +120,7 @@ covers the ST4S content areas:
 
 | Person (named) | Role | Module / content version | Date completed | Next due | Evidence (certificate / attestation ref) |
 |---|---|---|---|---|---|
-| Nic (Director) | Director / all access | ST4S content areas 1–7 + policy walkthrough | 2026-…-… | +12 months | (certificate / signed attestation) |
+| Nicholas Plevritis (Director) | Director / all access | ST4S content areas 1–7 + policy walkthrough | **2026-07-24** | 2027-07-24 | `SECURITY_TRAINING_RECORD.md` — self-directed session (completed) |
 
 ---
 
@@ -175,39 +179,71 @@ every shared secret they could have known has been rotated. Record the
 verification date. A for-cause exit additionally runs the incident-response
 review to check for any action taken before revocation.
 
+### 4.5 First offboarding dry-run (tabletop) — 2026-07-24
+
+Lumi is a single-operator estate with no departure yet, so HR3 was exercised as a
+**tabletop dry-run** against the populated Access Register
+(`ACCESS_REGISTER_TEMPLATE.md` §4) on **2026-07-24**. For a hypothetical leaver
+holding the director's full access profile, every system in the register was
+mapped to a §4.3 revocation step and its method/owner confirmed. **No access was
+actually revoked** (there is no real departure) — the exercise validates that the
+checklist is complete and that no system is missed.
+
+| Register system | §4.3 step | Revocation method | Covered? |
+|---|---|---|---|
+| GCP / Firebase `lumi-ninc-au` | Identity/SSO + GCP | Remove all IAM bindings; end sessions; confirm no SA impersonation/keys | ✅ |
+| GitHub | GitHub | Remove from org/repo; revoke PATs, SSH keys, OIDC/CI trust | ✅ |
+| Apple Developer | Apple Dev | Remove from team; revoke signing | ✅ |
+| Google Play | Google Play | Remove user + permissions | ✅ |
+| School + super-admin portals | Portals | Remove `/superAdmins/{uid}` + memberships (revokes app-level access) | ✅ |
+| Mailboxes (Google Workspace) | Mailboxes | Remove delegated access; reset shared credentials | ✅ |
+| Domain registrar | Registrar | Remove account access; rotate credentials if shared | ✅ |
+| Cloudflare | Cloudflare | Remove account access; rotate API tokens | ✅ |
+| Password manager | Password mgr | Revoke vault; **rotate every shared secret** (critical for a for-cause exit) | ✅ |
+| Devices | Devices | Collect / remote-wipe; retire device-register row | ✅ |
+
+**Findings.** The §4.3 checklist covers **100%** of the systems in the Access
+Register — no system is missed; the revocation method and owner are known for each;
+shared-secret rotation is correctly flagged as the critical for-cause step. The
+offboarding process is **validated and ready**. The first real departure will
+produce the completed §4.3 run with actual dated revocations. **Next dry-run:**
+annually, or immediately before the first hire/contractor engagement.
+
+Performed by: Nicholas Plevritis · Date: 2026-07-24.
+
 ---
 
 ## 5. Supporting evidence index
 
 | Control | Evidence (owned by Nic) |
 |---|---|
-| Screening standard (HR1) | Restricted HR file (type/ref/date/expiry) + **outcome line** in the evidence pack ("current WWCC verified", verifier, date) |
-| Awareness training (HR2) | Dated completion record / certificate per person (§3.3) |
-| Offboarding (HR3) | Completed checklist (§4.3) with dated revocations, driven by the Access Register |
-| Access register (driver for HR1 & HR3) | `ACCESS_REGISTER_TEMPLATE.md` (populated) |
+| Screening standard (HR1) | **Current WWCC held — verified 2026-07-24**; type/ref/date/expiry kept in Nic's off-git encrypted store; outcome line only in this pack |
+| Awareness training (HR2) | `SECURITY_TRAINING_RECORD.md` — completed **2026-07-24** (§3.3); next due 2027-07-24 |
+| Offboarding (HR3) | Process (§4.3) + **first tabletop dry-run 2026-07-24 (§4.5)** covering 100% of register systems; first real run on the first departure |
+| Access register (driver for HR1 & HR3) | `ACCESS_REGISTER_TEMPLATE.md` — **populated + first review 2026-07-24** |
 | Server-side portal/app revocation | `ACCESS_CONTROL_POLICY.md` §3.3, §8 (super-admin + membership offboarding) |
 | Device collection / wipe | `DEVICE_STANDARD.md` §5 |
 | Incident path for for-cause exits | `EV9_INCIDENT_RESPONSE_PLAN.md` |
 
-## 6. Known gaps / reviewer must confirm
+## 6. Status — HR1 / HR2 / HR3 (updated 2026-07-24)
 
-- **NIC — WWCC HELD (2026-07-24); just record the details.** Nic **holds a current
-  WWCC**, so HR1 screening for the director is met in substance. Remaining step:
-  record its type/reference/date/expiry in the **restricted HR file (not git)** and
-  add a one-line *outcome* to the evidence pack ("current WWCC held — verified
-  [date]"). Repeat for any contractor/adviser who later gains access to student data.
-- **NIC — training not yet completed.** §3 defines the program; the **dated
-  completion record** for each person (starting with the director) must exist for
-  HR2 to be evidenced.
-- **NIC — offboarding is untested until used.** The §4 checklist is real and
-  driven by the Access Register, but there is no completed run yet (single
-  operator). Confirm it is exercised on the first real departure, and consider a
-  dry-run against the register to prove no system is missed.
-- **Access register dependency.** HR1 and HR3 both depend on a **populated**
-  Access Register (`ACCESS_REGISTER_TEMPLATE.md`); that register is currently a
-  template awaiting Nic's population and first review.
-- **Restricted HR file location.** Confirm where the restricted HR file lives
-  (password manager / encrypted store) and that it holds no PII in git.
-- **Sign-off.** This pack requires Nic's sign-off, and HR1/HR2/HR3 are only
-  ST4S-submittable once the real check, the dated training record, and the
-  populated register exist.
+- **HR1 (screening) — MET.** Nic **holds a current WWCC**, verified **2026-07-24**.
+  Its type/reference/date/expiry are kept in Nic's **off-git encrypted store**
+  (backed up off Git); only the outcome line appears here. Repeat for any
+  contractor/adviser who later gains access to student data.
+- **HR2 (training) — DONE.** Annual security awareness training completed
+  **2026-07-24**; dated record `SECURITY_TRAINING_RECORD.md` (§3.3). Next due
+  **2027-07-24**.
+- **HR3 (offboarding) — PROCESS DOCUMENTED + DRY-RUN DONE.** The §4.3 checklist was
+  exercised as a dated **tabletop dry-run** against the populated register
+  (§4.5, 2026-07-24), covering **100%** of systems with no gap. The first *real*
+  run occurs on the first departure (single operator — none yet).
+- **Access register — POPULATED + FIRST REVIEW DONE.** `ACCESS_REGISTER_TEMPLATE.md`
+  is populated with a dated first review (2026-07-24); the HR1/HR3 dependency is
+  satisfied.
+- **Restricted HR file — CONFIRMED off-git.** WWCC / screening detail lives in
+  Nic's encrypted local store (password manager / encrypted disk), backed up off
+  Git; no PII in the repo.
+- **Remaining — Nic's signature.** The substantive HR1/HR2/HR3 evidence now exists;
+  the only open item is Nic countersigning this pack, the training record, and the
+  register.
