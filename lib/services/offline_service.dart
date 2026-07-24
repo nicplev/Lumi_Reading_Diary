@@ -481,6 +481,14 @@ class OfflineService with WidgetsBindingObserver {
     await _readingLogsBox.delete(logId);
   }
 
+  /// Refreshes the local cache copy of a log WITHOUT queueing anything —
+  /// used after a confirmed online content edit so offline reads show the
+  /// edited values.
+  Future<void> saveReadingLogCacheOnly(ReadingLogModel log) async {
+    if (!_initialized) return;
+    await _readingLogsBox.put(log.id, log.toLocal());
+  }
+
   /// Queue a parent-comment attach. The log itself may already exist in
   /// Firestore (online when logged, comment added offline) or also be
   /// queued (both offline) — the drain sorts so the log creates first.

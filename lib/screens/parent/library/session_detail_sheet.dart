@@ -2,12 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/utils/school_time.dart';
 import '../../../core/widgets/comments/comment_thread.dart';
+import '../../../core/widgets/lumi/lumi_toast.dart';
 import '../../../data/models/log_comment_model.dart';
 import '../../../data/models/reading_log_model.dart';
+import '../../../data/providers/access_provider.dart';
 import '../../../data/providers/school_settings_provider.dart';
+import '../../../services/firebase_service.dart';
+import '../../../services/reading_log_service.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
+import '../parent_logging_copy.dart';
+import '../widgets/edit_reading_log_sheet.dart';
 import 'reading_feeling_visuals.dart';
 import '../../../core/utils/image_decode.dart';
 
@@ -29,13 +36,103 @@ void showSessionDetailSheet(BuildContext context, ReadingLogModel log) {
   );
 }
 
-class _SessionDetailSheet extends ConsumerWidget {
+class _SessionDetailSheet extends ConsumerStatefulWidget {
   final ReadingLogModel log;
 
   const _SessionDetailSheet({required this.log});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_SessionDetailSheet> createState() =>
+      _SessionDetailSheetState();
+}
+
+class _SessionDetailSheetState extends ConsumerState<_SessionDetailSheet> {
+  late ReadingLogModel log;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    log = widget.log;
+  }
+
+  /// Owner-scoped recovery (§5): only the session's creator sees Edit/Remove
+  /// — other-guardian and teacher records stay view-only.
+  bool get _isMine =>
+      FirebaseService.instance.currentUser?.uid == log.parentId &&
+      log.loggedByRole != LoggedByRole.teacher;
+
+  Future<void> _edit() async {
+    if (_busy) return;
+    final updated = await showEditReadingLogSheet(context, log);
+    if (updated != null && mounted) setState(() => log = updated);
+  }
+
+  Future<void> _remove() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final school = ref.read(schoolByIdProvider(log.schoolId)).value;
+    final timezone = school?.timezone ?? SchoolTime.defaultTimezone;
+    final occurredOn =
+        log.occurredOn ?? SchoolTime.localDateString(log.date, timezone);
+    int qualifying = 2; // benign default: skip the strong warning on failure
+    try {
+      qualifying = await ReadingLogService.instance.countHomeSessionsOn(
+        schoolId: log.schoolId,
+        studentId: log.studentId,
+        occurredOn: occurredOn,
+        timezone: timezone,
+      );
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    final isLast = qualifying <= 1 && log.isHomeContext;
+    const firstName = 'your child';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove my session?'),
+        content: Text(
+          isLast
+              ? ParentLoggingCopy.removeLastSessionWarning(firstName)
+              : 'This removes just this session (${log.minutesRead} min) '
+                  'and its comments. Other sessions are untouched.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Keep it'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: LumiTokens.red),
+            child: const Text('Remove my session'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      await ReadingLogService.instance.deleteOwnLog(log);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      showLumiToast(
+          message: ParentLoggingCopy.undoDone, type: LumiToastType.info);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      showLumiToast(
+        message: "Couldn't remove the session. Please try again.",
+        type: LumiToastType.error,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Hide the parent↔teacher comment thread when the school has messaging off.
     final messagingOn = ref.watch(messagingEnabledProvider(log.schoolId));
     return DraggableScrollableSheet(
@@ -88,6 +185,28 @@ class _SessionDetailSheet extends ConsumerWidget {
                 ],
               ),
             ),
+            // Owner-scoped durable recovery (§5): visible ONLY on the
+            // caller's own sessions. Back/dismiss only navigate — removal is
+            // always this explicit action plus a confirm.
+            if (_isMine)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    LumiTokens.space5, LumiTokens.space2, LumiTokens.space5, 0),
+                child: Row(
+                  children: [
+                    _OwnerAction(
+                      label: ParentLoggingCopy.editThisLog,
+                      onPressed: _busy ? null : _edit,
+                    ),
+                    const SizedBox(width: LumiTokens.space4),
+                    _OwnerAction(
+                      label: 'Remove my session',
+                      destructive: true,
+                      onPressed: _busy ? null : _remove,
+                    ),
+                  ],
+                ),
+              ),
             const SizedBox(height: LumiTokens.space4),
             const Divider(height: 1, color: LumiTokens.rule),
             // Scrollable detail.
@@ -162,6 +281,47 @@ class _SessionDetailSheet extends ConsumerWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OwnerAction extends StatelessWidget {
+  const _OwnerAction({
+    required this.label,
+    required this.onPressed,
+    this.destructive = false,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(8),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
+          child: Align(
+            widthFactor: 1,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                label,
+                style: LumiType.caption.copyWith(
+                  color: destructive ? LumiTokens.red : LumiTokens.ink,
+                  fontWeight: FontWeight.w700,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );

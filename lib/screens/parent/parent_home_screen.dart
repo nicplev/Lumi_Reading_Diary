@@ -50,6 +50,7 @@ import 'widgets/character_picker_sheet.dart';
 import 'widgets/parent_child_switcher.dart';
 import 'widgets/widget_undo_banner.dart';
 import 'widgets/child_log_row.dart';
+import 'widgets/today_sessions_sheet.dart';
 import 'parent_logging_copy.dart';
 
 /// Vertical space the floating glass nav occupies above the safe-area inset.
@@ -907,8 +908,6 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                         quickLoggingBySchoolId: quickLoggingBySchoolId,
                         timezoneBySchoolId: timezoneBySchoolId,
                         schoolTodayBySchoolId: schoolTodayBySchoolId,
-                        onReviewChild: (student) =>
-                            unawaited(_showReadingHistoryFor(student)),
                       );
                       return context.motionAllowed
                           ? card.animate().fadeIn()
@@ -1770,7 +1769,6 @@ class _TonightMultiCard extends StatefulWidget {
   final Map<String, bool> quickLoggingBySchoolId;
   final Map<String, String> timezoneBySchoolId;
   final Map<String, String> schoolTodayBySchoolId;
-  final void Function(StudentModel student) onReviewChild;
 
   const _TonightMultiCard({
     required this.children,
@@ -1778,7 +1776,6 @@ class _TonightMultiCard extends StatefulWidget {
     required this.quickLoggingBySchoolId,
     required this.timezoneBySchoolId,
     required this.schoolTodayBySchoolId,
-    required this.onReviewChild,
   });
 
   @override
@@ -1892,7 +1889,6 @@ class _TonightMultiCardState extends State<_TonightMultiCard> {
                   widget.schoolTodayBySchoolId[children[i].schoolId] ??
                       SchoolTime.todayFor(
                           widget.timezoneBySchoolId[children[i].schoolId]),
-              onReview: widget.onReviewChild,
               classAllocations: _classAllocSnaps[children[i].classId],
             ),
           ],
@@ -1937,10 +1933,6 @@ class _TonightRow extends StatefulWidget {
   final String timezone;
   final String schoolToday;
 
-  /// Opens this child's session review (history) — the durable recovery
-  /// surface behind the Review action.
-  final void Function(StudentModel student) onReview;
-
   /// Latest whole-class allocations for this student's class, owned and
   /// deduped by [_TonightMultiCardState] (one listener per distinct class
   /// instead of one per sibling). Null until that listener's first snapshot.
@@ -1953,7 +1945,6 @@ class _TonightRow extends StatefulWidget {
     required this.quickLoggingEnabled,
     required this.timezone,
     required this.schoolToday,
-    required this.onReview,
     this.classAllocations,
   });
 
@@ -2215,7 +2206,17 @@ class _TonightRowState extends State<_TonightRow> {
               onChooseBook: () => _openDetail(allocations),
               onUndo:
                   undoable == null ? null : () => _undoQuickLog(undoable),
-              onReview: () => widget.onReview(widget.student),
+              // Review opens Tonight's sessions — the durable per-session
+              // recovery layer (owner-scoped Edit/Remove, §5.1). Full history
+              // stays reachable via the Library tab.
+              onReview: () => showTodaySessionsSheet(
+                context,
+                student: widget.student,
+                myUid: widget.parent.id,
+                timezone: widget.timezone,
+                schoolToday: widget.schoolToday,
+                onAddAnotherSession: () => _openDetail(allocations),
+              ),
               dateMismatchNote: SchoolTime.deviceDayDiffers(widget.timezone)
                   ? ParentLoggingCopy.dateMismatchNote(
                       DateFormat('EEE d MMM').format(
