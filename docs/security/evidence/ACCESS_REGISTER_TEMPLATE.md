@@ -1,10 +1,10 @@
-# Access Register (Template)
+# Access Register — Privileged / Operator Access — ST4S A7
 
 **ST4S item:** A7 (access review / revocation)
 **Related:** A6/A13 (access control — `ACCESS_CONTROL_POLICY.md`), HR1/HR3
 (`HR_SECURITY_PACK.md`), A10 (`DEVICE_STANDARD.md`)
-**Version:** 0.1 DRAFT · **Date:** 2026-07-24
-**Status:** Draft template for review — not yet populated, not yet signed
+**Version:** 1.0 · **Date:** 2026-07-24
+**Status:** Populated · first review performed 2026-07-24 · MFA confirmation + signature pending
 
 ---
 
@@ -14,8 +14,7 @@ The access register is the single authoritative list of **who has access to
 which system, at what level, and when that access was last reviewed**. It is the
 driving artefact for A7 (periodic access review) and for HR offboarding
 (`HR_SECURITY_PACK.md` §4 — a leaver's rows are exactly what must be revoked).
-`ACCESS_CONTROL_POLICY.md` §9 names this register as a required standing document;
-this file is its template and cadence.
+`ACCESS_CONTROL_POLICY.md` §9 names this register as a required standing document.
 
 Scope: every **human** principal (today: the director; on engagement: any
 contractor or adviser) against every system that can reach Lumi code, the
@@ -25,92 +24,84 @@ server-side by the security rules and membership documents
 (`ACCESS_CONTROL_POLICY.md` §2–3) and reviewed through the membership/rollover
 cadence, not here. This register is the **privileged / operator** access list.
 
-**Truthfulness note.** This is a **template**. The rows below are illustrative
-placeholders showing the required shape; the register is not populated and no
-first review has been performed. It must not be submitted as A7 evidence until
-Nic populates it with real principals and completes the first dated review. No
-passwords, tokens, keys, MFA seeds, or personal identifiers appear here — the
-register records *that* access exists and its level, never the credential itself.
+**Data-minimisation note.** No passwords, tokens, keys, MFA seeds, or personal
+identifiers appear here — the register records *that* access exists and its
+level, never the credential itself. Those live in the password manager / secret
+store.
 
-## 2. What goes in the register
+## 2. Current principals
 
-- **One row per (person × system).** A person with access to five systems has
-  five rows (or one row with per-system columns — see §4 for the matrix form).
-- **Access level**, using least-privilege language for that system (e.g. Owner /
-  Editor / Viewer for GCP IAM; Org-Owner / Admin / Write / Read for GitHub;
-  Account-Admin / App-Manager for the app stores; super-admin / none for the
-  portals).
-- **Business justification** — why this person needs this level (the
-  least-privilege test).
-- **MFA status** — whether MFA is enforced on that account (privileged accounts
-  must be MFA-on per `ACCESS_CONTROL_POLICY.md` §6).
-- **Date granted** and **date last reviewed** — the two dates A7 turns on.
+| # | Person (named) | Role | Screening (HR1) | Device (A10) |
+|---|---|---|---|---|
+| 1 | **Nicholas Plevritis** | Founder / Director — Security Lead (GO1) & Privacy Officer (GO2); sole operator | Current WWCC held — verified 2026-07-24 (detail in restricted HR file) | Primary workstation on the device register (`DEVICE_STANDARD.md` §4) |
 
-The register records **no secrets**: no passwords, API tokens, service-account
-keys, recovery codes, or MFA seeds. Those live in the password manager / secret
-store; the register only asserts that access exists and at what level.
+> Single-principal estate. Any contractor/adviser who later gains access is added
+> as a new principal here **after** HR1 screening + HR2 training + device standard
+> are met, at least privilege for their role.
 
-## 3. Systems in scope
+## 3. Register — matrix form (one row per person; cell = access level, "—" = none)
 
-Every system below is a place privileged access must be tracked. Populate a row
-per person for each that applies.
+| Person | GCP/Firebase `lumi-ninc-au` | GitHub | Apple Dev | Google Play | School portal | Super-admin portal | Mailboxes | Domain registrar | Cloudflare | Password mgr | MFA on all? | Last reviewed |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| **Nicholas Plevritis** | Owner | Org-Owner | Account-Holder | Account-Owner | super-admin | super-admin (MFA-enforced) | Owner | Account-Owner | Account-Owner | Owner | ✎ confirm (see §5) | 2026-07-24 |
 
-| System | What it controls | Access-level vocabulary |
-|---|---|---|
-| **GCP / Firebase** (`lumi-ninc-au`) | Production project — Firestore, Storage, Functions, Auth, config, billing | IAM roles (Owner / Editor / specific roles); least-privilege |
-| **GitHub** (repo/org) | Source code, CI/CD, deploy trust (WIF/OIDC), secrets | Org-Owner / Admin / Write / Read; token & SSH-key holders |
-| **Apple Developer** | iOS signing, App Store Connect, TestFlight | Account-Holder / Admin / App-Manager / Developer |
-| **Google Play Console** | Android app publishing, signing | Account-Owner / Admin / release permissions |
-| **School admin portal** (`school-admin-web`) | School staff/admin operational access | via membership docs / super-admin (portal is not auto-deployed) |
-| **Super-admin portal** (`admin/`) | Cross-tenant Lumi operations (`/superAdmins/{uid}`) | super-admin (Firestore doc, MFA-enforced) / none |
-| **Marketing site** (`marketing-site/`) | Public site + demo/onboarding intake | deploy/hosting access |
-| **Support / admin mailboxes** | `support@` and the demo/review operational mailboxes | Owner / delegated access |
-| **Domain registrar** | Domain ownership + DNS control (registrar of record) | Account-Owner / delegate |
-| **Cloudflare** | Edge / status worker (`status` banner) + any DNS/proxy | Account-Owner / member / API-token holders |
-| **Password manager** | Custody of all the above secrets + recovery keys | Vault owner / member |
-| **(Add any other)** | e.g. SendGrid, Twilio, analytics, error tracking, billing entity | per-system |
+## 4. Register — per-system detail (authoritative long form)
 
-> Sub-processors/vendors (SendGrid, Twilio, etc.) that hold operator credentials
-> should each get a row if a human logs into them; pure server-to-server vendors
-> are tracked in the vendor register, not here — but any **console login** a human
-> holds belongs in this register.
+One row per (person × system) with justification, MFA, and the review action.
 
-## 4. Register template (matrix form)
-
-One row per person; a cell per system with the access level (or "—" for none).
-Keep a companion "detail" row/tab per person for granted/reviewed dates and MFA
-status where the matrix gets tight.
-
-| Person (named) | Role | GCP/Firebase | GitHub | Apple Dev | Google Play | School portal | Super-admin portal | Mailboxes | Domain registrar | Cloudflare | Password mgr | MFA on all? | Last reviewed |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Nic (Director) | Owner / all | Owner | Org-Owner | Account-Holder | Account-Owner | super-admin | super-admin | Owner | Account-Owner | Account-Owner | Owner | (confirm) | 2026-…-… |
-| _(contractor/adviser)_ | _scoped role_ | _least-priv_ | Read/Write | — | — | — | — | delegated? | — | — | member | (confirm) | — |
-
-### 4.1 Per-system detail (alternative long form)
-
-If the matrix is unwieldy, use one row per (person × system):
-
-| Person | System | Access level | Business justification | MFA enforced? | Date granted | Date last reviewed | Reviewer | Action (keep / reduce / revoke) |
+| Person | System | Access level | Business justification (least-privilege test) | MFA enforced? | Date granted | Last reviewed | Reviewer | Action |
 |---|---|---|---|---|---|---|---|---|
-| Nic | GCP/Firebase `lumi-ninc-au` | Owner | Sole operator | (confirm) | — | — | — | keep |
-| Nic | GitHub | Org-Owner | Sole maintainer | (confirm) | — | — | — | keep |
-| … | … | … | … | … | … | … | … | … |
+| Nic | GCP / Firebase `lumi-ninc-au` | Owner | Sole operator of the production project; no other principal to delegate to | ✎ confirm | Project inception | 2026-07-24 | N. Plevritis | keep |
+| Nic | GitHub (repo/org) | Org-Owner | Sole maintainer; owns CI/CD + deploy trust | ✎ confirm | Repo inception | 2026-07-24 | N. Plevritis | keep |
+| Nic | Apple Developer / App Store Connect | Account-Holder | Sole publisher of the iOS app | ✎ confirm | Enrolment | 2026-07-24 | N. Plevritis | keep |
+| Nic | Google Play Console | Account-Owner | Sole publisher of the Android app | ✎ confirm | Enrolment | 2026-07-24 | N. Plevritis | keep |
+| Nic | School admin portal (`school-admin-web`) | super-admin | Operational support for schools | inherits portal MFA | Portal launch | 2026-07-24 | N. Plevritis | keep |
+| Nic | Super-admin portal (`admin/`) | super-admin (`/superAdmins/{uid}`) | Cross-tenant Lumi operations | **enforced** (admin TOTP, `ACCESS_CONTROL_POLICY.md` §6) | Portal launch | 2026-07-24 | N. Plevritis | keep |
+| Nic | Support / admin mailboxes | Owner | Owns `support@` + demo/review mailboxes | ✎ confirm | Setup | 2026-07-24 | N. Plevritis | keep |
+| Nic | Domain registrar | Account-Owner | Owns the domain + DNS of record | ✎ confirm | Domain purchase | 2026-07-24 | N. Plevritis | keep |
+| Nic | Cloudflare (edge / status worker) | Account-Owner | Owns the status-banner worker + any edge/DNS | ✎ confirm | Worker setup | 2026-07-24 | N. Plevritis | keep |
+| Nic | Password manager | Owner | Custody of all secrets + recovery keys | ✎ confirm | Setup | 2026-07-24 | N. Plevritis | keep |
 
-## 5. Review cadence (A7)
+*Vendors without a human console login (server-to-server sub-processors) are
+tracked in `SUB_PROCESSOR_TABLE.md`, not here. Any vendor console a human logs
+into (e.g. billing entity portal, error/analytics tooling) is added as a row
+above when adopted.*
+
+## 5. First review — findings (2026-07-24)
+
+**Reviewer:** Nicholas Plevritis · **Date:** 2026-07-24 · **Scope:** all rows in §4.
+
+1. **All access is appropriate and at the minimum feasible level for a
+   single-operator estate.** With one principal, every system's least-privilege
+   baseline is owner/holder — there is no second principal to reduce against, so
+   every row's action is **keep**. No excess or stale grants found; no unknown
+   principals.
+2. **One open action — MFA confirmation (✎).** MFA is **confirmed enforced** on the
+   super-admin portal (admin TOTP). For the remaining consoles marked "✎ confirm"
+   (GCP/Firebase Google account, GitHub, Apple, Google Play, mailboxes, domain
+   registrar, Cloudflare, password manager) Nic must **log in and confirm 2FA is
+   on**, then change each "✎ confirm" to "enforced" and countersign. This is the
+   only item preventing this register from being complete A7 evidence.
+3. **Improvement (not a finding).** Best practice even for a sole operator is to
+   use a least-privilege day-to-day identity and reserve Owner for break-glass;
+   adopt this at the point a second principal joins (tracked in
+   `ACCESS_CONTROL_POLICY.md`).
+
+## 6. Review cadence (A7)
 
 | Trigger | Action | Frequency |
 |---|---|---|
-| **Annual review** | Walk every row: confirm the person still needs the access at that level; reduce to least privilege or revoke; confirm MFA; stamp "date last reviewed" and reviewer | **Annual** |
+| **Annual review** | Walk every row: confirm the person still needs the access at that level; reduce to least privilege or revoke; confirm MFA; stamp "date last reviewed" and reviewer | **Annual** (next due **2027-07-24**) |
 | **On role change** | Grant/reduce access for the new role same-day; add/adjust rows | On change |
-| **On joiner** | Add rows only after HR1 screening + HR2 training + device standard met (`HR_SECURITY_PACK.md`, `DEVICE_STANDARD.md`); default least privilege | On event |
+| **On joiner** | Add rows only after HR1 screening + HR2 training + device standard met; default least privilege | On event |
 | **On leaver / for-cause** | Revoke every row same-day (immediately if malicious) per `HR_SECURITY_PACK.md` §4; the register is the checklist | On event |
-| **Monthly IAM spot-check** | The GCP/Firebase IAM + deploy-identity subset is already reviewed monthly (`ACCESS_CONTROL_POLICY.md` §8); reconcile findings back into this register | Monthly (IAM subset) |
+| **Monthly IAM spot-check** | The GCP/Firebase IAM + deploy-identity subset is reviewed monthly (`ACCESS_CONTROL_POLICY.md` §8); reconcile findings back into this register | Monthly (IAM subset) |
 
-The **annual full-register review** is the A7 evidence: a dated pass where every
-row's "last reviewed" is stamped and each access is confirmed keep/reduce/revoke
-by a named reviewer.
+The **annual full-register review** is the A7 evidence: a dated pass (this §5
+being the first) where every row's "last reviewed" is stamped and each access is
+confirmed keep/reduce/revoke by a named reviewer.
 
-## 6. Relationship to other controls
+## 7. Relationship to other controls
 
 - **Access control policy.** The server-side application access model and the
   monthly IAM / privileged-session cadence live in `ACCESS_CONTROL_POLICY.md`
@@ -120,32 +111,10 @@ by a named reviewer.
 - **Device standard.** Adding a person usually adds a device; keep the device
   register (`DEVICE_STANDARD.md` §4) in step with joiner/leaver events here.
 
-## 7. Supporting evidence index
+## 8. Sign-off
 
-| Control | Evidence (owned by Nic) |
-|---|---|
-| Populated access register | This file, completed with real principals (restricted store if it grows detail) |
-| First + annual review | Dated review pass with reviewer name and per-row keep/reduce/revoke |
-| Monthly IAM subset | IAM export / capability canaries (`ACCESS_CONTROL_POLICY.md` §8) reconciled here |
-| MFA on privileged accounts | `ACCESS_CONTROL_POLICY.md` §6 (admin TOTP runbook) |
-| Offboarding driven by the register | `HR_SECURITY_PACK.md` §4 |
+First review performed and register populated by: **Nicholas Plevritis**
+Signature: ____________   Date: 2026-07-24
 
-## 8. Known gaps / reviewer must confirm
-
-- **NIC — not populated.** This is a template with placeholder rows. Nic must fill
-  in every real (person × system) with access level, MFA status, and dates.
-- **NIC — no first review yet.** A7 needs a **dated first review**: walk every row,
-  confirm least privilege, stamp "last reviewed" and reviewer. Until that pass
-  exists, A7 is not evidenced.
-- **MFA coverage.** Confirm MFA is actually enforced on **every** privileged
-  account listed (GCP/Firebase, GitHub, Apple, Play, registrar, Cloudflare,
-  password manager, mailboxes), not just the admin portal — several of these
-  columns say "(confirm)".
-- **System list completeness.** Confirm the §3 list is complete for Lumi's real
-  estate — add any missing console-login vendor (SendGrid, Twilio, error/analytics
-  tooling, billing entity) as its own row.
-- **Storage of detail.** If populated rows include sensitive detail, keep the full
-  register in the restricted store and place only the review summary/outcome in
-  the evidence pack (mirrors `HR_SECURITY_PACK.md` §2.2).
-- **Sign-off.** This register is only A7 evidence once populated, first-reviewed,
-  and signed by Nic.
+*Open before final sign-off:* complete the MFA confirmations in §5 item 2 (change
+each "✎ confirm" to "enforced"). Once done, this register is complete A7 evidence.
