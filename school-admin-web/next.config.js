@@ -24,6 +24,21 @@ const nextConfig = {
   // Cloud Run SSR bundle can't resolve a bundled/hash-aliased copy
   // (ERR_MODULE_NOT_FOUND). Mirrors the admin/ portal's config.
   serverExternalPackages: ['firebase-admin'],
+  // Defence-in-depth response headers (Wave 3 hardening). Deliberately NOT a
+  // full Content-Security-Policy — a correct CSP for Next needs nonce-based
+  // middleware and is deferred to avoid silently breaking the app.
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        ],
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;

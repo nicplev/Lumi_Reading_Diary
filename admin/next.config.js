@@ -22,6 +22,21 @@ const nextConfig = {
   turbopack: {
     root: path.resolve(__dirname, ".."),
   },
+  // Defence-in-depth response headers (Wave 3 hardening). Deliberately NOT a
+  // full Content-Security-Policy — a correct CSP for Next needs nonce-based
+  // middleware and is deferred to avoid silently breaking the app.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        ],
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;
