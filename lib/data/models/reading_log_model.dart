@@ -97,6 +97,12 @@ class ReadingLogModel {
   // streaks but contribute nothing to books-read analytics until resolved.
   final bool titleUnresolved;
 
+  // Structured per-book entries: {title, source: assigned|library|manual|
+  // pinned, format: print|ebook|audiobook|readAloud, bookId?}. Optional —
+  // [bookTitles] stays the denormalised projection stats count from, so a
+  // session's duration contributes once regardless of book count.
+  final List<Map<String, dynamic>>? books;
+
   // Comprehension voice recording fields. The path is the Storage object key
   // (NOT a download URL — resolved on demand). `uploaded` gates the teacher
   // playback UI; the log is created with `uploaded: false`, then patched to
@@ -151,6 +157,7 @@ class ReadingLogModel {
     this.occurredOn,
     this.context,
     this.titleUnresolved = false,
+    this.books,
     this.comprehensionAudioPath,
     this.comprehensionAudioDurationSec,
     this.comprehensionAudioUploaded = false,
@@ -278,6 +285,10 @@ class ReadingLogModel {
       occurredOn: data['occurredOn'] as String?,
       context: data['context'] as String?,
       titleUnresolved: data['titleUnresolved'] as bool? ?? false,
+      books: (data['books'] as List?)
+          ?.whereType<Map>()
+          .map((entry) => Map<String, dynamic>.from(entry))
+          .toList(),
       comprehensionAudioPath: data['comprehensionAudioPath'] as String?,
       comprehensionAudioDurationSec:
           (data['comprehensionAudioDurationSec'] as num?)?.toInt(),
@@ -335,6 +346,7 @@ class ReadingLogModel {
       'occurredOn': occurredOn,
       'context': context,
       'titleUnresolved': titleUnresolved ? true : null,
+      'books': books,
       'comprehensionAudioPath': comprehensionAudioPath,
       'comprehensionAudioDurationSec': comprehensionAudioDurationSec,
       'comprehensionAudioUploaded': comprehensionAudioUploaded,
@@ -387,6 +399,7 @@ class ReadingLogModel {
     String? occurredOn,
     String? context,
     bool? titleUnresolved,
+    List<Map<String, dynamic>>? books,
     String? comprehensionAudioPath,
     int? comprehensionAudioDurationSec,
     bool? comprehensionAudioUploaded,
@@ -434,6 +447,7 @@ class ReadingLogModel {
       occurredOn: occurredOn ?? this.occurredOn,
       context: context ?? this.context,
       titleUnresolved: titleUnresolved ?? this.titleUnresolved,
+      books: books ?? this.books,
       comprehensionAudioPath:
           comprehensionAudioPath ?? this.comprehensionAudioPath,
       comprehensionAudioDurationSec:
@@ -494,6 +508,7 @@ class ReadingLogModel {
       'occurredOn': occurredOn,
       'context': context,
       'titleUnresolved': titleUnresolved,
+      'books': books,
       'comprehensionAudioPath': comprehensionAudioPath,
       'comprehensionAudioDurationSec': comprehensionAudioDurationSec,
       'comprehensionAudioUploaded': comprehensionAudioUploaded,
@@ -579,6 +594,10 @@ class ReadingLogModel {
       occurredOn: map['occurredOn'] as String?,
       context: map['context'] as String?,
       titleUnresolved: map['titleUnresolved'] as bool? ?? false,
+      books: (map['books'] as List?)
+          ?.whereType<Map>()
+          .map((entry) => Map<String, dynamic>.from(entry))
+          .toList(),
       comprehensionAudioPath: map['comprehensionAudioPath'] as String?,
       comprehensionAudioDurationSec:
           (map['comprehensionAudioDurationSec'] as num?)?.toInt(),

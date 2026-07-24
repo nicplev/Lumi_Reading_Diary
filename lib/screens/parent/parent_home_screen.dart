@@ -50,6 +50,7 @@ import 'widgets/add_email_for_recovery_modal.dart';
 import 'widgets/character_picker_sheet.dart';
 import 'widgets/parent_child_switcher.dart';
 import 'widgets/widget_undo_banner.dart';
+import 'widgets/book_picker_sheet.dart';
 import 'widgets/child_log_row.dart';
 import 'widgets/pending_session_sheet.dart';
 import 'widgets/today_sessions_sheet.dart';
@@ -1963,6 +1964,10 @@ class _TonightRowState extends State<_TonightRow> {
   /// undo layer targets exactly this session. Cleared on day rollover.
   String? _lastQuickLogId;
 
+  /// A pin made in THIS session via the picker — the parent model is a
+  /// per-session snapshot, so mirror the new pin locally for instant UI.
+  String? _sessionPinnedTitle;
+
   /// This child's queued (saved-on-this-phone) sessions and any parked
   /// quick-slot conflict, live from the outbox (§7.1/§7.2).
   StreamSubscription<List<PendingSync>>? _queueSub;
@@ -2229,7 +2234,7 @@ class _TonightRowState extends State<_TonightRow> {
             // Assigned union first; a guardian-pinned book fills in when
             // school hasn't allocated anything (§4.1/§6.4).
             var titles = _resolvedTitles(allocations);
-            final pinned =
+            final pinned = _sessionPinnedTitle ??
                 widget.parent.pinnedBookTitleFor(widget.student.id);
             if (titles.isEmpty && pinned != null) titles = [pinned];
 
@@ -2272,7 +2277,24 @@ class _TonightRowState extends State<_TonightRow> {
                 resolvedTitles: titles,
                 usualMinutes: usualMinutes,
               ),
-              onChooseBook: () => _openDetail(allocations),
+              // Choose book NEVER writes a session: the picker establishes a
+              // current book (pin persists per guardian×child) and the row
+              // returns to Ready with it (§4.1).
+              onChooseBook: () async {
+                final result = await showBookPickerSheet(
+                  context,
+                  student: widget.student,
+                  myUid: widget.parent.id,
+                  assignedTitles: titles,
+                  pinnedTitle: _sessionPinnedTitle ??
+                      widget.parent.pinnedBookTitleFor(widget.student.id),
+                );
+                // The parent model is a per-session snapshot; mirror the new
+                // pin locally so the row flips to Ready immediately.
+                if (result != null && mounted) {
+                  setState(() => _sessionPinnedTitle = result.title);
+                }
+              },
               onUndo:
                   undoable == null ? null : () => _undoQuickLog(undoable),
               // Review routes by state: a parked conflict gets the §7.2
