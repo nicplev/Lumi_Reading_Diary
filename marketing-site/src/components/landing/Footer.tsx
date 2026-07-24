@@ -50,25 +50,19 @@ export function Footer() {
           <div style={{ fontFamily: "'Nunito',sans-serif", fontWeight: 800, fontSize: 14, color: "#fff", marginBottom: 16 }}>Resources</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
             <a
-              href="https://lumi-school-admin-au.web.app/support"
-              target="_blank"
-              rel="noopener"
+              href="/support"
               style={{ fontWeight: 300, fontSize: 14, color: "#A49C8E", textDecoration: "none" }}
             >
               Help centre
             </a>
             <a
-              href="https://lumi-school-admin-au.web.app/legal/privacy"
-              target="_blank"
-              rel="noopener"
+              href="/legal/privacy"
               style={{ fontWeight: 300, fontSize: 14, color: "#A49C8E", textDecoration: "none" }}
             >
               Privacy
             </a>
             <a
-              href="https://lumi-school-admin-au.web.app/legal/terms"
-              target="_blank"
-              rel="noopener"
+              href="/legal/terms"
               style={{ fontWeight: 300, fontSize: 14, color: "#A49C8E", textDecoration: "none" }}
             >
               Terms
