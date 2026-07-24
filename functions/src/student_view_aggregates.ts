@@ -21,7 +21,7 @@
  */
 
 import * as admin from "firebase-admin";
-import {localDateString, shiftDays} from "./dateUtils";
+import {localDateString, resolveOccurrenceDate, shiftDays} from "./dateUtils";
 
 /** Rolling window (school-local days) kept in `feelingsByDay` — matches the
  * app's former 366-day query floor so the card's "All" tab keeps its reach. */
@@ -106,7 +106,7 @@ export function buildFeelingsByDay(
     if (!feeling) continue;
     const ts = log.date as admin.firestore.Timestamp | undefined;
     if (!ts) continue;
-    const day = localDateString(ts.toDate(), tz);
+    const day = resolveOccurrenceDate(log.occurredOn, ts.toDate(), tz);
     if (day < floor) continue;
     const bucket = (map[day] ??= {});
     bucket[feeling] = (bucket[feeling] ?? 0) + 1;
@@ -164,7 +164,7 @@ export function applyFeelingsDelta(
     if (!feeling) return;
     const ts = log.date as admin.firestore.Timestamp | undefined;
     if (!ts) return;
-    const day = localDateString(ts.toDate(), tz);
+    const day = resolveOccurrenceDate(log.occurredOn, ts.toDate(), tz);
     const bucket = (map[day] ??= {});
     const next = (bucket[feeling] ?? 0) + delta;
     if (next > 0) {

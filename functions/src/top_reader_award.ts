@@ -5,6 +5,7 @@ import {
   buildIsCountingDay,
   localDateString,
   parseTermDates,
+  resolveOccurrenceDate,
   shiftDays,
 } from "./dateUtils";
 import {DEFAULT_TIMEZONE} from "./access";
@@ -218,7 +219,7 @@ export const topReaderAward = onSchedule(
               if (isInvalidatedLog(d)) continue; // flagged logs can't win gold
               const dt = d.date?.toDate?.();
               if (!dt) continue;
-              const ds = localDateString(dt, tz);
+              const ds = resolveOccurrenceDate(d.occurredOn, dt, tz);
               if (ds < firstDay || ds > lastDay) continue;
               const sid = d.studentId as string | undefined;
               if (!sid || !rosterIds.has(sid)) continue;

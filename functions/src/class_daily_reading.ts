@@ -1,7 +1,7 @@
 import * as admin from "firebase-admin";
 import * as crypto from "crypto";
 import {DEFAULT_TIMEZONE} from "./access";
-import {localDateString} from "./dateUtils";
+import {resolveOccurrenceDate} from "./dateUtils";
 import {isInvalidatedLog} from "./stats_aggregation";
 
 export const CLASS_DAILY_READING_SCHEMA_VERSION = 1;
@@ -72,7 +72,7 @@ export function buildDailyReadingProjection(
   if (!Number.isInteger(minutes) || minutes < 1 || minutes > 240) return null;
   return {
     classId,
-    localDate: localDateString(date.toDate(), timezone),
+    localDate: resolveOccurrenceDate(data.occurredOn, date.toDate(), timezone),
     shard: dailyReadingShard(studentId),
     studentId,
     minutes,
@@ -222,7 +222,13 @@ export function applyDailyReadingDelta(
 const timezoneCache = new Map<string, {timezone: string; loadedAt: number}>();
 const TIMEZONE_CACHE_MS = 60_000;
 
-async function schoolTimezone(schoolId: string): Promise<string> {
+/**
+ * Owning school's IANA timezone, cached ~60s per instance. Shared with the
+ * reading-log validation/cleanup paths in index.ts / reading_log_cleanup.ts.
+ * @param {string} schoolId School document ID.
+ * @return {Promise<string>} IANA timezone (DEFAULT_TIMEZONE fallback).
+ */
+export async function schoolTimezone(schoolId: string): Promise<string> {
   const cached = timezoneCache.get(schoolId);
   if (cached && Date.now() - cached.loadedAt < TIMEZONE_CACHE_MS) {
     return cached.timezone;

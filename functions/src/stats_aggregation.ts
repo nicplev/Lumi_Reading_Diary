@@ -33,6 +33,7 @@ import {
   countInWindow,
   localDateUtcRange,
   localDateString,
+  resolveOccurrenceDate,
   parseTermDates,
 } from "./dateUtils";
 import {DEFAULT_TIMEZONE} from "./access";
@@ -112,11 +113,13 @@ interface CountedLogFields {
  * the log is not counted (draft, missing date, missing studentId, etc.).
  * Mirrors the `.where("status", "in", COUNTED_STATUSES)` filter the legacy
  * code applies during full re-aggregation.
+ *
+ * Exported for unit tests — production callers are the delta path below.
  * @param {FirebaseFirestore.DocumentData | null} logData Snapshot data.
  * @param {string} tz Owning school's IANA timezone.
  * @return {CountedLogFields | null} Contribution, or null if uncounted.
  */
-function extractCountedFields(
+export function extractCountedFields(
   logData: FirebaseFirestore.DocumentData | null,
   tz: string,
 ): CountedLogFields | null {
@@ -126,7 +129,7 @@ function extractCountedFields(
   if (isInvalidatedLog(logData)) return null;
   const date = logData.date as admin.firestore.Timestamp | undefined;
   if (!date) return null;
-  const localDate = localDateString(date.toDate(), tz);
+  const localDate = resolveOccurrenceDate(logData.occurredOn, date.toDate(), tz);
   const minutes = Number(logData.minutesRead) || 0;
   const books = Array.isArray(logData.bookTitles) ? logData.bookTitles.length : 0;
   return {minutes, books, localDate, date};
@@ -180,6 +183,9 @@ export function isStatsNoopUpdate(
   return (
     String(b.studentId ?? "") === String(a.studentId ?? "") &&
     (bDate?.toMillis() ?? null) === (aDate?.toMillis() ?? null) &&
+    // occurredOn feeds the day bucket (resolveOccurrenceDate); rules make it
+    // immutable, but the guard stays correct even for Admin-SDK edits.
+    (b.occurredOn ?? null) === (a.occurredOn ?? null) &&
     (Number(b.minutesRead) || 0) === (Number(a.minutesRead) || 0) &&
     (Array.isArray(b.bookTitles) ? b.bookTitles.length : 0) ===
       (Array.isArray(a.bookTitles) ? a.bookTitles.length : 0)
@@ -243,7 +249,7 @@ export async function reconcileStudentStats(
     totalBooksRead += Array.isArray(data.bookTitles) ? data.bookTitles.length : 0;
     const ts = data.date as admin.firestore.Timestamp | undefined;
     if (ts) {
-      readingDatesSet.add(localDateString(ts.toDate(), tz));
+      readingDatesSet.add(resolveOccurrenceDate(data.occurredOn, ts.toDate(), tz));
       if (!lastReadingDate || ts.toMillis() > lastReadingDate.toMillis()) {
         lastReadingDate = ts;
       }
@@ -338,25 +344,50 @@ export async function applyStudentStatsDelta(
 
   // Date may disappear if either: (a) log was counted before and isn't now,
   // or (b) log moved to a different date. Only drop it if no other counted
-  // log for this student shares that date.
+  // log for this student shares that BUCKET day. A log's bucket day is
+  // resolveOccurrenceDate(occurredOn ?? date), so membership needs two
+  // probes: logs whose timestamp lands in the day's UTC range (filtered
+  // per-doc, since a backdated log's timestamp can sit in the range while
+  // bucketing to the previous day) and logs explicitly backdated INTO the
+  // day (occurredOn == day, timestamp elsewhere). Both probes only run on
+  // the rare drop path; per-student-per-day volume keeps them tiny.
   let dropBeforeDate = false;
   if (
     beforeCounted &&
     (!afterCounted || beforeCounted.localDate !== afterCounted.localDate)
   ) {
-    const {startInclusive, endExclusive} =
-      localDateUtcRange(beforeCounted.localDate, tz);
-    const others = await db
+    const day = beforeCounted.localDate;
+    const {startInclusive, endExclusive} = localDateUtcRange(day, tz);
+    const inRange = await db
       .collection(`schools/${schoolId}/readingLogs`)
       .where("studentId", "==", studentId)
       .where("status", "in", COUNTED_STATUSES)
       .where("date", ">=", admin.firestore.Timestamp.fromDate(startInclusive))
       .where("date", "<", admin.firestore.Timestamp.fromDate(endExclusive))
       .where(admin.firestore.FieldPath.documentId(), "!=", change.before.id)
-      .limit(1)
-      .count()
+      .select("date", "occurredOn", "validationStatus")
       .get();
-    dropBeforeDate = others.data().count === 0;
+    const rangeHolds = inRange.docs.some((doc) => {
+      const data = doc.data();
+      if (isInvalidatedLog(data)) return false;
+      const ts = data.date as admin.firestore.Timestamp | undefined;
+      if (!ts) return false;
+      return resolveOccurrenceDate(data.occurredOn, ts.toDate(), tz) === day;
+    });
+    let backdatedHolds = false;
+    if (!rangeHolds) {
+      const backdated = await db
+        .collection(`schools/${schoolId}/readingLogs`)
+        .where("studentId", "==", studentId)
+        .where("status", "in", COUNTED_STATUSES)
+        .where("occurredOn", "==", day)
+        .where(admin.firestore.FieldPath.documentId(), "!=", change.before.id)
+        .select("validationStatus")
+        .get();
+      backdatedHolds = backdated.docs.some((doc) =>
+        !isInvalidatedLog(doc.data()));
+    }
+    dropBeforeDate = !rangeHolds && !backdatedHolds;
   }
 
   // If this write removes the student's most-recent counted log (a delete, or a

@@ -10,6 +10,8 @@ const {
   countInWindow,
   parseTermDates,
   buildIsCountingDay,
+  isValidOccurredOn,
+  resolveOccurrenceDate,
   MAX_REST_DAYS,
 } = require('../lib/dateUtils.js');
 
@@ -250,4 +252,38 @@ test('countInWindow counts distinct reads in the inclusive trailing window', () 
   // The 50-day window includes ago(49) but not ago(50).
   const reads2 = new Set([ago(0), ago(49), ago(50)]);
   assert.equal(countInWindow(reads2, TODAY, 50), 2);
+});
+
+// ─── resolveOccurrenceDate — client-stated day wins, derived day is fallback ──
+
+test('isValidOccurredOn accepts YYYY-MM-DD only', () => {
+  assert.equal(isValidOccurredOn('2026-07-24'), true);
+  assert.equal(isValidOccurredOn('24/07/2026'), false);
+  assert.equal(isValidOccurredOn('2026-7-24'), false);
+  assert.equal(isValidOccurredOn(''), false);
+  assert.equal(isValidOccurredOn(null), false);
+  assert.equal(isValidOccurredOn(20260724), false);
+});
+
+test('resolveOccurrenceDate prefers a valid occurredOn (Yesterday backdating)', () => {
+  // Logged at 07:00 Sydney on the 24th, explicitly for yesterday's reading.
+  const instant = new Date('2026-07-23T21:00:00Z'); // 07:00 AEST on the 24th
+  assert.equal(
+    resolveOccurrenceDate('2026-07-23', instant, 'Australia/Sydney'),
+    '2026-07-23',
+  );
+});
+
+test('resolveOccurrenceDate falls back to the school-local derived day for legacy logs', () => {
+  // 23:30 Sydney on the 24th is 13:30 UTC on the 24th.
+  const instant = new Date('2026-07-24T13:30:00Z');
+  assert.equal(
+    resolveOccurrenceDate(undefined, instant, 'Australia/Sydney'),
+    '2026-07-24',
+  );
+  // Malformed values are ignored, not trusted.
+  assert.equal(
+    resolveOccurrenceDate('not-a-date', instant, 'Australia/Sydney'),
+    '2026-07-24',
+  );
 });

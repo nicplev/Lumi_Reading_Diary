@@ -129,6 +129,41 @@ export function localDateString(d: Date, tz: string): string {
   }
 }
 
+const OCCURRED_ON_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Whether a value is a well-formed `occurredOn` school-local date string
+ * ("YYYY-MM-DD"). Shape-only check — timezone consistency with the log's
+ * `date` timestamp is validateReadingLog's job.
+ * @param {unknown} value Candidate value from an untrusted log document.
+ * @return {boolean} True when the value is a usable occurrence-date string.
+ */
+export function isValidOccurredOn(value: unknown): value is string {
+  return typeof value === "string" && OCCURRED_ON_PATTERN.test(value);
+}
+
+/**
+ * The school-local calendar day a reading log belongs to.
+ *
+ * Prefers the client-stamped `occurredOn` (the guardian's stated occurrence
+ * day — captures explicit Yesterday backdating and offline-before-midnight
+ * sessions exactly), falling back to deriving the day from the `date`
+ * timestamp in the school's timezone for every pre-redesign log.
+ * @param {unknown} occurredOn The log's optional occurredOn field.
+ * @param {Date} date The log's date timestamp as a Date.
+ * @param {string} tz Owning school's IANA timezone.
+ * @return {string} The occurrence day as "YYYY-MM-DD".
+ */
+export function resolveOccurrenceDate(
+  occurredOn: unknown,
+  date: Date,
+  tz: string,
+): string {
+  return isValidOccurredOn(occurredOn) ?
+    occurredOn :
+    localDateString(date, tz);
+}
+
 /**
  * Offset from UTC for an instant in an IANA timezone. Invalid timezones fall
  * back to UTC, matching localDateString's failure posture.
