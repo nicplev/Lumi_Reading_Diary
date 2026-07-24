@@ -81,6 +81,22 @@ class ReadingLogModel {
   // ownership rules (parentId == auth.uid) cover create/update/delete.
   final LoggedByRole? loggedByRole;
 
+  // School-local occurrence day ('YYYY-MM-DD'), stamped at tap time so the
+  // stated day survives offline-before-midnight syncs and captures explicit
+  // Yesterday backdating. Null on legacy docs (server derives the day from
+  // `date` in the school timezone). Immutable after create (rules).
+  final String? occurredOn;
+
+  // 'home' | 'classroom'. Null on legacy docs (treated as home). Classroom
+  // sessions display on the parent Home but never satisfy the home quick
+  // slot or flip the row to "all done". Parents may only write 'home'.
+  final String? context;
+
+  // Structured "title not known — add later" state (detailed flow only).
+  // Legal only with an empty [bookTitles]; such sessions count minutes and
+  // streaks but contribute nothing to books-read analytics until resolved.
+  final bool titleUnresolved;
+
   // Comprehension voice recording fields. The path is the Storage object key
   // (NOT a download URL — resolved on demand). `uploaded` gates the teacher
   // playback UI; the log is created with `uploaded: false`, then patched to
@@ -132,6 +148,9 @@ class ReadingLogModel {
     this.loggedByName,
     this.loggedByLabel,
     this.loggedByRole,
+    this.occurredOn,
+    this.context,
+    this.titleUnresolved = false,
     this.comprehensionAudioPath,
     this.comprehensionAudioDurationSec,
     this.comprehensionAudioUploaded = false,
@@ -152,6 +171,13 @@ class ReadingLogModel {
   /// parent. Teacher views surface this subtly so attribution is read with the
   /// right confidence.
   bool get isQuickLog => metadata?['quickLog'] == true;
+
+  /// True for classroom reading. Legacy docs (null context) are home reading.
+  bool get isClassroomContext => context == 'classroom';
+
+  /// True when this session counts as home reading (the home row / quick-slot
+  /// vocabulary): everything except explicit classroom sessions.
+  bool get isHomeContext => !isClassroomContext;
 
   /// True when this log has an uploaded comprehension audio ready to play.
   /// Drives the teacher's inline player visibility on the student detail row.
@@ -249,6 +275,9 @@ class ReadingLogModel {
               orElse: () => LoggedByRole.parent,
             )
           : null,
+      occurredOn: data['occurredOn'] as String?,
+      context: data['context'] as String?,
+      titleUnresolved: data['titleUnresolved'] as bool? ?? false,
       comprehensionAudioPath: data['comprehensionAudioPath'] as String?,
       comprehensionAudioDurationSec:
           (data['comprehensionAudioDurationSec'] as num?)?.toInt(),
@@ -303,6 +332,9 @@ class ReadingLogModel {
       'loggedByName': loggedByName,
       'loggedByLabel': loggedByLabel,
       'loggedByRole': loggedByRole?.toString().split('.').last,
+      'occurredOn': occurredOn,
+      'context': context,
+      'titleUnresolved': titleUnresolved ? true : null,
       'comprehensionAudioPath': comprehensionAudioPath,
       'comprehensionAudioDurationSec': comprehensionAudioDurationSec,
       'comprehensionAudioUploaded': comprehensionAudioUploaded,
@@ -352,6 +384,9 @@ class ReadingLogModel {
     String? loggedByName,
     String? loggedByLabel,
     LoggedByRole? loggedByRole,
+    String? occurredOn,
+    String? context,
+    bool? titleUnresolved,
     String? comprehensionAudioPath,
     int? comprehensionAudioDurationSec,
     bool? comprehensionAudioUploaded,
@@ -396,6 +431,9 @@ class ReadingLogModel {
       loggedByName: loggedByName ?? this.loggedByName,
       loggedByLabel: loggedByLabel ?? this.loggedByLabel,
       loggedByRole: loggedByRole ?? this.loggedByRole,
+      occurredOn: occurredOn ?? this.occurredOn,
+      context: context ?? this.context,
+      titleUnresolved: titleUnresolved ?? this.titleUnresolved,
       comprehensionAudioPath:
           comprehensionAudioPath ?? this.comprehensionAudioPath,
       comprehensionAudioDurationSec:
@@ -453,6 +491,9 @@ class ReadingLogModel {
       'loggedByName': loggedByName,
       'loggedByLabel': loggedByLabel,
       'loggedByRole': loggedByRole?.toString().split('.').last,
+      'occurredOn': occurredOn,
+      'context': context,
+      'titleUnresolved': titleUnresolved,
       'comprehensionAudioPath': comprehensionAudioPath,
       'comprehensionAudioDurationSec': comprehensionAudioDurationSec,
       'comprehensionAudioUploaded': comprehensionAudioUploaded,
@@ -535,6 +576,9 @@ class ReadingLogModel {
               orElse: () => LoggedByRole.parent,
             )
           : null,
+      occurredOn: map['occurredOn'] as String?,
+      context: map['context'] as String?,
+      titleUnresolved: map['titleUnresolved'] as bool? ?? false,
       comprehensionAudioPath: map['comprehensionAudioPath'] as String?,
       comprehensionAudioDurationSec:
           (map['comprehensionAudioDurationSec'] as num?)?.toInt(),

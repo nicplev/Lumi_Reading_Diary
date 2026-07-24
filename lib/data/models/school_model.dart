@@ -103,7 +103,10 @@ class SchoolModel {
         ),
       ),
       quietHours: Map<String, String>.from(data['quietHours'] ?? {}),
-      timezone: data['timezone'] ?? 'UTC',
+      // Matches the server default (functions/src/access.ts DEFAULT_TIMEZONE).
+      // The old 'UTC' fallback made client day-boundaries disagree with every
+      // stats/streak/award computation for schools without an explicit tz.
+      timezone: data['timezone'] ?? 'Australia/Sydney',
       address: data['address'],
       contactEmail: data['contactEmail'],
       contactPhone: data['contactPhone'],

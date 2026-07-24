@@ -421,20 +421,64 @@ class OfflineService with WidgetsBindingObserver {
   /// `_isOnline` (a pure connectivity check) is too narrow now that
   /// `ServiceStatusController.canWriteToFirebase` also covers
   /// `firebaseDown` and `degraded`.
-  Future<void> saveReadingLogLocally(ReadingLogModel log) async {
+  Future<void> saveReadingLogLocally(
+    ReadingLogModel log, {
+    bool claimQuickSlot = false,
+  }) async {
     try {
       await _readingLogsBox.put(log.id, log.toLocal());
+      // The slot claim rides in the payload so the drain can replay the same
+      // atomic batch (log + slot) the online path uses. fromLocal() ignores
+      // the extra key.
+      final data = log.toLocal();
+      if (claimQuickSlot) data[quickSlotClaimKey] = true;
       await _enqueueAndPersist(PendingSync(
         id: log.id,
         type: SyncType.readingLog,
         action: SyncAction.create,
-        data: log.toLocal(),
+        data: data,
         createdAt: DateTime.now(),
       ));
     } catch (e) {
       debugPrint('Error saving reading log locally: $e');
       rethrow;
     }
+  }
+
+  /// Queues a delete of the caller's own reading log (undo / remove-my-
+  /// session while offline) and removes the local copy so the UI reflects
+  /// the removal immediately. The server-side onReadingLogDeleted cascade
+  /// cleans dependents and frees the quick slot once the delete lands.
+  Future<void> enqueueReadingLogDelete(ReadingLogModel log) async {
+    await _readingLogsBox.delete(log.id);
+    // An unsynced queued CREATE for the same id cancels out entirely —
+    // nothing ever reached the server, so drop both sides locally.
+    final queuedCreate = _syncQueue
+        .where((it) =>
+            it.id == log.id &&
+            it.type == SyncType.readingLog &&
+            it.action == SyncAction.create)
+        .toList();
+    if (queuedCreate.isNotEmpty) {
+      _syncQueue.removeWhere((it) => it.id == log.id);
+      await _pendingSyncBox.delete(log.id);
+      _broadcastQueue();
+      return;
+    }
+    await _enqueueAndPersist(PendingSync(
+      id: log.id,
+      type: SyncType.readingLog,
+      action: SyncAction.delete,
+      data: log.toLocal(),
+      createdAt: DateTime.now(),
+    ));
+  }
+
+  /// Removes the locally-cached copy of a log (after a confirmed online
+  /// delete).
+  Future<void> removeLocalReadingLog(String logId) async {
+    if (!_initialized) return;
+    await _readingLogsBox.delete(logId);
   }
 
   /// Queue a parent-comment attach. The log itself may already exist in
@@ -965,6 +1009,28 @@ class OfflineService with WidgetsBindingObserver {
   /// Classify a failure and update the item's persisted retry/backoff state.
   /// Never drops the item.
   Future<void> _handleItemFailure(PendingSync item, Object error) async {
+    // A quick-slot conflict is not a failure to retry — it's a decision only
+    // the guardian can make ("Same session — discard mine" / "Different
+    // session — add mine"). Park it with the winner's details so the UI can
+    // present the choice; resolveQuickSlotConflict() re-arms or drops it.
+    if (error is QuickSlotConflictException) {
+      item
+        ..retryCount += 1
+        ..lastAttemptAt = DateTime.now()
+        ..lastError = quickSlotConflictError
+        ..needsAttention = true;
+      item.data[quickSlotConflictKey] = {
+        'occurredOn': error.occurredOn,
+        if (error.byUid != null) 'byUid': error.byUid,
+        if (error.existingLogId != null) 'existingLogId': error.existingLogId,
+      };
+      item.contentHash = PendingSync.computeContentHash(item.data);
+      await _persistItem(item);
+      _recordHistory(item, SyncResult.permanentFail, item.lastError);
+      _broadcastQueue();
+      return;
+    }
+
     item
       ..retryCount += 1
       ..lastAttemptAt = DateTime.now()
@@ -987,6 +1053,77 @@ class OfflineService with WidgetsBindingObserver {
     // Persist the updated state so backoff/attention survives a restart —
     // the bug that previously made retry counting incoherent.
     await _persistItem(item);
+  }
+
+  /// Pending quick logs parked on a slot conflict, for the reconnect prompt
+  /// ("{name} logged reading while you were offline. Was yours the same
+  /// session?"). Each item's `data[quickSlotConflictKey]` carries the
+  /// winner's details.
+  List<PendingSync> get quickSlotConflicts => _syncQueue
+      .where((it) =>
+          it.type == SyncType.readingLog &&
+          it.lastError == quickSlotConflictError &&
+          it.data[quickSlotConflictKey] != null)
+      .toList(growable: false);
+
+  /// Resolves a parked quick-slot conflict.
+  ///
+  /// [keepMine] = "Different session — add mine": the claim is stripped so
+  /// the drain replays it as a plain additional session (never touching the
+  /// winner's slot). Otherwise ("Same session — discard mine") the item and
+  /// its local optimistic copy are dropped — nothing was ever written.
+  Future<void> resolveQuickSlotConflict({
+    required String logId,
+    required bool keepMine,
+  }) async {
+    final matches = _syncQueue
+        .where((it) => it.id == logId && it.type == SyncType.readingLog)
+        .toList();
+    if (matches.isEmpty) return;
+    final item = matches.first;
+    if (!keepMine) {
+      _syncQueue.removeWhere((it) => it.id == logId);
+      await _pendingSyncBox.delete(logId);
+      await _readingLogsBox.delete(logId);
+      _broadcastQueue();
+      return;
+    }
+    item.data.remove(quickSlotClaimKey);
+    item.data.remove(quickSlotConflictKey);
+    item
+      ..needsAttention = false
+      ..nextAttemptAt = null
+      ..lastError = null
+      ..contentHash = PendingSync.computeContentHash(item.data);
+    await _persistItem(item);
+    _broadcastQueue();
+    unawaited(triggerSync());
+  }
+
+  /// Purges every locally-cached artefact for one child — called on child
+  /// unlink and access revocation so child-scoped data (and queued writes
+  /// that would now be rules-rejected anyway) never outlives the
+  /// relationship. Sign-out uses [clearAllCaches].
+  Future<void> purgeChildData(String studentId) async {
+    if (!_initialized) return;
+    final logKeys = _readingLogsBox.keys.where((key) {
+      final raw = _readingLogsBox.get(key);
+      return raw != null && raw['studentId'] == studentId;
+    }).toList();
+    for (final key in logKeys) {
+      await _readingLogsBox.delete(key);
+    }
+    await _logDraftsBox.delete(studentId);
+    await _studentsBox.delete(studentId);
+    final queued = _syncQueue
+        .where((it) => it.data['studentId'] == studentId)
+        .map((it) => it.id)
+        .toList();
+    for (final id in queued) {
+      _syncQueue.removeWhere((it) => it.id == id);
+      await _pendingSyncBox.delete(id);
+    }
+    if (queued.isNotEmpty) _broadcastQueue();
   }
 
   Future<void> _syncOne(PendingSync item) async {
@@ -1121,7 +1258,69 @@ class OfflineService with WidgetsBindingObserver {
             createData.remove('lastCommentAt');
             createData.remove('lastCommentByRole');
             createData.remove('commentsViewedAt');
-            await logRef.set(createData);
+
+            final claimsSlot =
+                pendingSync.data[quickSlotClaimKey] == true &&
+                    log.occurredOn != null;
+            if (claimsSlot) {
+              // Replay the same atomic shape as the online quick log:
+              // log create + slot create in ONE batch. If another guardian
+              // (or this guardian's other device) claimed the day's slot
+              // while we were offline, do NOT write — park the item as an
+              // explicit conflict for the guardian to resolve ("Same
+              // session — discard mine" / "Different session — add mine").
+              final slotRef = _firestore
+                  .collection('schools')
+                  .doc(schoolId)
+                  .collection('students')
+                  .doc(log.studentId)
+                  .collection('quickSlots')
+                  .doc(log.occurredOn);
+              Map<String, dynamic>? slotData;
+              try {
+                final slotSnap =
+                    await slotRef.get(const GetOptions(source: Source.server));
+                if (slotSnap.exists) slotData = slotSnap.data();
+              } on FirebaseException catch (e) {
+                if (e.code != 'permission-denied' && e.code != 'not-found') {
+                  rethrow;
+                }
+                // Unreadable → let the batch + rules arbitrate below.
+              }
+              if (slotData != null && slotData['logId'] != log.id) {
+                throw QuickSlotConflictException(
+                  occurredOn: log.occurredOn!,
+                  byUid: slotData['byUid'] as String?,
+                  existingLogId: slotData['logId'] as String?,
+                );
+              }
+              final batch = _firestore.batch();
+              batch.set(logRef, createData);
+              batch.set(slotRef, {
+                'logId': log.id,
+                'byUid': log.parentId,
+                'createdAt': FieldValue.serverTimestamp(),
+              });
+              try {
+                await batch.commit();
+              } on FirebaseException catch (e) {
+                if (e.code != 'permission-denied') rethrow;
+                // Lost the race between check and commit → conflict, not a
+                // genuine authz failure (that would also deny the re-read).
+                final slotNow =
+                    await slotRef.get(const GetOptions(source: Source.server));
+                if (slotNow.exists && slotNow.data()?['logId'] != log.id) {
+                  throw QuickSlotConflictException(
+                    occurredOn: log.occurredOn!,
+                    byUid: slotNow.data()?['byUid'] as String?,
+                    existingLogId: slotNow.data()?['logId'] as String?,
+                  );
+                }
+                rethrow;
+              }
+            } else {
+              await logRef.set(createData);
+            }
           }
         }
         break;
@@ -1687,6 +1886,37 @@ enum SyncType {
   parentPrefs,
   childFeeling,
   allocationAssignment,
+}
+
+/// Extra key in a queued reading-log payload marking that the drain must
+/// replay the atomic quick-log batch (log create + home quick-slot create).
+const String quickSlotClaimKey = 'claimQuickSlot';
+
+/// Extra key added to a parked payload carrying the slot winner's details
+/// ({occurredOn, byUid, existingLogId}) for the conflict prompt.
+const String quickSlotConflictKey = 'slotConflict';
+
+/// `PendingSync.lastError` marker identifying a parked quick-slot conflict.
+const String quickSlotConflictError = 'quick_slot_conflict';
+
+/// The day's home quick slot was claimed by another write while this queued
+/// quick log waited — a guardian decision, not a retryable failure. The
+/// drain parks the item (`needsAttention` + [quickSlotConflictKey]); the UI
+/// resolves it via [OfflineService.resolveQuickSlotConflict].
+class QuickSlotConflictException implements Exception {
+  const QuickSlotConflictException({
+    required this.occurredOn,
+    this.byUid,
+    this.existingLogId,
+  });
+
+  final String occurredOn;
+  final String? byUid;
+  final String? existingLogId;
+
+  @override
+  String toString() =>
+      'Quick slot for $occurredOn already claimed; guardian must resolve';
 }
 
 enum SyncAction {

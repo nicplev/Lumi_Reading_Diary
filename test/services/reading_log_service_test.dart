@@ -66,7 +66,10 @@ void main() {
           createdAt: DateTime(2026, 1, 1),
         );
 
-    StudentModel buildStudent({StudentStats? stats}) => StudentModel(
+    // writeLog fail-closes on access (StudentAccessInactiveException), so
+    // fixtures carry a live entitlement like every real student doc.
+    StudentModel buildStudent({StudentStats? stats, StudentAccess? access}) =>
+        StudentModel(
           id: studentId,
           firstName: 'Sam',
           lastName: 'Reader',
@@ -74,6 +77,12 @@ void main() {
           classId: 'class_1',
           createdAt: DateTime(2026, 1, 1),
           stats: stats,
+          access: access ??
+              StudentAccess(
+                status: StudentAccess.statusActive,
+                academicYear: 2026,
+                expiresAt: DateTime.now().add(const Duration(days: 365)),
+              ),
         );
 
     /// Seeds the Firestore student doc with the supplied stats map.
@@ -240,6 +249,9 @@ void main() {
         service.logReading(
           student: buildStudent(),
           parent: buildParent(),
+          // Explicit title so book resolution succeeds and the school-level
+          // gate (not NoCurrentBookException) is what fires.
+          bookTitles: const ['The Bad Guys'],
           quickLog: true,
         ),
         throwsA(isA<QuickLoggingDisabledException>()),
@@ -262,6 +274,7 @@ void main() {
         parentId: parentId,
         schoolId: schoolId,
         classId: 'class_1',
+        bookTitle: 'The Bad Guys',
       );
 
       final raw = (await firestore
@@ -273,6 +286,252 @@ void main() {
           .data()!;
       expect(result.log.loggedByRole, LoggedByRole.parent);
       expect(raw['loggedByRole'], 'parent');
+    });
+
+    test('identifier-only quick log with no title throws — never fabricates',
+        () async {
+      await seedStudent(null);
+
+      // buildLog throws synchronously (before a Future exists), so assert on
+      // the closure rather than the call expression.
+      expect(
+        () => service.logQuickFromIds(
+          studentId: studentId,
+          parentId: parentId,
+          schoolId: schoolId,
+          classId: 'class_1',
+        ),
+        throwsA(isA<NoCurrentBookException>()),
+      );
+
+      final logs = await firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection('readingLogs')
+          .get();
+      expect(logs.docs, isEmpty);
+    });
+
+    test(
+        'quick log with no resolvable book throws NoCurrentBookException '
+        'and writes nothing', () async {
+      await seedStudent(null);
+
+      expect(
+        () => service.logReading(
+          student: buildStudent(),
+          parent: buildParent(),
+          quickLog: true, // no allocations, no explicit titles
+        ),
+        throwsA(isA<NoCurrentBookException>()),
+      );
+
+      final logs = await firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection('readingLogs')
+          .get();
+      expect(logs.docs, isEmpty, reason: "no fabricated 'Reading' title ever");
+    });
+
+    test('inactive access throws before any write or queue', () async {
+      await seedStudent(null);
+
+      await expectLater(
+        service.logReading(
+          student: buildStudent(
+            access: StudentAccess(
+              status: StudentAccess.statusActive,
+              academicYear: 2025,
+              expiresAt: DateTime.now().subtract(const Duration(days: 1)),
+            ),
+          ),
+          parent: buildParent(),
+          bookTitles: const ['Zog'],
+        ),
+        throwsA(isA<StudentAccessInactiveException>()),
+      );
+    });
+  });
+
+  group('ReadingLogService quick-slot claim', () {
+    late FakeFirebaseFirestore firestore;
+    late ReadingLogService service;
+    const schoolId = 'school_1';
+    const studentId = 'student_1';
+
+    setUp(() {
+      firestore = FakeFirebaseFirestore();
+      service = ReadingLogService.forTest(firestore: firestore);
+      ServiceStatusController.instance
+          .debugSetCurrent(ServiceStatusSnapshot.healthy());
+    });
+
+    tearDown(() {
+      ServiceStatusController.instance
+          .debugSetCurrent(ServiceStatusSnapshot.unknown());
+    });
+
+    UserModel parentUser(String uid) => UserModel(
+          id: uid,
+          email: '$uid@example.com',
+          fullName: 'Parent $uid',
+          role: UserRole.parent,
+          schoolId: schoolId,
+          createdAt: DateTime(2026, 1, 1),
+        );
+
+    StudentModel student() => StudentModel(
+          id: studentId,
+          firstName: 'Lincoln',
+          lastName: 'Reader',
+          schoolId: schoolId,
+          classId: 'class_1',
+          createdAt: DateTime(2026, 1, 1),
+          access: StudentAccess(
+            status: StudentAccess.statusActive,
+            academicYear: 2026,
+            expiresAt: DateTime.now().add(const Duration(days: 365)),
+          ),
+        );
+
+    DocumentReference<Map<String, dynamic>> slotRef(String date) => firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('students')
+        .doc(studentId)
+        .collection('quickSlots')
+        .doc(date);
+
+    test('quick log stamps occurredOn/context and claims the day slot',
+        () async {
+      final result = await service.logReading(
+        student: student(),
+        parent: parentUser('parent_a'),
+        bookTitles: const ['The Bad Guys'],
+        quickLog: true,
+      );
+
+      expect(result.log.occurredOn, matches(RegExp(r'^\d{4}-\d{2}-\d{2}$')));
+      expect(result.log.context, 'home');
+
+      final raw = (await firestore
+              .collection('schools')
+              .doc(schoolId)
+              .collection('readingLogs')
+              .doc(result.log.id)
+              .get())
+          .data()!;
+      expect(raw['occurredOn'], result.log.occurredOn);
+      expect(raw['context'], 'home');
+
+      final slot = await slotRef(result.log.occurredOn!).get();
+      expect(slot.exists, isTrue);
+      expect(slot.data()!['logId'], result.log.id);
+      expect(slot.data()!['byUid'], 'parent_a');
+    });
+
+    test('second quick log for the day throws QuickSlotTakenException '
+        'with the winner and writes nothing', () async {
+      final first = await service.logReading(
+        student: student(),
+        parent: parentUser('parent_a'),
+        bookTitles: const ['The Bad Guys'],
+        minutesRead: 20,
+        quickLog: true,
+      );
+
+      await expectLater(
+        service.logReading(
+          student: student(),
+          parent: parentUser('parent_b'),
+          bookTitles: const ['The Bad Guys'],
+          quickLog: true,
+        ),
+        throwsA(isA<QuickSlotTakenException>()
+            .having((e) => e.byUid, 'byUid', 'parent_a')
+            .having((e) => e.existingLogId, 'existingLogId', first.log.id)
+            .having((e) => e.existingLog?.minutesRead, 'winner minutes', 20)),
+      );
+
+      final logs = await firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection('readingLogs')
+          .get();
+      expect(logs.docs, hasLength(1), reason: 'the loser wrote nothing');
+    });
+
+    test('claimQuickSlot: false adds a separate session without touching '
+        'the slot', () async {
+      await service.logReading(
+        student: student(),
+        parent: parentUser('parent_a'),
+        bookTitles: const ['The Bad Guys'],
+        quickLog: true,
+      );
+      final extra = await service.logReading(
+        student: student(),
+        parent: parentUser('parent_b'),
+        bookTitles: const ['Zog'],
+        quickLog: true,
+        claimQuickSlot: false,
+      );
+
+      final logs = await firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection('readingLogs')
+          .get();
+      expect(logs.docs, hasLength(2));
+
+      final slot = await slotRef(extra.log.occurredOn!).get();
+      expect(slot.data()!['byUid'], 'parent_a',
+          reason: 'the additional session never rebinds the slot');
+    });
+
+    test('deleteOwnLog removes exactly that session and frees its slot',
+        () async {
+      final result = await service.logReading(
+        student: student(),
+        parent: parentUser('parent_a'),
+        bookTitles: const ['The Bad Guys'],
+        quickLog: true,
+      );
+
+      await service.deleteOwnLog(result.log);
+
+      final log = await firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection('readingLogs')
+          .doc(result.log.id)
+          .get();
+      expect(log.exists, isFalse);
+      expect((await slotRef(result.log.occurredOn!).get()).exists, isFalse,
+          reason: 'undo frees the day slot for the co-guardian');
+    });
+
+    test("deleteOwnLog leaves a sibling session's slot alone", () async {
+      final first = await service.logReading(
+        student: student(),
+        parent: parentUser('parent_a'),
+        bookTitles: const ['The Bad Guys'],
+        quickLog: true,
+      );
+      final extra = await service.logReading(
+        student: student(),
+        parent: parentUser('parent_a'),
+        bookTitles: const ['Zog'],
+        quickLog: true,
+        claimQuickSlot: false,
+      );
+
+      await service.deleteOwnLog(extra.log);
+
+      final slot = await slotRef(first.log.occurredOn!).get();
+      expect(slot.exists, isTrue);
+      expect(slot.data()!['logId'], first.log.id);
     });
   });
 }
