@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import { toCsv } from '@/lib/csv-export';
 import { Modal } from '@/components/lumi/modal';
 import { Button } from '@/components/lumi/button';
 import { Badge } from '@/components/lumi/badge';
@@ -165,14 +166,18 @@ export function BulkImportStaffModal({ open, onClose }: BulkImportStaffModalProp
 
   const downloadCredentialsCSV = () => {
     if (!result) return;
-    const rows = [
-      'Name,Email,Role,Temporary Password',
-      ...result.created.map((c) =>
-        [c.fullName, c.email, c.role === 'schoolAdmin' ? 'Admin' : 'Teacher', c.tempPassword]
-          .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-          .join(',')
-      ),
-    ].join('\n');
+    // Formula-safe: this file carries temporary passwords, so a formula
+    // smuggled in via a staff name must never be able to read the password
+    // column out to an attacker when an admin opens it.
+    const rows = toCsv([
+      ['Name', 'Email', 'Role', 'Temporary Password'],
+      ...result.created.map((c) => [
+        c.fullName,
+        c.email,
+        c.role === 'schoolAdmin' ? 'Admin' : 'Teacher',
+        c.tempPassword,
+      ]),
+    ]);
     const blob = new Blob([rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

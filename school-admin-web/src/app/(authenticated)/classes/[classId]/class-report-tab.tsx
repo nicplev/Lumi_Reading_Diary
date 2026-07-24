@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { toCsv } from '@/lib/csv-export';
 import { Card } from '@/components/lumi/card';
 import { QueryError } from '@/components/lumi/query-error';
 import { Button } from '@/components/lumi/button';
@@ -285,10 +286,6 @@ export function ClassReportTab({ classId, className, yearLevel, defaultMinutesTa
 
   const handleDownloadCsv = () => {
     if (!report) return;
-    const esc = (v: string | number | null) => {
-      const s = String(v ?? '');
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
     const rows = [
       ['Student', 'Minutes', 'Sessions', 'Reading days', 'Met target %', 'Last read', 'Reading level'],
       ...report.students.map((r) => [
@@ -296,7 +293,7 @@ export function ClassReportTab({ classId, className, yearLevel, defaultMinutesTa
       ]),
       ['Class total', report.totalMinutes, report.totalSessions, report.totalReadingDays, report.targetMetRate, '', ''],
     ];
-    const csv = rows.map((row) => row.map(esc).join(',')).join('\r\n');
+    const csv = toCsv(rows);
     const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
