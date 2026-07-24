@@ -40,7 +40,7 @@ These do not affect the S1/S3/S5 answer; they are optional uplift.
 
 1. **`lumi-reading.com` HSTS** lacks `includeSubDomains; preload` (the four `.web.app` sites have the full directive). Add them on the custom-domain HSTS config.
 2. **Status worker** (`workers.dev`) sets no HSTS and no security headers. It serves only a public status banner (no personal data), so this is low-risk — optionally enable HSTS via Cloudflare, or move it behind a custom domain with min-TLS pinned (already TLS 1.2+ in practice).
-3. **Portal response headers:** the root responses carry HSTS but not `Content-Security-Policy`, `X-Frame-Options`, or `X-Content-Type-Options`. Consider adding these defense-in-depth headers to the SSR portals (relates to S11 security configuration, not S1/S3/S5). Only the root path was profiled.
+3. **Portal response headers:** ~~the root responses carry HSTS but not `Content-Security-Policy`, `X-Frame-Options`, or `X-Content-Type-Options`.~~ **DONE for the portals (2026-07-24, PR #569):** `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, and `Referrer-Policy: strict-origin-when-cross-origin` added to school-admin-web + admin (deployed + verified live) and the marketing static-hosting config (`firebase.json`). A full `Content-Security-Policy` remains **deferred** (needs nonce-based Next middleware; risks breaking the app) — a separate deliberate task. Relates to S11 security configuration, not S1/S3/S5.
 
 ---
 
