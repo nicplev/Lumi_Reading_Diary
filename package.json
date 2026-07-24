@@ -22,7 +22,7 @@
     "test:demo-readiness": "bash scripts/demo-readiness-local.sh"
   },
   "devDependencies": {
-    "firebase-admin": "^13.10.0",
+    "firebase-admin": "^14.2.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   },
