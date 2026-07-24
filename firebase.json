@@ -20,6 +20,9 @@
     {
       "target": "admin",
       "source": "admin",
+      "predeploy": [
+        "./scripts/check-csv-exports.sh"
+      ],
       "frameworksBackend": {
         "region": "australia-southeast1",
         "memory": "512MiB",
@@ -34,6 +37,9 @@
     {
       "target": "school",
       "source": "school-admin-web",
+      "predeploy": [
+        "./scripts/check-csv-exports.sh"
+      ],
       "frameworksBackend": {
         "region": "australia-southeast1",
         "memory": "512MiB",
