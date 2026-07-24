@@ -2763,6 +2763,21 @@ async function seedSchoolWithParentAndLog({ parentUid, otherParentUid }) {
         linkedChildren: ['student_1'],
       });
     }
+    // Deletes (and content updates) re-check the student's live access, so the
+    // seed needs the student doc a real log always has.
+    await db.collection('schools').doc('school_1').collection('students').doc('student_1').set({
+      schoolId: 'school_1',
+      classId: 'class_1',
+      firstName: 'Student',
+      lastName: 'One',
+      isActive: true,
+      access: {
+        status: 'active',
+        academicYear: 2026,
+        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        source: 'book_pack_assumed',
+      },
+    });
     await db.collection('schools').doc('school_1').collection('readingLogs').doc('log_1').set({
       schoolId: 'school_1',
       studentId: 'student_1',
