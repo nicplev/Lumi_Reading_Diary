@@ -30,6 +30,8 @@ export async function GET(
       targetId: sessionId,
     }).catch(console.error);
 
+    // csv-export-guardrail: pass-through — exportSessionAsCsv already encoded
+    // this with the formula-safe toCsvString.
     return new Response(csv, {
       status: 200,
       headers: {

@@ -13,6 +13,12 @@
 //
 // Numbers are emitted as-is: a numeric cell can't be a formula, and prefixing
 // a quote would corrupt legitimate values (e.g. a negative total).
+//
+// Mirrors admin/src/lib/utils/export.ts — keep the two in sync.
+// scripts/check-csv-exports.sh fails the build if either loses the formula
+// defence, or if a new export is written that bypasses these helpers.
+//
+// csv-export-guardrail: formula-safe-encoder
 
 const FORMULA_TRIGGER = /^[=+\-@\t\r]/;
 const NEEDS_QUOTING = /[",\n\r]/;

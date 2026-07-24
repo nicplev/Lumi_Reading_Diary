@@ -125,6 +125,8 @@ export function CSVImportDialog({ open, onClose, embedded }: CSVImportDialogProp
               <button
                 type="button"
                 onClick={() => {
+                  // csv-export-guardrail: static-template — hardcoded literals
+                  // only, no user or database data, so no injection surface.
                   const csv = [
                     'Student ID,First Name,Last Name,Class Name,Year Level,Parent Email,Reading Level',
                     'S10001,Jane,Smith,3A,3,jane.parent@email.com,Level 12',

@@ -79,6 +79,10 @@ jobs:
           flutter-version: 3.44.6
           channel: stable
           cache: true
+      # Cheap, dependency-free guardrails first — they fail in seconds rather
+      # than after the full install + Flutter suite.
+      - name: Guardrail — CSV exports are formula-safe (F-10)
+        run: ./scripts/check-csv-exports.sh
       - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
       - name: Install Functions dependencies

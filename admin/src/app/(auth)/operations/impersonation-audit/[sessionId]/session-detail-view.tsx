@@ -124,6 +124,8 @@ export function SessionDetailView({ initialSession, initialEvents }: Props) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? `HTTP ${res.status}`);
       }
+      // csv-export-guardrail: pass-through — the server already encoded this
+      // CSV with toCsvString (formula-safe); re-encoding here would double it.
       const text = await res.text();
       const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);

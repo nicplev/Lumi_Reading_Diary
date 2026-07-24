@@ -43,6 +43,8 @@ interface AccessStepData {
   recentBatches: RenewalBatchSummary[];
 }
 
+// csv-export-guardrail: static-template — hardcoded literals only, no user or
+// database data, so no injection surface.
 const TEMPLATE_CSV = [
   'Student ID,First Name,Last Name,Class Name,Year Level,Parent Email',
   'S10001,Jane,Smith,4A,4,',
