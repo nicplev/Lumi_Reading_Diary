@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lumi CASES21 Export Kit</title>
+<style>
+  :root {
+    --ink: #2c2a28;
+    --muted: #6b6560;
+    --cream: #faf6ef;
+    --paper: #ffffff;
+    --rule: #e6ded2;
+    --accent: #1f7a63;
+    --warn: #a8541c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 40px 24px 80px;
+    background: var(--cream);
+    color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  main { max-width: 780px; margin: 0 auto; }
+  header { border-bottom: 3px solid var(--accent); padding-bottom: 16px; margin-bottom: 32px; }
+  .eyebrow { text-transform: uppercase; letter-spacing: .08em; font-size: 12px; font-weight: 700; color: var(--accent); margin: 0 0 4px; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; }
+  h2 { font-size: 21px; margin: 36px 0 10px; }
+  h3 { font-size: 16px; margin: 24px 0 6px; }
+  p, li { color: var(--ink); }
+  .lede { color: var(--muted); margin: 0; }
+  ol.steps { padding-left: 0; list-style: none; counter-reset: step; }
+  ol.steps > li { counter-increment: step; position: relative; padding: 0 0 18px 46px; }
+  ol.steps > li::before {
+    content: counter(step);
+    position: absolute; left: 0; top: 0;
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    font-weight: 700; font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  ol.steps h3 { margin: 3px 0 4px; }
+  code, kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
+  code { background: #efe8dc; padding: 1px 5px; border-radius: 4px; }
+  .path { background: var(--paper); border: 1px solid var(--rule); border-radius: 8px; padding: 10px 14px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 4px; font-size: 14.5px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .req { color: var(--accent); font-weight: 700; }
+  .callout { background: var(--paper); border: 1px solid var(--rule); border-left: 4px solid var(--accent); border-radius: 8px; padding: 14px 16px; margin: 18px 0; }
+  .callout.warn { border-left-color: var(--warn); }
+  .callout p:first-child { margin-top: 0; }
+  .callout p:last-child { margin-bottom: 0; }
+  dl.faq dt { font-weight: 700; margin-top: 18px; }
+  dl.faq dd { margin: 4px 0 0; color: var(--muted); }
+  footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--rule); color: var(--muted); font-size: 13.5px; }
+  @media print {
+    body { background: #fff; padding: 0; font-size: 11.5pt; }
+    .callout, .path, table { break-inside: avoid; }
+    h2 { break-after: avoid; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <p class="eyebrow">Lumi Reading</p>
+  <h1>CASES21 Export Kit</h1>
+  <p class="lede">How to get your student roster out of CASES21 and into Lumi — for first-time setup and for the annual class rollover. Version 1.1.</p>
+</header>
+
+<h2>What you'll do</h2>
+<ol class="steps">
+  <li>
+    <h3>Open the CASES21 SQL worksheet</h3>
+    <p>Follow this menu path:</p>
+    <p class="path">Utilities → MAZE → View and Report Data → Worksheet → SQL editor</p>
+  </li>
+  <li>
+    <h3>Run the Lumi query</h3>
+    <p>Paste in the whole of <code>lumi-cases21-export-kit.sql</code> (downloaded from the same place as this guide) and run it. You should see one row per currently-enrolled student, sorted by year level then home group.</p>
+  </li>
+  <li>
+    <h3>Export the results to Excel</h3>
+    <p>Use the worksheet's <strong>export to Microsoft Excel</strong> option. Nothing needs editing afterwards — please don't rename or reorder the columns.</p>
+  </li>
+  <li>
+    <h3>Upload it to Lumi</h3>
+    <p>In Lumi go to <strong>Students</strong>, then:</p>
+    <ul>
+      <li><strong>Setting up for the first time</strong> — choose <em>Import CSV</em></li>
+      <li><strong>Moving to a new school year</strong> — choose <em>School Year Transition</em></li>
+    </ul>
+    <p>Upload the Excel file exactly as it was saved. Lumi shows you what it read before anything is saved, and a year rollover can be undone afterwards.</p>
+  </li>
+</ol>
+
+<div class="callout">
+  <p><strong>Three ways to hand Lumi the data — all equally fine.</strong></p>
+  <p>Upload the <code>.xlsx</code> straight from Excel; or <em>Save As → CSV (Comma delimited)</em> and upload that; or select the rows in Excel, copy, and use Lumi's <strong>Paste from Excel</strong> box. Use whichever is easiest.</p>
+</div>
+
+<h2>The columns Lumi reads</h2>
+<table>
+  <thead>
+    <tr><th>Column</th><th>Comes from</th><th>Required</th><th>Notes</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Student ID</td><td><code>ST.STKEY</code></td><td>Recommended</td><td>How Lumi recognises a returning student each year, so their reading history and parent accounts stay attached.</td></tr>
+    <tr><td>First Name</td><td><code>ST.FIRST_NAME</code></td><td class="req">Yes</td><td></td></tr>
+    <tr><td>Last Name</td><td><code>ST.SURNAME</code></td><td class="req">Yes</td><td></td></tr>
+    <tr><td>Class Name</td><td><code>ST.HOME_GROUP</code></td><td class="req">Yes</td><td>Imported exactly as written, so <code>00A</code> stays <code>00A</code>. Classes that don't exist in Lumi yet are created for you.</td></tr>
+    <tr><td>Year Level</td><td><code>ST.SCHOOL_YEAR</code></td><td>Recommended</td><td>CASES21 stores Foundation as <strong>0</strong>; the query converts it to <code>Prep</code>.</td></tr>
+    <tr><td>Parent Email</td><td><code>DF.E_MAIL_A</code>, else <code>E_MAIL_B</code></td><td>First-time setup only</td><td>Siblings share a family record, so the same address repeating is expected.</td></tr>
+  </tbody>
+</table>
+<p class="lede">Column order doesn't matter and extra columns are ignored. The uppercase headings the worksheet produces are read correctly.</p>
+
+<div class="callout">
+  <p><strong>Doing the annual rollover rather than first-time setup?</strong></p>
+  <p>Parent emails aren't needed — Lumi already has them. The SQL file ends with a five-column variant that leaves contact details out of the export entirely.</p>
+</div>
+
+<h2>If something looks wrong</h2>
+<dl class="faq">
+
+  <dt>Lumi says it can't find First Name, Last Name or Class Name</dt>
+  <dd>The heading row is missing. Re-export including headings, or when pasting, start the selection at the heading row.</dd>
+
+  <dt>Some students show "Missing required fields"</dt>
+  <dd>Those students have no home group in CASES21. Assign one there and re-export, or exclude those rows in Lumi's review step.</dd>
+
+  <dt>A student appears twice, or Lumi refuses a duplicate ID</dt>
+  <dd>Two CASES21 records share one student key. Lumi won't guess between them — correct it in CASES21 and re-export.</dd>
+
+  <dt>Lots of students are flagged as having left the school</dt>
+  <dd>The export is probably incomplete — one campus or one year level only. Check the row count against your enrolment before confirming. For a large number, Lumi asks you to tick an extra confirmation.</dd>
+
+  <dt>Next year's Prep students are missing</dt>
+  <dd>They're in CASES21 with a <em>future</em> enrolment status. The SQL file has a commented option that includes them — swap the <code>WHERE</code> line as shown.</dd>
+
+  <dt>The query returns an error mentioning CAST</dt>
+  <dd>Your CASES21 version handles the year-level conversion differently. The SQL file's header comment shows a one-line replacement; Lumi reads that form too.</dd>
+
+  <dt>Lumi won't accept the file</dt>
+  <dd>Lumi reads <code>.xlsx</code>, not the older <code>.xls</code>. In Excel choose <em>File → Save As → Excel Workbook (.xlsx)</em>.</dd>
+
+</dl>
+
+<div class="callout warn">
+  <p><strong>Before you send the file anywhere</strong></p>
+  <p>This export contains student names and, for first-time setup, family email addresses. Upload it to Lumi directly rather than emailing it, and delete the file from your computer once the import is confirmed.</p>
+</div>
+
+<footer>
+  Lumi CASES21 Export Kit v1.1 · Pairs with <code>lumi-cases21-export-kit.sql</code> ·
+  Stuck? Contact Lumi support with the row count you expected and the message Lumi showed you.
+</footer>
+
+</main>
+</body>
+</html>

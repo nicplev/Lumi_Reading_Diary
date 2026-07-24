@@ -8,6 +8,7 @@ const rowSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
   className: z.string().min(1),
+  yearLevel: z.string().optional(),
   parentEmail: z.string().optional(),
   readingLevel: z.string().optional(),
 });

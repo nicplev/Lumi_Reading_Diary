@@ -1,13 +1,15 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { PageHeader } from '@/components/lumi/page-header';
 import { Button } from '@/components/lumi/button';
 import { Badge } from '@/components/lumi/badge';
 import { Icon } from '@/components/lumi/icon';
 import { ConfirmDialog } from '@/components/lumi/confirm-dialog';
 import { useToast } from '@/components/lumi/toast';
-import { parseCSV, matchHeader } from '@/lib/csv';
+import { SisImportInput, SisDetectionSummary } from '@/components/sis-import-input';
+import { CASES21KitPanel } from '@/components/cases21-kit-panel';
+import type { SisParseResult } from '@/lib/sis/detect';
 import type { RolloverCSVRow } from '@/lib/rollover/classify';
 import type { RolloverAction, RolloverPlan, RolloverCommitResult } from '@/lib/rollover/plan';
 import type { RolloverPreview, RolloverImportSummary } from '@/lib/firestore/rollover';
@@ -48,6 +50,9 @@ const TEMPLATE_CSV = [
   ',Zoe,Nguyen,Prep B,Prep,zoe.parent@email.com',
 ].join('\n');
 
+/** Max rows accepted in one import — mirrors the preview API's limit. */
+const MAX_IMPORT_ROWS = 2000;
+
 export function RolloverWizard({
   classes,
   currentAcademicYear,
@@ -59,12 +64,13 @@ export function RolloverWizard({
   recentRenewalBatches,
 }: RolloverWizardProps) {
   const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<WizardStep>('upload');
   const targetYear = targetAcademicYear;
   const [preview, setPreview] = useState<RolloverPreview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  /** What we made of the uploaded file — surfaced on the review step. */
+  const [parseResult, setParseResult] = useState<SisParseResult | null>(null);
 
   // Review-step resolutions.
   const [rowRes, setRowRes] = useState<Record<number, RowResolution>>({});
@@ -117,70 +123,34 @@ export function RolloverWizard({
 
   // ── Upload ─────────────────────────────────────────────────────────────────
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const text = ev.target?.result as string;
-      const { headers, rows } = parseCSV(text);
-      const mapping: Record<number, string> = {};
-      headers.forEach((h, i) => {
-        const field = matchHeader(h);
-        if (field) mapping[i] = field;
-      });
-      const parsed: RolloverCSVRow[] = rows.map((r) => {
-        const obj: Record<string, string> = {};
-        headers.forEach((_, i) => {
-          const field = mapping[i];
-          if (field) obj[field] = r[i] ?? '';
-        });
-        return {
-          studentId: obj.studentId || undefined,
-          firstName: obj.firstName ?? '',
-          lastName: obj.lastName ?? '',
-          className: obj.className ?? '',
-          yearLevel: obj.yearLevel || undefined,
-          parentEmail: obj.parentEmail || undefined,
-          readingLevel: obj.readingLevel || undefined,
-        };
-      });
+  const handleParsed = async (result: SisParseResult) => {
+    const parsed: RolloverCSVRow[] = result.rows;
+    if (parsed.length > MAX_IMPORT_ROWS) {
+      throw new Error(`Maximum ${MAX_IMPORT_ROWS} rows per import — that file has ${parsed.length}`);
+    }
 
-      if (parsed.length === 0) {
-        toast('No rows found in that file', 'error');
-        return;
+    setLoadingPreview(true);
+    try {
+      const res = await fetch('/api/rollover/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows: parsed, targetAcademicYear: targetYear }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Preview failed');
       }
-      if (parsed.length > 2000) {
-        toast('Maximum 2000 rows per import', 'error');
-        return;
-      }
-
-      setLoadingPreview(true);
-      try {
-        const res = await fetch('/api/rollover/preview', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ rows: parsed, targetAcademicYear: targetYear }),
-        });
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || 'Preview failed');
-        }
-        const data: RolloverPreview = await res.json();
-        setPreview(data);
-        setRowRes({});
-        setMissingRes({});
-        setDeactivateIds(new Set());
-        setArchiveGuardChecked(false);
-        setStep('review');
-      } catch (error) {
-        toast(error instanceof Error ? error.message : 'Preview failed', 'error');
-      } finally {
-        setLoadingPreview(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      }
-    };
-    reader.readAsText(file);
+      const data: RolloverPreview = await res.json();
+      setPreview(data);
+      setParseResult(result);
+      setRowRes({});
+      setMissingRes({});
+      setDeactivateIds(new Set());
+      setArchiveGuardChecked(false);
+      setStep('review');
+    } finally {
+      setLoadingPreview(false);
+    }
   };
 
   const downloadTemplate = () => {
@@ -322,6 +292,7 @@ export function RolloverWizard({
       setUndoTarget(null);
       setStep('upload');
       setPreview(null);
+      setParseResult(null);
       setResult(null);
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Undo failed', 'error');
@@ -340,7 +311,7 @@ export function RolloverWizard({
         description={`Move the roster from ${currentAcademicYear} to ${targetAcademicYear}, then grant reading access in one guided workflow`}
         action={
           step !== 'upload' && step !== 'applying' && step !== 'access' ? (
-            <Button variant="outline" onClick={() => { setStep('upload'); setPreview(null); setResult(null); setAccessResult(null); }}>
+            <Button variant="outline" onClick={() => { setStep('upload'); setPreview(null); setParseResult(null); setResult(null); setAccessResult(null); }}>
               Start over
             </Button>
           ) : undefined
@@ -363,7 +334,7 @@ export function RolloverWizard({
             <h3 className="font-bold text-ink mb-2">Step 1: update the {targetAcademicYear} roster</h3>
             <ol className="text-sm text-muted space-y-1.5 list-decimal ml-4 mb-4">
               <li>Export class lists from your school system (CASES21, Compass…) with student IDs.</li>
-              <li>Paste them into the Lumi template — one row per student, returning and new.</li>
+              <li>Upload that export as-is, or paste it straight out of Excel — Lumi reads the columns for you.</li>
               <li>Returning students are matched by Student ID and moved to their new class — parent accounts stay linked.</li>
               <li>Students not in the file are flagged as graduated or left, for you to confirm.</li>
             </ol>
@@ -372,14 +343,21 @@ export function RolloverWizard({
               <p>After it completes, this same workflow refreshes the active roster and asks you to grant {targetAcademicYear} reading access. Run the roster import outside class time if possible because classes reorganise live.</p>
             </div>
 
-            <input ref={fileInputRef} type="file" accept=".csv,.tsv,.txt" onChange={handleFileSelect} className="hidden" />
-            <div className="flex items-center gap-4">
-              <Button onClick={() => fileInputRef.current?.click()} disabled={loadingPreview}>
-                {loadingPreview ? 'Analysing…' : 'Choose CSV File'}
-              </Button>
-              <button type="button" onClick={downloadTemplate} className="text-sm text-section hover:underline font-semibold">
-                Download CSV Template
-              </button>
+            <SisImportInput
+              onParsed={handleParsed}
+              busy={loadingPreview}
+              busyLabel="Analysing…"
+              fileButtonLabel="Choose file"
+            >
+              <div className="mt-4">
+                <button type="button" onClick={downloadTemplate} className="text-sm text-section hover:underline font-semibold">
+                  Download CSV template
+                </button>
+              </div>
+            </SisImportInput>
+
+            <div className="mt-5 pt-5 border-t border-rule">
+              <CASES21KitPanel />
             </div>
             <div className="mt-5 pt-5 border-t border-rule">
               <p className="text-sm text-muted mb-2">Already updated classes and leavers manually?</p>
@@ -431,6 +409,11 @@ export function RolloverWizard({
               It&apos;s outside the usual rollover window (October–February) — double-check the school year is right: {preview.targetAcademicYear}.
             </div>
           )}
+          {parseResult && (
+            <div className="mb-4">
+              <SisDetectionSummary result={parseResult} />
+            </div>
+          )}
           <ReviewStep
             preview={preview}
             classes={classes}
@@ -442,7 +425,7 @@ export function RolloverWizard({
             setDeactivateIds={setDeactivateIds}
           />
           <div className="flex justify-end gap-3 mt-6">
-            <Button variant="outline" onClick={() => { setStep('upload'); setPreview(null); }}>Back</Button>
+            <Button variant="outline" onClick={() => { setStep('upload'); setPreview(null); setParseResult(null); }}>Back</Button>
             <Button onClick={() => setStep('confirm')}>Continue</Button>
           </div>
         </>
@@ -588,7 +571,7 @@ export function RolloverWizard({
                 Review remaining access
               </Button>
               {!accessResult?.hasMore && (
-                <Button onClick={() => { setStep('upload'); setPreview(null); setResult(null); setAccessResult(null); }}>
+                <Button onClick={() => { setStep('upload'); setPreview(null); setParseResult(null); setResult(null); setAccessResult(null); }}>
                   Done
                 </Button>
               )}
