@@ -236,6 +236,7 @@ upstream-tracked (see the register and `VULNERABILITY_ASSESSMENT_REPORT_2026-07-
 | SAST (semgrep) | `.github/workflows/sast-semgrep.yml` |
 | Dependency updates | `.github/dependabot.yml` |
 | Rules-as-code tests | `functions/test/firestore.rules.test.js`, `functions/test/security_poc.rules.test.js`, `functions/test/storage.rules.test.js` |
+| Regression guardrails (fail-closed) | `scripts/check-storage-rules.sh`, `scripts/check-csv-exports.sh` — run in CI **and** `firebase.json` predeploy; each blocks a specific defect class from recurring (Storage-rules→Firestore reads; CSV/formula injection, F-10) |
 | Release review gate | `docs/privacy/RELEASE_PRIVACY_SECURITY_REVIEW.md` |
 | Admin auto-deploy + identity guard | `.github/workflows/admin-deploy.yml`, `infra/iam/audit-admin-build-identity.sh` |
 | Findings register / assessment | `docs/security/FINDINGS_REGISTER.md`, `docs/security/VULNERABILITY_ASSESSMENT_REPORT_2026-07-24.md` |
