@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
+import '../../../services/analytics_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -117,6 +121,7 @@ class _SessionDetailSheetState extends ConsumerState<_SessionDetailSheet> {
     setState(() => _busy = true);
     try {
       await ReadingLogService.instance.deleteOwnLog(log);
+      unawaited(AnalyticsService.instance.logSessionRemoved());
       if (!mounted) return;
       Navigator.of(context).pop();
       showLumiToast(

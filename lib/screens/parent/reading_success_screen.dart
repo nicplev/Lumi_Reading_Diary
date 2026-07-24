@@ -345,6 +345,7 @@ class _ReadingSuccessScreenState extends ConsumerState<ReadingSuccessScreen>
     if (confirmed != true || !mounted) return;
     try {
       await ReadingLogService.instance.deleteOwnLog(widget.readingLog);
+      unawaited(AnalyticsService.instance.logSessionRemoved());
       if (!mounted) return;
       showLumiToast(message: 'Log removed', type: LumiToastType.info);
       _goHome();

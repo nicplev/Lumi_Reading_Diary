@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
+import '../../../services/analytics_service.dart';
 
 import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../data/models/reading_log_model.dart';
@@ -164,6 +168,7 @@ class _BookPickerSheetState extends State<_BookPickerSheet> {
         // The choice still returns; pinning is a convenience, not a gate.
       }
     }
+    unawaited(AnalyticsService.instance.logBookChooserUsed());
     if (!mounted) return;
     Navigator.of(context).pop(BookPickerResult(title: title, pin: pin));
   }

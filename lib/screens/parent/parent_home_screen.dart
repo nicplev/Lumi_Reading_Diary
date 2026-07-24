@@ -36,6 +36,7 @@ import '../../data/providers/school_settings_provider.dart';
 import '../../data/providers/user_provider.dart';
 import '../../services/book_cover_cache_service.dart';
 import '../../services/firebase_service.dart';
+import '../../services/analytics_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/offline_service.dart';
 import '../../services/reading_log_service.dart';
@@ -1072,6 +1073,7 @@ class _TodayCardState extends State<_TodayCard> {
     if (log == null) return;
     try {
       await ReadingLogService.instance.deleteOwnLog(log);
+      unawaited(AnalyticsService.instance.logQuickLogUndone());
       if (!mounted) return;
       setState(() => _lastQuickLogId = null);
       announceForAccessibility(context, ParentLoggingCopy.undoDone);
@@ -1162,6 +1164,7 @@ class _TodayCardState extends State<_TodayCard> {
       context.push('/parent/log-reading');
     } on QuickSlotTakenException catch (e) {
       // Someone else won the day's default session — nothing was written.
+      unawaited(AnalyticsService.instance.logQuickSlotRejected());
       if (!mounted) return;
       setState(() => _isQuickLogging = false);
       showLumiToast(
@@ -2172,6 +2175,7 @@ class _TonightRowState extends State<_TonightRow> {
       _openDetail(allocations);
     } on QuickSlotTakenException catch (e) {
       // Someone else won the day's default session — nothing was written.
+      unawaited(AnalyticsService.instance.logQuickSlotRejected());
       if (!mounted) return;
       setState(() => _isQuickLogging = false);
       showLumiToast(
@@ -2191,6 +2195,7 @@ class _TonightRowState extends State<_TonightRow> {
   Future<void> _undoQuickLog(ReadingLogModel log) async {
     try {
       await ReadingLogService.instance.deleteOwnLog(log);
+      unawaited(AnalyticsService.instance.logQuickLogUndone());
       if (!mounted) return;
       setState(() => _lastQuickLogId = null);
       announceForAccessibility(context, ParentLoggingCopy.undoDone);
