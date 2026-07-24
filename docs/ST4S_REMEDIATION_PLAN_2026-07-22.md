@@ -373,6 +373,7 @@ Not needed for a Ready outcome; each removes a "medium risk" note in the Full As
 | 2026-07-24 | A2 (Phase 1.1) | Passwords enforced at 14+/complexity everywhere: temp-pw generators 12→16+symbol, portal Add-Staff min-6→14, shared app+portal validators; Firebase console password policy set to Require/min-14/all-4-classes. Portal + `processStaffOnboardingEmail` deployed. A2 now true across all surfaces. | #554 | ☑ |
 | 2026-07-24 | Q5 | Low-severity hardening: SAST-01 (super-admin MFA-crypto GCM `authTagLength` pin + truncated-tag rejection) and F-07 (books/lookup strict ISBN validation + per-user rate limit) fixed. Each deploys with its portal. | #557 + F-07 | ☑ |
 | 2026-07-24 | A5/S4/A13 | F-04 defence-in-depth: fail-closed `assertSuperAdmin` guard added inside the 5 destructive super-admin server-ops (were single-layer, gated only by the portal route). Deployed via admin-deploy. | #561 | ☑ |
+| 2026-07-24 | EV11 / EV10 | Vulnerability Assessment Report produced (`docs/security/VULNERABILITY_ASSESSMENT_REPORT_2026-07-24.md`) — full findings, remediation + verification, ST4S mapping. Satisfies EV11; interim input to EV10 (independent external pen test still outstanding). | — | ☑ (EV11) |
 
 ---
 
