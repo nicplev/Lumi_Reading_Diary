@@ -9,7 +9,7 @@ Status markers: ☐ not started · ◐ in progress · 🔍 under test / awaiting
 
 ## ▶ Where we're up to (one glance)
 
-- **Now:** **F-01/F-02/F-03 fixed + deployed** (rules live in prod, PR #520). **A2 passwords done + deployed** (PR #554, `2b29e9a`): the 3 temp-pw generators are 16-char/symbol, portal "Add Staff" enforces 14+/complexity (shared validator), and the Firebase console password policy is set to **Require / min 14 / all four classes** (confirmed by screenshot) — A2 is now true across every surface. Portal + `processStaffOnboardingEmail` deployed; app-side Dart validators ship with the next app release.
+- **Now:** **All code-security findings fixed + deployed** (F-01/02/03, A2, SAST-01, F-07, F-04); **S1/S3/S5 verified** (Wave 3 TLS scan); **EV11 report** produced; portal security headers deployed. **15 technical/policy evidence docs drafted** in the `docs/st4s-evidence-pack` worktree (pending review + sign-off). The security-code assessment is complete; what remains is document sign-off + your real-world tasks (GO1/GO2 officer letters, WWCC, access register, restore drill, external pen test EV10).
 - **Boundary held:** no active production testing; Wave 3 (passive prod TLS scan) stays parked for an explicit hostname exception. Prod deploys (rules, portal, function) were done under explicit user authorisation.
 - **Left:** the documents/evidence-pack workstream (running in the `docs/st4s-evidence-pack` worktree; first 3 technical docs drafted); the independent external pen test (EV10 — needs booking, scoping pack ready); F-05 App Check (launch-gated). **All code-security findings fixed + deployed; Wave 3 TLS scan done (S1/S3/S5 ✔).** (F-06/F-08 accept-as-designed; cross-tenant CG-sweep proven in #520.)
 
@@ -81,10 +81,10 @@ Owner tags: **[SEC]** this security orchestration · **[DOC]** separate document
 | A2 | Password strength & storage | Answered Yes, not true | [SEC]+[NIC] | ☑ **done + deployed** (code #554 + console policy Require/14/all-classes) | 1.1 |
 | A5 | MFA for privileged accounts | Not Ready | [NIC]+[SEC] | ☐ verify portal enforcement | 2.2 |
 | A13 | Deny-by-default access | Ready | [SEC] | 🔍 validating (W1/W2) | — |
-| A7 | Access review/revocation | Not Ready | [NIC]+[DOC] | ☐ | 2.4 / 4 |
+| A7 | Access review/revocation | Not Ready | [NIC]+[DOC] | ◐ register template drafted; Nic populates + reviews | 2.4 / 4 |
 | T1 | Monitoring + annual pen test | Not Ready | [SEC]+[DOC]+[NIC] | ◐ Monitoring Plan drafted; scans live; external pen test (EV10) outstanding | 0.2 / 5 |
 | T2 | Centrally managed patching | Not Ready | [SEC]+[DOC] | ◐ Dependabot live + EV12 patch process drafted | 4 / 5 |
-| T3 | Patch deadlines 14d/48h | Ready (see honesty list) | [DOC] | ☐ | 4 / 5 |
+| T3 | Patch deadlines 14d/48h | Ready (see honesty list) | [DOC] | ◐ EV12 patch process drafted | 4 / 5 |
 | Q5 | Security testing per framework | Ready (med risk) | [SEC] | ◐ | 0.2 / 5 |
 | AP1 | Scan every deploy + monthly | Not Ready | [SEC] | ☐ (Wave 5) | 5 |
 | AP2 | Mobile tested per MASTG | Not Ready | [SEC] | ☐ (Wave 4) | 5.4 |
@@ -92,13 +92,13 @@ Owner tags: **[SEC]** this security orchestration · **[DOC]** separate document
 | EV10 | Penetration-test report | Not Ready | [SEC] interim + external final | ◐ interim assessment report done; independent external test still outstanding | 4 |
 | EV11 | Vulnerability-assessment reports | Not Ready | [SEC] | ☑ report produced (`VULNERABILITY_ASSESSMENT_REPORT_2026-07-24.md`) | 4 / 5 |
 | Privacy/T&C consent (web portals) | Not captured in portals | [SEC] code + [DOC] policy | ☐ | 1.2 / 6.5 |
-| EV6–EV9, EV12, EV13 | Policy pack (InfoSec/BCP/DR/IRP/patch/SSDLC) | Not Ready | **[DOC]** | ◐ EV13/EV12/EV9 + monitoring/access-control **drafted** (evidence-pack worktree), pending review+sign-off; EV6/EV7/EV8 pending | 4 |
-| HR1/HR2/HR3 | Screening / training / offboarding | Not Ready | [NIC]+[DOC] | ☐ separate | 0.1 / 4 |
+| EV6–EV9, EV12, EV13 | Policy pack (InfoSec/BCP/DR/IRP/patch/SSDLC) | Not Ready | **[DOC]** | ◐ **all drafted** (EV6/EV7/EV8/EV9/EV12/EV13, evidence-pack worktree), pending review+sign-off (GO1/GO2 letters, restore drill) | 4 |
+| HR1/HR2/HR3 | Screening / training / offboarding | Not Ready | [NIC]+[DOC] | ◐ standards drafted (HR pack); need Nic's WWCC + dated training + register | 0.1 / 4 |
 | GO1/GO2 | Named security & privacy officers | Not Ready | [NIC]+[DOC] | ☐ separate | 0.3 |
-| PR2 | Privacy policy content | Not Ready | **[DOC]** | ☐ separate | 6.1 |
-| PR10 | Data shared with third parties | Not Ready (answered Yes) | **[DOC]** | ☐ separate | 6.3 |
-| PR17 | Sub-processors described publicly | Ready (med risk) | **[DOC]** | ☐ separate | 6.2 |
-| INT7 | Written data agreements | Not Ready | [NIC]+[DOC] | ☐ separate | 6.4 |
+| PR2 | Privacy policy content | Not Ready | **[DOC]** | ◐ rewrite drafted (adviser sign-off + APP 8 gate) | 6.1 |
+| PR10 | Data shared with third parties | Not Ready (answered Yes) | **[DOC]** | ◐ audit drafted → answer "No"; adviser to confirm | 6.3 |
+| PR17 | Sub-processors described publicly | Ready (med risk) | **[DOC]** | ◐ sub-processor table drafted; DPA reviews pending | 6.2 |
+| INT7 | Written data agreements | Not Ready | [NIC]+[DOC] | ◐ DPA-record template drafted; Nic files acceptances | 6.4 |
 
 ---
 
@@ -134,3 +134,4 @@ A control-assertion document may only be written once the control is **true and 
 | 2026-07-24 | **F-04 done + deployed** (PR #561 / `6d5b795`): fail-closed `assertSuperAdmin` on the 5 destructive super-admin server-ops (offboard/grantDevAccess/manageParent/bulkDeleteParents/manageSchoolUserAuth); `authority.parity.test.ts` green in admin-ci; auto-deployed via admin-deploy. **This closes the last code-security finding — all are now fixed and deployed.** |
 | 2026-07-24 | **Wave 3 (passive prod TLS scan) done** (authorised). All 6 Lumi endpoints: TLS 1.0/1.1 rejected, 1.2/1.3 supported, TLS 1.3 negotiated with AES-GCM, valid CA certs, HSTS present → S1/S3/S5 ✔. Evidence: `TLS_CRYPTO_PROFILE_2026-07-24.md`. Also: evidence-pack worktree stood up; first 3 technical docs (EV13 / monitoring / access-control) drafted. |
 | 2026-07-24 | **Header hardening done + technical evidence docs drafted.** nosniff / X-Frame-Options / Referrer-Policy added to both portals (deployed + verified) + marketing config (PR #569). Evidence-pack now has **5 drafted technical docs** — EV13 SSDLC, Monitoring Plan (T1), Access Control Policy (A6/A7/A13), EV12 Patch Management (T2/T3), EV9 Incident Response (T6/T7) — pending review + sign-off (GO1/GO2 letters still needed). |
+| 2026-07-24 | **Full evidence pack drafted (15 docs total).** Added EV6 InfoSec Policy, EV7 BCP, EV8 DR, device standard (A10), HR pack (HR1/2/3), access register (A7), sub-processor table (PR17), data-sharing audit (PR10), privacy policy rewrite (PR2 — adviser), INT7 record. All DRAFTS on `docs/st4s-evidence-pack` (commit `1e15d67`). Recurring blockers: GO1/GO2 letters unsigned, restore drill + WWCC + register + DPA acceptances pending, APP 8 sign-off, Cloudflare/support-mailbox not yet in the vendor register. |

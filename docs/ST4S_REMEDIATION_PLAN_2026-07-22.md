@@ -376,6 +376,7 @@ Not needed for a Ready outcome; each removes a "medium risk" note in the Full As
 | 2026-07-24 | EV11 / EV10 | Vulnerability Assessment Report produced (`docs/security/VULNERABILITY_ASSESSMENT_REPORT_2026-07-24.md`) — full findings, remediation + verification, ST4S mapping. Satisfies EV11; interim input to EV10 (independent external pen test still outstanding). | — | ☑ (EV11) |
 | 2026-07-24 | S1/S3/S5 (Phase 3) | Authorised passive TLS scan of all 6 public endpoints: TLS 1.2+ only (1.0/1.1 rejected), TLS 1.3 + AES-GCM, valid CA certs (Google Trust Services / Let's Encrypt), HSTS. Crypto profile: `docs/security/TLS_CRYPTO_PROFILE_2026-07-24.md`. S1/S3/S5 can take the strong TLS option. | — | ☑ |
 | 2026-07-24 | S11 / Phase 4 | Portal security headers (nosniff / X-Frame-Options / Referrer-Policy) deployed to both portals + marketing (#569). Five technical evidence docs **drafted** in the evidence-pack worktree (pending sign-off): EV13 SSDLC, Monitoring Plan (T1), Access Control Policy (A6/A7/A13), EV12 Patch Management (T2/T3), EV9 Incident Response (T6/T7). | #569 | ◐ drafts |
+| 2026-07-24 | Phase 4 + 6 | Full technical+policy evidence pack drafted (15 docs, `docs/st4s-evidence-pack`): + EV6 InfoSec Policy, EV7 BCP, EV8 DR, device standard (A10), HR pack (HR1/2/3), access register (A7), sub-processor table (PR17), data-sharing audit (PR10 → "No"), privacy policy rewrite (PR2, adviser), INT7 record. All DRAFT — pending review + sign-off + Nic's real-world tasks (officer letters, WWCC, register, restore drill, DPA acceptances). | — | ◐ drafts |
 
 ---
 
