@@ -23,6 +23,9 @@ import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../core/tour/lumi_app_tour.dart';
 import '../../core/services/navigation_state_service.dart';
+import '../../core/utils/motion.dart';
+import '../../core/utils/school_time.dart';
+import '../../data/providers/school_time_provider.dart';
 import '../../data/models/achievement_model.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
@@ -46,18 +49,8 @@ import 'widgets/add_email_for_recovery_modal.dart';
 import 'widgets/character_picker_sheet.dart';
 import 'widgets/parent_child_switcher.dart';
 import 'widgets/widget_undo_banner.dart';
-
-/// Copy for the "someone else won the day's default session" outcome. The
-/// loser's tap wrote NOTHING — this must say so plainly. Falls back to a
-/// nameless variant when the winning log isn't readable.
-String quickSlotTakenMessage(QuickSlotTakenException e) {
-  final winner = e.existingLog;
-  if (winner != null) {
-    return '${winner.loggedByDisplay} logged ${winner.minutesRead} min '
-        'moments ago. No new session was added.';
-  }
-  return 'Tonight is already logged. No new session was added.';
-}
+import 'widgets/child_log_row.dart';
+import 'parent_logging_copy.dart';
 
 /// Vertical space the floating glass nav occupies above the safe-area inset.
 /// Scroll content reserves this so the last item clears the bar.
@@ -518,11 +511,26 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
             _scheduleAwardCelebration(children);
             final activeChild =
                 ref.watch(activeChildProvider).value ?? children.first;
+            final schoolIds = {
+              for (final child in children) child.schoolId,
+            };
             final quickLoggingBySchoolId = {
-              for (final schoolId in {
-                for (final child in children) child.schoolId,
-              })
+              for (final schoolId in schoolIds)
                 schoolId: ref.watch(quickLoggingEnabledProvider(schoolId)),
+            };
+            // School-local day per school: the day-boundary authority for
+            // occurredOn stamping, the Home "today" window and the quick-slot
+            // date. schoolTodayProvider re-emits at school-local midnight so
+            // Home rolls over without an app restart (§6.5).
+            final timezoneBySchoolId = {
+              for (final schoolId in schoolIds)
+                schoolId: ref.watch(schoolTimezoneProvider(schoolId)),
+            };
+            final schoolTodayBySchoolId = {
+              for (final entry in timezoneBySchoolId.entries)
+                entry.key:
+                    ref.watch(schoolTodayProvider(entry.value)).value ??
+                        SchoolTime.todayFor(entry.value),
             };
             _scheduleWidgetDeepLinkHandling(children);
             return LumiTourScope(
@@ -554,6 +562,9 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                                   children,
                                   quickLoggingBySchoolId:
                                       quickLoggingBySchoolId,
+                                  timezoneBySchoolId: timezoneBySchoolId,
+                                  schoolTodayBySchoolId:
+                                      schoolTodayBySchoolId,
                                 ),
                               ),
                               // Library section (yellow). Its scroll views add
@@ -770,6 +781,8 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     StudentModel selectedChild,
     List<StudentModel> children, {
     required Map<String, bool> quickLoggingBySchoolId,
+    required Map<String, String> timezoneBySchoolId,
+    required Map<String, String> schoolTodayBySchoolId,
   }) {
     return SafeArea(
       child: CustomScrollView(
@@ -864,25 +877,43 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                 if (children.length == 1)
                   LumiTourTarget(
                     id: 'parent.readingCard',
-                    child: _ChildTodayCard(
-                      student: children.first,
-                      parent: widget.user,
-                      quickLoggingEnabled:
-                          quickLoggingBySchoolId[children.first.schoolId] ??
-                              true,
-                      onViewHistory: () => unawaited(
-                        _showReadingHistoryFor(children.first),
-                      ),
-                    ).animate().fadeIn().scale(),
+                    child: Builder(builder: (context) {
+                      final card = _ChildTodayCard(
+                        student: children.first,
+                        parent: widget.user,
+                        quickLoggingEnabled:
+                            quickLoggingBySchoolId[children.first.schoolId] ??
+                                true,
+                        timezone:
+                            timezoneBySchoolId[children.first.schoolId] ??
+                                SchoolTime.defaultTimezone,
+                        onViewHistory: () => unawaited(
+                          _showReadingHistoryFor(children.first),
+                        ),
+                      );
+                      // Respect Reduce Motion (§3.6).
+                      return context.motionAllowed
+                          ? card.animate().fadeIn().scale()
+                          : card;
+                    }),
                   )
                 else
                   LumiTourTarget(
                     id: 'parent.readingCard',
-                    child: _TonightMultiCard(
-                      children: children,
-                      parent: widget.user,
-                      quickLoggingBySchoolId: quickLoggingBySchoolId,
-                    ).animate().fadeIn(),
+                    child: Builder(builder: (context) {
+                      final card = _TonightMultiCard(
+                        children: children,
+                        parent: widget.user,
+                        quickLoggingBySchoolId: quickLoggingBySchoolId,
+                        timezoneBySchoolId: timezoneBySchoolId,
+                        schoolTodayBySchoolId: schoolTodayBySchoolId,
+                        onReviewChild: (student) =>
+                            unawaited(_showReadingHistoryFor(student)),
+                      );
+                      return context.motionAllowed
+                          ? card.animate().fadeIn()
+                          : card;
+                    }),
                   ),
 
                 LumiGap.m,
@@ -953,6 +984,9 @@ class _TodayCard extends StatefulWidget {
   final bool quickLoggingEnabled;
   final VoidCallback onViewHistory;
 
+  /// School IANA timezone — day-boundary authority for occurredOn stamping.
+  final String timezone;
+
   /// Opens the full detail wizard.
   final VoidCallback? onTap;
 
@@ -965,6 +999,7 @@ class _TodayCard extends StatefulWidget {
     this.todayLogs = const [],
     required this.quickLoggingEnabled,
     required this.onViewHistory,
+    this.timezone = SchoolTime.defaultTimezone,
     this.onTap,
   });
 
@@ -974,6 +1009,10 @@ class _TodayCard extends StatefulWidget {
 
 class _TodayCardState extends State<_TodayCard> {
   bool _isQuickLogging = false;
+
+  /// The id my most recent quick log from THIS card returned — the immediate,
+  /// confirmation-free undo layer targets exactly this session (§3.3/§5).
+  String? _lastQuickLogId;
 
   StudentModel get student => widget.student;
   List<AllocationModel> get activeAllocations => widget.activeAllocations;
@@ -1011,6 +1050,42 @@ class _TodayCardState extends State<_TodayCard> {
 
   String get _quickLogLabel => 'Quick log $_targetMinutes min';
 
+  /// Whether a one-tap log has anything legitimate to attribute — mirrors
+  /// the service's union resolution. Empty ⇒ the affordance becomes
+  /// "Choose book" (a title is never fabricated).
+  bool get _hasResolvableBook => _firstAssignedTitle != null;
+
+  /// The just-created session this guardian may still undo in one tap.
+  ReadingLogModel? get _undoableLog {
+    final id = _lastQuickLogId;
+    if (id == null) return null;
+    for (final log in todayLogs) {
+      if (log.id == id && log.parentId == widget.parent.id) return log;
+    }
+    return null;
+  }
+
+  Future<void> _handleUndoQuickLog() async {
+    final log = _undoableLog;
+    if (log == null) return;
+    try {
+      await ReadingLogService.instance.deleteOwnLog(log);
+      if (!mounted) return;
+      setState(() => _lastQuickLogId = null);
+      announceForAccessibility(context, ParentLoggingCopy.undoDone);
+      showLumiToast(
+        message: ParentLoggingCopy.undoDone,
+        type: LumiToastType.info,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      showLumiToast(
+        message: "Couldn't undo — please try again.",
+        type: LumiToastType.error,
+      );
+    }
+  }
+
   /// Records a default reading log for today in a single tap (Rec 1).
   Future<void> _handleQuickLog() async {
     if (_isQuickLogging) return;
@@ -1042,8 +1117,20 @@ class _TodayCardState extends State<_TodayCard> {
         parent: widget.parent,
         allocations: activeAllocations,
         quickLog: true,
+        schoolTimezone: widget.timezone,
       );
       if (!mounted) return;
+      // Remember the exact session for the one-tap undo shown when the
+      // parent returns from the celebration screen.
+      setState(() {
+        _lastQuickLogId = result.log.id;
+        _isQuickLogging = false;
+      });
+      announceForAccessibility(
+        context,
+        ParentLoggingCopy.semanticsSaved(
+            result.log.minutesRead, student.firstName),
+      );
       context.go('/parent/reading-success', extra: {
         'student': student,
         'parent': widget.parent,
@@ -1061,9 +1148,8 @@ class _TodayCardState extends State<_TodayCard> {
         type: LumiToastType.info,
       );
     } on NoCurrentBookException {
-      // No resolvable book: never fabricate a title — send the parent to the
-      // detailed flow to choose one. (PR-D replaces this with the row-level
-      // "Choose book" state.)
+      // No resolvable book: never fabricate a title — choose one in the
+      // detailed flow instead (row-level Choose book covers the usual path).
       if (!mounted) return;
       setState(() => _isQuickLogging = false);
       NavigationStateService().setTempData({
@@ -1077,7 +1163,7 @@ class _TodayCardState extends State<_TodayCard> {
       if (!mounted) return;
       setState(() => _isQuickLogging = false);
       showLumiToast(
-        message: quickSlotTakenMessage(e),
+        message: ParentLoggingCopy.slotLost(e),
         type: LumiToastType.info,
       );
     } catch (_) {
@@ -1274,6 +1360,18 @@ class _TodayCardState extends State<_TodayCard> {
                   color: LumiTokens.red,
                 ),
               ),
+              // Immediate, confirmation-free undo of exactly the session this
+              // guardian just created — deliberately NOT where the quick-log
+              // button was, so a rapid second tap can't land on it (§3.3).
+              if (_undoableLog != null)
+                Center(
+                  child: LumiTextButton(
+                    onPressed: _handleUndoQuickLog,
+                    text: ParentLoggingCopy.undoMyQuickLog,
+                    icon: Icons.undo_rounded,
+                    color: LumiTokens.muted,
+                  ),
+                ),
             ] else ...[
               LumiPrimaryButton(
                 onPressed: _isQuickLogging ? null : onTap,
@@ -1285,15 +1383,32 @@ class _TodayCardState extends State<_TodayCard> {
               LumiGap.xxs,
               if (quickLoggingEnabled) ...[
                 Center(
-                  child: LumiTextButton(
-                    onPressed: _isQuickLogging ? null : _handleQuickLog,
-                    isLoading: _isQuickLogging,
-                    text: _quickLogLabel,
-                    icon: Icons.check_circle_outline,
-                    color: LumiTokens.red,
+                  child: Semantics(
+                    button: true,
+                    label: _hasResolvableBook
+                        ? ParentLoggingCopy.semanticsQuickLog(_targetMinutes,
+                            student.firstName, _firstAssignedTitle!)
+                        : '${ParentLoggingCopy.needsBookAction} '
+                            'for ${student.firstName}',
+                    excludeSemantics: true,
+                    child: LumiTextButton(
+                      onPressed: _isQuickLogging
+                          ? null
+                          : (_hasResolvableBook ? _handleQuickLog : onTap),
+                      isLoading: _isQuickLogging,
+                      // No resolvable book ⇒ the action says what it does:
+                      // choose one. A title is never fabricated (§4.1).
+                      text: _hasResolvableBook
+                          ? _quickLogLabel
+                          : ParentLoggingCopy.needsBookAction,
+                      icon: _hasResolvableBook
+                          ? Icons.check_circle_outline
+                          : Icons.menu_book_outlined,
+                      color: LumiTokens.red,
+                    ),
                   ),
                 ),
-                if (_firstAssignedTitle != null) ...[
+                if (_hasResolvableBook) ...[
                   LumiGap.xxs,
                   Center(
                     child: Text(
@@ -1353,12 +1468,14 @@ class _ChildTodayCard extends StatefulWidget {
   final StudentModel student;
   final UserModel parent;
   final bool quickLoggingEnabled;
+  final String timezone;
   final VoidCallback onViewHistory;
 
   const _ChildTodayCard({
     required this.student,
     required this.parent,
     required this.quickLoggingEnabled,
+    this.timezone = SchoolTime.defaultTimezone,
     required this.onViewHistory,
   });
 
@@ -1455,6 +1572,7 @@ class _ChildTodayCardState extends State<_ChildTodayCard> {
               hasLoggedToday: hasLoggedToday,
               todayLogs: todayLogs,
               quickLoggingEnabled: widget.quickLoggingEnabled,
+              timezone: widget.timezone,
               onViewHistory: widget.onViewHistory,
               onTap: () {
                 NavigationStateService().setTempData({
@@ -1650,11 +1768,17 @@ class _TonightMultiCard extends StatefulWidget {
   final List<StudentModel> children;
   final UserModel parent;
   final Map<String, bool> quickLoggingBySchoolId;
+  final Map<String, String> timezoneBySchoolId;
+  final Map<String, String> schoolTodayBySchoolId;
+  final void Function(StudentModel student) onReviewChild;
 
   const _TonightMultiCard({
     required this.children,
     required this.parent,
     required this.quickLoggingBySchoolId,
+    required this.timezoneBySchoolId,
+    required this.schoolTodayBySchoolId,
+    required this.onReviewChild,
   });
 
   @override
@@ -1751,19 +1875,30 @@ class _TonightMultiCardState extends State<_TonightMultiCard> {
             ),
           ),
           LumiGap.s,
+          // Rows render in linkedChildren order and are keyed by child id —
+          // logging one child NEVER reorders or resizes a sibling's row
+          // (§3.1 layout-stability invariant, locked by widget tests).
           for (int i = 0; i < children.length; i++) ...[
             if (i > 0) const Divider(height: 1, color: LumiTokens.rule),
             _TonightRow(
+              key: ValueKey(children[i].id),
               student: children[i],
               parent: parent,
               quickLoggingEnabled:
                   widget.quickLoggingBySchoolId[children[i].schoolId] ?? true,
+              timezone: widget.timezoneBySchoolId[children[i].schoolId] ??
+                  SchoolTime.defaultTimezone,
+              schoolToday:
+                  widget.schoolTodayBySchoolId[children[i].schoolId] ??
+                      SchoolTime.todayFor(
+                          widget.timezoneBySchoolId[children[i].schoolId]),
+              onReview: widget.onReviewChild,
               classAllocations: _classAllocSnaps[children[i].classId],
             ),
           ],
           LumiGap.xs,
-          // Teach both gestures: the row opens the richer flow, the circle is
-          // the one-tap shortcut.
+          // Teach both gestures: the row opens the richer flow, the labelled
+          // button is the one-tap shortcut.
           Row(
             children: [
               Icon(Icons.touch_app_outlined,
@@ -1772,7 +1907,7 @@ class _TonightMultiCardState extends State<_TonightMultiCard> {
               Expanded(
                 child: Text(
                   anyQuickLoggingEnabled
-                      ? 'Tap a name to add how it went · tap a circle where shown to log fast'
+                      ? 'Tap a name to add how it went · use the button to log fast'
                       : 'Tap a name to log reading details',
                   style: LumiType.caption.copyWith(
                     color: LumiTokens.muted,
@@ -1796,15 +1931,29 @@ class _TonightRow extends StatefulWidget {
   final UserModel parent;
   final bool quickLoggingEnabled;
 
+  /// School IANA timezone + the current school-local day ('YYYY-MM-DD') —
+  /// the day-boundary authority for the row's query window, state machine
+  /// and quick-slot date. schoolToday flips at school-local midnight.
+  final String timezone;
+  final String schoolToday;
+
+  /// Opens this child's session review (history) — the durable recovery
+  /// surface behind the Review action.
+  final void Function(StudentModel student) onReview;
+
   /// Latest whole-class allocations for this student's class, owned and
   /// deduped by [_TonightMultiCardState] (one listener per distinct class
   /// instead of one per sibling). Null until that listener's first snapshot.
   final QuerySnapshot? classAllocations;
 
   const _TonightRow({
+    super.key,
     required this.student,
     required this.parent,
     required this.quickLoggingEnabled,
+    required this.timezone,
+    required this.schoolToday,
+    required this.onReview,
     this.classAllocations,
   });
 
@@ -1813,27 +1962,20 @@ class _TonightRow extends StatefulWidget {
 }
 
 class _TonightRowState extends State<_TonightRow> {
-  late final Stream<QuerySnapshot> _todayLogsStream;
+  Stream<QuerySnapshot>? _todayLogsStream;
   late final Stream<QuerySnapshot> _allocationsStream;
   bool _isQuickLogging = false;
+
+  /// The id my most recent quick log from THIS row returned — the immediate
+  /// undo layer targets exactly this session. Cleared on day rollover.
+  String? _lastQuickLogId;
 
   @override
   void initState() {
     super.initState();
     final firestore = FirebaseService.instance.firestore;
     final schoolId = widget.parent.schoolId;
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-
-    _todayLogsStream = firestore
-        .collection('schools')
-        .doc(schoolId)
-        .collection('readingLogs')
-        .where('studentId', isEqualTo: widget.student.id)
-        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
-        .orderBy('date', descending: true)
-        .snapshots()
-        .asBroadcastStream();
+    _initTodayStream();
 
     // Allocations targeting this student specifically. Whole-class
     // allocations arrive via widget.classAllocations (shared per class by
@@ -1846,6 +1988,74 @@ class _TonightRowState extends State<_TonightRow> {
         .where('isActive', isEqualTo: true)
         .snapshots()
         .asBroadcastStream();
+  }
+
+  /// Query window = the school-local day ±1 day, membership decided
+  /// client-side by `occurredOn ?? derived-day` — so an offline log made
+  /// before midnight, a backdated session, or a device clock ahead of school
+  /// time all land in the right day (§6.5).
+  void _initTodayStream() {
+    final start = SchoolTime.utcRangeForLocalDay(
+      SchoolTime.shiftDays(widget.schoolToday, -1),
+      widget.timezone,
+    ).startInclusive;
+    final end = SchoolTime.utcRangeForLocalDay(
+      SchoolTime.shiftDays(widget.schoolToday, 1),
+      widget.timezone,
+    ).endExclusive;
+    _todayLogsStream = FirebaseService.instance.firestore
+        .collection('schools')
+        .doc(widget.parent.schoolId)
+        .collection('readingLogs')
+        .where('studentId', isEqualTo: widget.student.id)
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('date', isLessThan: Timestamp.fromDate(end))
+        .orderBy('date', descending: true)
+        .snapshots()
+        .asBroadcastStream();
+  }
+
+  @override
+  void didUpdateWidget(covariant _TonightRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.schoolToday != widget.schoolToday ||
+        oldWidget.timezone != widget.timezone) {
+      // School-local midnight rolled over (schoolTodayProvider) — re-derive
+      // the day window and retire yesterday's immediate-undo affordance.
+      setState(() {
+        _lastQuickLogId = null;
+        _initTodayStream();
+      });
+    }
+  }
+
+  List<ReadingLogModel> _todayFrom(AsyncSnapshot<QuerySnapshot> snapshot) {
+    if (!snapshot.hasData) return const [];
+    return snapshot.data!.docs
+        .map((doc) => ReadingLogModel.fromFirestore(doc))
+        .where((log) =>
+            (log.occurredOn ??
+                SchoolTime.localDateString(log.date, widget.timezone)) ==
+            widget.schoolToday)
+        .toList();
+  }
+
+  /// Union of the child's effective assigned titles (D3), deduped/sanitized —
+  /// the same resolution the service applies, so the row's preview and the
+  /// persisted payload can't drift apart.
+  List<String> _resolvedTitles(List<AllocationModel> allocations) {
+    final seen = <String>{};
+    final titles = <String>[];
+    for (final allocation in allocations) {
+      for (final item
+          in allocation.effectiveAssignmentItemsForStudent(widget.student.id)) {
+        final title = item.title.trim();
+        if (title.isEmpty) continue;
+        if (!seen.add(title.toLowerCase())) continue;
+        titles.add(IsbnAssignmentService.sanitizeDisplayTitle(title));
+      }
+    }
+    return titles;
   }
 
   List<AllocationModel> _activeFrom(AsyncSnapshot<QuerySnapshot> snapshot) {
@@ -1866,40 +2076,15 @@ class _TonightRowState extends State<_TonightRow> {
     return result;
   }
 
-  String _summary(List<AllocationModel> allocations) {
-    final target =
-        allocations.isNotEmpty ? allocations.first.targetMinutes : 20;
-    String? book;
-    for (final allocation in allocations) {
-      for (final item
-          in allocation.effectiveAssignmentItemsForStudent(widget.student.id)) {
-        final title = item.title.trim();
-        if (title.isNotEmpty) {
-          book = IsbnAssignmentService.sanitizeDisplayTitle(title);
-          break;
-        }
-      }
-      if (book != null) break;
-    }
-    return book != null ? '$target min · $book' : '$target min · Any book';
-  }
-
   Future<void> _quickLog(List<AllocationModel> allocations) async {
     if (_isQuickLogging) return;
-    if (!widget.quickLoggingEnabled) {
-      showLumiToast(
-        message:
-            'Quick log is turned off by your school. Tap the name to add details.',
-        type: LumiToastType.info,
-      );
-      return;
-    }
     // Access gate — route to the log-reading gate (→ AccessLockedScreen) rather
     // than attempting a write the licence no longer permits (endless retry).
     if (!widget.student.hasActiveAccess) {
       _openDetail(allocations);
       return;
     }
+    // Lock synchronously at the moment of the tap (§3.3 step 1).
     setState(() => _isQuickLogging = true);
     try {
       final result = await ReadingLogService.instance.logReading(
@@ -1907,8 +2092,18 @@ class _TonightRowState extends State<_TonightRow> {
         parent: widget.parent,
         allocations: allocations,
         quickLog: true,
+        schoolTimezone: widget.timezone,
       );
       if (!mounted) return;
+      setState(() {
+        _lastQuickLogId = result.log.id;
+        _isQuickLogging = false;
+      });
+      announceForAccessibility(
+        context,
+        ParentLoggingCopy.semanticsSaved(
+            result.log.minutesRead, widget.student.firstName),
+      );
       context.go('/parent/reading-success', extra: {
         'student': widget.student,
         'parent': widget.parent,
@@ -1926,8 +2121,7 @@ class _TonightRowState extends State<_TonightRow> {
         type: LumiToastType.info,
       );
     } on NoCurrentBookException {
-      // No resolvable book: open the detailed flow to choose one — a title
-      // is never fabricated. (PR-D replaces this with "Choose book".)
+      // Defensive — the row shows "Choose book" before this can fire.
       if (!mounted) return;
       setState(() => _isQuickLogging = false);
       _openDetail(allocations);
@@ -1936,7 +2130,7 @@ class _TonightRowState extends State<_TonightRow> {
       if (!mounted) return;
       setState(() => _isQuickLogging = false);
       showLumiToast(
-        message: quickSlotTakenMessage(e),
+        message: ParentLoggingCopy.slotLost(e),
         type: LumiToastType.info,
       );
     } catch (_) {
@@ -1944,6 +2138,25 @@ class _TonightRowState extends State<_TonightRow> {
       setState(() => _isQuickLogging = false);
       showLumiToast(
         message: "Couldn't log reading. Please try again.",
+        type: LumiToastType.error,
+      );
+    }
+  }
+
+  Future<void> _undoQuickLog(ReadingLogModel log) async {
+    try {
+      await ReadingLogService.instance.deleteOwnLog(log);
+      if (!mounted) return;
+      setState(() => _lastQuickLogId = null);
+      announceForAccessibility(context, ParentLoggingCopy.undoDone);
+      showLumiToast(
+        message: ParentLoggingCopy.undoDone,
+        type: LumiToastType.info,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      showLumiToast(
+        message: "Couldn't undo — please try again.",
         type: LumiToastType.error,
       );
     }
@@ -1963,12 +2176,7 @@ class _TonightRowState extends State<_TonightRow> {
     return StreamBuilder<QuerySnapshot>(
       stream: _todayLogsStream,
       builder: (context, logSnapshot) {
-        final todayLogs = logSnapshot.hasData
-            ? logSnapshot.data!.docs
-                .map((doc) => ReadingLogModel.fromFirestore(doc))
-                .toList()
-            : <ReadingLogModel>[];
-        final hasLoggedToday = todayLogs.isNotEmpty;
+        final todayLogs = _todayFrom(logSnapshot);
 
         return StreamBuilder<QuerySnapshot>(
           stream: _allocationsStream,
@@ -1978,133 +2186,45 @@ class _TonightRowState extends State<_TonightRow> {
               allocations,
               FirebaseService.instance.firestore,
             );
-            // A "full" entry: feeling, a recording, or a note was added —
-            // earns a gentle mark (positive recognition; quick logs are never
-            // penalised for its absence).
-            final hasDetail = todayLogs.any((log) =>
-                log.childFeeling != null ||
-                log.comprehensionAudioPath != null ||
-                (log.parentComment != null && log.parentComment!.isNotEmpty));
+            final titles = _resolvedTitles(allocations);
+            final usualMinutes = allocations.isNotEmpty
+                ? allocations.first.targetMinutes
+                : 20;
 
-            return InkWell(
-              onTap: _isQuickLogging ? null : () => _openDetail(allocations),
-              borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Row(
-                  children: [
-                    StudentAvatar.fromStudent(widget.student, size: 44),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.student.firstName,
-                            style: LumiType.body
-                                .copyWith(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              if (hasLoggedToday && hasDetail) ...[
-                                const Icon(Icons.auto_awesome,
-                                    size: 12, color: LumiTokens.green),
-                                const SizedBox(width: 4),
-                              ],
-                              Flexible(
-                                child: Text(
-                                  hasLoggedToday
-                                      ? '${todayLogs.fold<int>(0, (total, log) => total + log.minutesRead)} min read today'
-                                      : _summary(allocations),
-                                  style: LumiType.caption
-                                      .copyWith(color: LumiTokens.muted),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Chevron signals the row opens the full detail flow —
-                    // the richer path. The circle beside it is the shortcut.
-                    const Icon(Icons.chevron_right_rounded,
-                        color: LumiTokens.muted, size: 20),
-                    if (widget.quickLoggingEnabled) ...[
-                      const SizedBox(width: 6),
-                      _LogCircle(
-                        done: hasLoggedToday,
-                        loading: _isQuickLogging,
-                        onTap: hasLoggedToday || _isQuickLogging
-                            ? null
-                            : () => _quickLog(allocations),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+            final state = deriveChildLogRowState(
+              student: widget.student,
+              todayLogs: todayLogs,
+              resolvedBookTitles: titles,
+              usualMinutes: usualMinutes,
+              quickLoggingEnabled: widget.quickLoggingEnabled,
+              submitting: _isQuickLogging,
+              myUid: widget.parent.id,
+              justCreatedLogId: _lastQuickLogId,
+            );
+
+            final undoable = state is RowJustCreatedByMe ? state.log : null;
+
+            return ChildLogRow(
+              key: ValueKey(widget.student.id),
+              student: widget.student,
+              state: state,
+              onOpenDetail: () {
+                if (!_isQuickLogging) _openDetail(allocations);
+              },
+              onQuickLog: () => _quickLog(allocations),
+              onChooseBook: () => _openDetail(allocations),
+              onUndo:
+                  undoable == null ? null : () => _undoQuickLog(undoable),
+              onReview: () => widget.onReview(widget.student),
+              dateMismatchNote: SchoolTime.deviceDayDiffers(widget.timezone)
+                  ? ParentLoggingCopy.dateMismatchNote(
+                      DateFormat('EEE d MMM').format(
+                          DateTime.parse('${widget.schoolToday}T12:00:00')))
+                  : null,
             );
           },
         );
       },
-    );
-  }
-}
-
-/// The tap target on a Tonight row: a hollow red ring before logging, a filled
-/// green check once done, a spinner mid-log.
-class _LogCircle extends StatelessWidget {
-  final bool done;
-  final bool loading;
-  final VoidCallback? onTap;
-
-  const _LogCircle({
-    required this.done,
-    required this.loading,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final Widget inner;
-    if (loading) {
-      inner = const SizedBox(
-        width: 22,
-        height: 22,
-        child: CircularProgressIndicator(
-          strokeWidth: 2.5,
-          color: LumiTokens.red,
-        ),
-      );
-    } else if (done) {
-      inner = Container(
-        width: 40,
-        height: 40,
-        decoration: const BoxDecoration(
-          color: LumiTokens.green,
-          shape: BoxShape.circle,
-        ),
-        child:
-            const Icon(Icons.check_rounded, color: LumiTokens.paper, size: 24),
-      );
-    } else {
-      inner = Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: LumiTokens.red, width: 2),
-        ),
-        child: Icon(Icons.check_rounded,
-            color: LumiTokens.red.withValues(alpha: 0.35), size: 22),
-      );
-    }
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(width: 44, height: 44, child: Center(child: inner)),
     );
   }
 }

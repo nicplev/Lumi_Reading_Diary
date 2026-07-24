@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/school_time.dart';
 import 'access_provider.dart';
 import 'active_child_provider.dart';
 
@@ -28,6 +29,16 @@ final quickLoggingEnabledProvider =
   if (schoolId.isEmpty) return true;
   final school = ref.watch(schoolByIdProvider(schoolId)).value;
   return school?.quickLoggingSettings.enabled ?? true;
+});
+
+/// The school's IANA timezone — the day-boundary authority for logging
+/// (occurredOn stamping, the Home "today" window, the quick-slot date).
+/// Falls back to the server default while the school stream loads.
+final schoolTimezoneProvider = Provider.family<String, String>((ref, schoolId) {
+  if (schoolId.isEmpty) return SchoolTime.defaultTimezone;
+  final school = ref.watch(schoolByIdProvider(schoolId)).value;
+  final tz = school?.timezone;
+  return (tz == null || tz.isEmpty) ? SchoolTime.defaultTimezone : tz;
 });
 
 /// Live platform-wide emergency switch for comprehension audio.
