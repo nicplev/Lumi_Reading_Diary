@@ -50,7 +50,7 @@ export interface PublicDeletionStatus {
   retrying: boolean;
 }
 
-type Counts = Record<string, number>;
+export type Counts = Record<string, number>;
 
 function deletionRuntime(
   options: Pick<CallableOptions, "timeoutSeconds" | "memory">
@@ -162,7 +162,10 @@ function errorCode(error: unknown): string {
   return "internal";
 }
 
-async function deleteStorageFile(path: string, counts: Counts): Promise<void> {
+export async function deleteStorageFile(
+  path: string,
+  counts: Counts
+): Promise<void> {
   try {
     await admin.storage().bucket().file(path).delete({ignoreNotFound: true});
     bump(counts, "storageObjectsDeleted");
@@ -174,7 +177,7 @@ async function deleteStorageFile(path: string, counts: Counts): Promise<void> {
 
 // AI comprehension-eval artifacts for a log: the teacher-only eval doc and
 // the deny-all pipeline job. Deleted whenever the log itself is deleted.
-async function deleteAiEvalArtifacts(
+export async function deleteAiEvalArtifacts(
   schoolId: string,
   logId: string,
   counts: Counts

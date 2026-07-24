@@ -39,8 +39,10 @@ import {
   computeGentleStreak,
   computeLongestStreak,
   countInWindow,
+  isValidOccurredOn,
   localDateString,
   parseTermDates,
+  resolveOccurrenceDate,
   shiftDays,
 } from "./dateUtils";
 import {DEFAULT_TIMEZONE} from "./access";
@@ -58,6 +60,7 @@ import {runStreakRefreshPass} from "./streak_refresh";
 import {runStateTermDatesFillPass} from "./term_dates_fallback";
 import {
   reconcileClassDailyReadingPass,
+  schoolTimezone as getSchoolTimezone,
   syncReadingLogDailySummary,
 } from "./class_daily_reading";
 
@@ -210,6 +213,9 @@ export {grantAccessOnStudentCreate} from "./whole_school_access";
 export {processInvoiceEmail} from "./invoice_email";
 export {renewStudents, annualRollover} from "./renewals";
 export {topReaderAward} from "./top_reader_award";
+// Dependent-data cascade for single reading-log deletes (undo / remove-my-
+// session / widget-undo / admin): comments, audio, AI evals, quick slot.
+export {onReadingLogDeleted} from "./reading_log_cleanup";
 export {submitDemoRequest, submitContactSalesInquiry} from "./marketing_leads";
 
 // Daily cleanup for comprehension audio + per-row teacher/school-admin
@@ -352,7 +358,8 @@ export const aggregateStudentStats = onDocumentWritten(
 
         if (logData.date) {
           const ts = logData.date as admin.firestore.Timestamp;
-          readingDates.add(localDateString(ts.toDate(), tz));
+          readingDates.add(
+            resolveOccurrenceDate(logData.occurredOn, ts.toDate(), tz));
           if (!lastReadingDate || ts.toMillis() > lastReadingDate.toMillis()) {
             lastReadingDate = ts;
           }
@@ -1406,12 +1413,17 @@ async function processSchool(
       .where("studentId", "in", batch)
       .where("date", ">=", windowStartTs)
       .where("date", "<", windowEndTs)
-      .select("studentId", "date")
+      .select("studentId", "date", "occurredOn")
       .get();
     snap.docs.forEach((d) => {
       const ts = d.data().date as admin.firestore.Timestamp | undefined;
       const dt = ts?.toDate?.();
-      if (!dt || localDateString(dt, schoolTz) !== todayStr) return;
+      // Bucket by occurredOn when present: a session backdated to yesterday
+      // must NOT suppress tonight's reminder.
+      if (!dt ||
+        resolveOccurrenceDate(d.data().occurredOn, dt, schoolTz) !== todayStr) {
+        return;
+      }
       loggedToday.add(d.data().studentId as string);
     });
   }));
@@ -2179,6 +2191,40 @@ export const validateReadingLog = onDocumentCreated(
     const parentLinked = studentData?.parentIds?.includes(logData.parentId);
     if (!isTeacherProxy && studentData && !parentLinked) {
       validationErrors.push("Parent not linked to this student");
+    }
+
+    // occurredOn (school-local occurrence day) consistency: rules can only
+    // shape-check it (no timezone math there), so the timezone-aware window
+    // check lives here. Allowed: the day derived from the `date` timestamp,
+    // the previous day (explicit Yesterday backdating), or the next day
+    // (device clock ahead of school time). Anything further off means the
+    // stated day can't be trusted for streaks/awards.
+    if (logData.occurredOn != null) {
+      if (!isValidOccurredOn(logData.occurredOn)) {
+        validationErrors.push("occurredOn must be YYYY-MM-DD");
+      } else if (logData.date) {
+        const tz = await getSchoolTimezone(schoolId);
+        const derived = localDateString(
+          (logData.date as admin.firestore.Timestamp).toDate(), tz);
+        const allowed = [shiftDays(derived, -1), derived, shiftDays(derived, 1)];
+        if (!allowed.includes(logData.occurredOn)) {
+          validationErrors.push(
+            "occurredOn is more than one day from the log timestamp");
+        }
+      }
+    }
+
+    // Telemetry for the retired fabricated-title fallback: pre-redesign
+    // clients quick-logging a child with no assignment wrote a literal
+    // ['Reading'] placeholder. Log-based metric measures the old-client tail
+    // so the post-adoption rules hardening can be timed with evidence.
+    // (No identifiers — see log_safety guardrail.)
+    if (Array.isArray(logData.bookTitles) &&
+      logData.bookTitles.length === 1 &&
+      logData.bookTitles[0] === "Reading") {
+      functions.logger.info("legacy_fabricated_title_log", {
+        quickLog: logData.metadata?.quickLog === true,
+      });
     }
 
     // If validation fails, mark the log as invalid. Valid logs get NO write:

@@ -107,3 +107,63 @@ test('date added to a previously undated log must be processed', () => {
   const before = countedLog({ date: undefined });
   assert.equal(isStatsNoopUpdate(change(before, countedLog())), false);
 });
+
+// ─── occurredOn (parent-logging redesign) ─────────────────────────────────────
+
+test('occurredOn change must be processed (moves the day bucket)', () => {
+  const before = countedLog({ occurredOn: '2026-07-24' });
+  const after = countedLog({ occurredOn: '2026-07-23' });
+  assert.equal(isStatsNoopUpdate(change(before, after)), false);
+});
+
+test('identical occurredOn stays a no-op for stats-irrelevant edits', () => {
+  const before = countedLog({ occurredOn: '2026-07-24' });
+  const after = countedLog({ occurredOn: '2026-07-24', teacherComment: 'Nice' });
+  assert.equal(isStatsNoopUpdate(change(before, after)), true);
+});
+
+// ─── extractCountedFields — occurredOn wins the day bucket ────────────────────
+
+const { extractCountedFields } = require('../lib/stats_aggregation.js');
+
+// extractCountedFields calls date.toDate(); give the fake a real instant.
+// 21:00 UTC on the 23rd = 07:00 AEST on the 24th.
+const instantTs = {
+  toDate: () => new Date('2026-07-23T21:00:00Z'),
+  toMillis: () => new Date('2026-07-23T21:00:00Z').getTime(),
+};
+
+test('extractCountedFields buckets by occurredOn when present', () => {
+  const fields = extractCountedFields({
+    status: 'completed',
+    date: instantTs,
+    occurredOn: '2026-07-23', // guardian backdated to yesterday
+    minutesRead: 30,
+    bookTitles: ['Zog', 'Dog Man'],
+  }, 'Australia/Sydney');
+  assert.equal(fields.localDate, '2026-07-23');
+  assert.equal(fields.minutes, 30);
+  assert.equal(fields.books, 2);
+});
+
+test('extractCountedFields derives the school-local day for legacy logs', () => {
+  const fields = extractCountedFields({
+    status: 'completed',
+    date: instantTs,
+    minutesRead: 15,
+    bookTitles: [],
+  }, 'Australia/Sydney');
+  assert.equal(fields.localDate, '2026-07-24'); // derived in school tz
+  assert.equal(fields.books, 0); // unresolved-title sessions add no books
+});
+
+test('extractCountedFields ignores a malformed occurredOn', () => {
+  const fields = extractCountedFields({
+    status: 'completed',
+    date: instantTs,
+    occurredOn: 'yesterday',
+    minutesRead: 15,
+    bookTitles: ['Zog'],
+  }, 'Australia/Sydney');
+  assert.equal(fields.localDate, '2026-07-24');
+});
