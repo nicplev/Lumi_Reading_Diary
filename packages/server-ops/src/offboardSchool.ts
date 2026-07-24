@@ -1,6 +1,7 @@
 import type { Firestore, WriteBatch } from "firebase-admin/firestore";
 import { z } from "zod";
 import { logAuditEvent, ServerOpsValidationError, type Actor } from "./audit";
+import { assertSuperAdmin } from "./authority";
 
 const OFFBOARD_SUBCOLLECTIONS = [
   "users",
@@ -86,6 +87,7 @@ export async function offboardSchoolStep(
   actor: Actor,
   params: OffboardSchoolStepParams
 ): Promise<OffboardSchoolStepResult> {
+  await assertSuperAdmin(db, actor.uid);
   const { schoolId } = params;
   if (!schoolId || typeof schoolId !== "string") {
     throw new ServerOpsValidationError("schoolId is required");

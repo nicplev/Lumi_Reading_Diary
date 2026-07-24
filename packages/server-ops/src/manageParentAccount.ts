@@ -4,6 +4,7 @@ import type { Firestore } from "firebase-admin/firestore";
 import { FieldValue } from "firebase-admin/firestore";
 import { z } from "zod";
 import { logAuditEvent, ServerOpsValidationError, type Actor } from "./audit";
+import { assertSuperAdmin } from "./authority";
 
 // Parent accounts span three systems: Firebase Auth (the account, keyed by uid,
 // which also owns the enrolled MFA phone factor), the school-scoped parent doc
@@ -285,6 +286,7 @@ export async function manageParentAccount(
   actor: Actor,
   params: ManageParentAccountParams
 ): Promise<ManageParentAccountResult> {
+  await assertSuperAdmin(db, actor.uid);
   const parsed = paramsSchema.safeParse(params);
   if (!parsed.success) {
     throw new ServerOpsValidationError(
@@ -439,6 +441,7 @@ export async function bulkDeleteParents(
   actor: Actor,
   params: { items: { schoolId: string; parentId: string }[] }
 ): Promise<BulkDeleteParentsResult> {
+  await assertSuperAdmin(db, actor.uid);
   const parsed = bulkParamsSchema.safeParse(params);
   if (!parsed.success) {
     throw new ServerOpsValidationError(
