@@ -6,19 +6,19 @@ Connect. App: **Lumi** (`com.lumi.lumiReadingTracker`), v1.0.0.
 ## 1. Privacy
 | Requirement | Where | Status |
 |---|---|---|
-| Privacy Policy URL (live, public) | https://lumi-school-admin-au.web.app/legal/privacy → `school-admin-web/src/app/legal/privacy/page.tsx` | Built; **deploy portal to go live** |
+| Privacy Policy URL (live, public) | https://lumi-reading.com/legal/privacy → `marketing-site/src/app/legal/privacy/page.tsx` | Live on the marketing site; **deploy `hosting:marketing` after any edit** |
 | App Privacy labels (App Store Connect questionnaire) | `docs/app-store/app-privacy-labels.md` | Answers ready to paste |
 | Privacy Manifest in the build | `ios/Runner/PrivacyInfo.xcprivacy` (wired into the Runner target) | Done |
 
 ## 2. Terms / EULA
 | Requirement | Where | Status |
 |---|---|---|
-| EULA (custom Terms of Use) | https://lumi-school-admin-au.web.app/legal/terms → `school-admin-web/src/app/legal/terms/page.tsx`; paste URL/text into App Store Connect EULA field | Built; **deploy + paste URL** |
+| EULA (custom Terms of Use) | https://lumi-reading.com/legal/terms → `marketing-site/src/app/legal/terms/page.tsx`; paste URL/text into App Store Connect EULA field | Live on the marketing site; **paste URL into App Store Connect** |
 
 ## 3. Support & contact
 | Requirement | Where | Status |
 |---|---|---|
-| Support URL (public) | https://lumi-school-admin-au.web.app/support → `school-admin-web/src/app/support/page.tsx` | Built; **deploy portal** |
+| Support URL (public) | https://lumi-reading.com/support → `marketing-site/src/app/support/page.tsx` | Live on the marketing site; **deploy `hosting:marketing` after any edit** |
 | Contact email | support@lumi-reading.com (on Support page + App Store Connect) | Done |
 | In-app access to the above | Privacy / Terms / Support links in the parent + teacher "About Lumi" dialogs | Done |
 

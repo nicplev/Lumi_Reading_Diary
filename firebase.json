@@ -61,6 +61,23 @@
         "**/.*",
         "**/node_modules/**"
       ],
+      "redirects": [
+        {
+          "source": "/privacy",
+          "destination": "/legal/privacy",
+          "type": 301
+        },
+        {
+          "source": "/terms",
+          "destination": "/legal/terms",
+          "type": 301
+        },
+        {
+          "source": "/legal",
+          "destination": "/legal/privacy",
+          "type": 301
+        }
+      ],
       "rewrites": [
         {
           "source": "/.well-known/apple-app-site-association",

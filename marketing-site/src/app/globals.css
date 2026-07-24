@@ -32,7 +32,14 @@
   --color-ink-faint: #857E73;
   --color-rule: #ECE7DD;
 
+  /* Portal-compatible aliases. The legal/support pages moved here from the
+     school portal (school-admin-web) so they are reachable without a login,
+     and their markup uses the portal's token names. Keeping the aliases lets
+     those pages stay byte-identical to the reviewed originals. */
+  --color-muted: #857E73;
+
   --font-heading: "Nunito", sans-serif;
+  --font-display: "Nunito", sans-serif;
   --font-body: "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 

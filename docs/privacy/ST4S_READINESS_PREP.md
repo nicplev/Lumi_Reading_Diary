@@ -99,7 +99,7 @@ request a demo account.
 
 | ST4S ask | Existing Lumi artifact |
 |---|---|
-| Privacy policy content controls (PR series) | Portal/app privacy policy (`school-admin-web/src/app/legal/privacy/page.tsx`) + AI section draft pending counsel |
+| Privacy policy content controls (PR series) | Portal/app privacy policy (`marketing-site/src/app/legal/privacy/page.tsx`) + AI section draft pending counsel |
 | Data-flow / subprocessor register (EV19, P12) | `docs/privacy/VENDOR_DATA_FLOW_REGISTER.md` — near submission-ready |
 | Hosting locations incl. all environments (H1, H2) | `docs/security/AU_RESOURCE_LOCATION_AUDIT_2026-07-17.md` + vendor-evidence residency capture (2026-07-20). Must be extended to state backup/DR/test/dev locations explicitly |
 | PIA | `docs/privacy/PRIVACY_IMPACT_ASSESSMENT.md` + AI section draft |

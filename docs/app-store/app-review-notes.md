@@ -48,14 +48,16 @@ access, the two logins above, and two sample reading logs. It is idempotent.
 > advertising, or tracking.
 
 ## Other review-readiness reminders
-- **Privacy Policy URL:** https://lumi-school-admin-au.web.app/legal/privacy
-- **Support URL:** https://lumi-school-admin-au.web.app/support
+- **Privacy Policy URL:** https://lumi-reading.com/legal/privacy
+- **Support URL:** https://lumi-reading.com/support
 - **EULA:** custom Terms of Use — paste
-  https://lumi-school-admin-au.web.app/legal/terms into the EULA field (or its
+  https://lumi-reading.com/legal/terms into the EULA field (or its
   full text).
 - **Contact email:** support@lumi-reading.com
-- These pages must be **live** before submitting — deploy the school portal
-  (`firebase deploy --only hosting:school`).
+- These pages must be **live** before submitting — deploy the marketing site
+  (`firebase deploy --only hosting:marketing`). They moved off the school
+  portal so no login can ever sit in front of them; the old portal URLs
+  308-redirect here for builds already on devices.
 - **Account deletion (Guideline 5.1.1(v)):** the Support page documents how a
   user requests deletion via support@lumi-reading.com. If review asks for an
   in-app deletion entry point, add a "Request account deletion" link in Settings.

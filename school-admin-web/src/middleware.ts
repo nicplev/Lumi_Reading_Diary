@@ -2,10 +2,33 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
-// Unauthenticated routes: the session-cookie API endpoints, plus the public
-// legal/support pages (Privacy Policy, Terms of Use, Support) that the mobile
-// app links to and that Apple App Review must reach without signing in.
+// Unauthenticated routes: the session-cookie API endpoints, plus the legal and
+// support paths. The pages themselves now live on the marketing site (see
+// LEGAL_REDIRECTS below) but these entries stay as a backstop so a legal/support
+// URL can never fall through to the admin login redirect.
 const publicPaths = ['/api/auth/session', '/api/auth/logout', '/legal', '/support'];
+
+/**
+ * The Privacy Policy, Terms of Use and Support pages moved to the marketing
+ * site (lumi-reading.com), which is static hosting with no auth middleware in
+ * front of it. They were public here too, but every *near-miss* path on this
+ * host — `/privacy`, `/terms`, a typo — hit the catch-all below and landed the
+ * visitor on the admin login, which reads as "the policy is gated".
+ *
+ * These redirects are permanent and must not be removed: already-installed app
+ * builds have this origin compiled into `lib/core/constants/legal_links.dart`,
+ * and the App Store / Play listings may still point here.
+ */
+const LEGAL_BASE = 'https://lumi-reading.com';
+const LEGAL_REDIRECTS: Record<string, string> = {
+  '/legal': `${LEGAL_BASE}/legal/privacy`,
+  '/legal/privacy': `${LEGAL_BASE}/legal/privacy`,
+  '/legal/terms': `${LEGAL_BASE}/legal/terms`,
+  '/support': `${LEGAL_BASE}/support`,
+  // Guessable aliases that used to dead-end on the admin login.
+  '/privacy': `${LEGAL_BASE}/legal/privacy`,
+  '/terms': `${LEGAL_BASE}/legal/terms`,
+};
 
 /**
  * API paths that MUST be reachable even with non-GET methods during an active
@@ -50,6 +73,17 @@ async function getSessionData(sessionValue: string): Promise<Record<string, unkn
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Legal/support pages now live on the marketing domain. This runs before the
+  // public-path check (and well before the login catch-all) so both the old
+  // canonical URLs and the near-miss aliases resolve for everyone, signed in or
+  // not. Trailing slashes are normalised so `/support/` redirects too.
+  const normalisedPath =
+    pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+  const legalDestination = LEGAL_REDIRECTS[normalisedPath];
+  if (legalDestination) {
+    return NextResponse.redirect(legalDestination, 308);
+  }
 
   // Allow public paths
   if (publicPaths.some((path) => pathname.startsWith(path))) {
