@@ -46,6 +46,7 @@ All scanners are CI workflows in `.github/workflows/` (see EV13 §5 for detail):
 | `sca-osv.yml` | `osv-scanner` over every lockfile (npm + pub), SARIF → Security tab | Monthly (1st, 03:17 UTC) + on demand | Report-only |
 | `sast-semgrep.yml` | `semgrep` SAST (typescript/javascript/secrets rulesets), SARIF → Security tab | Monthly (1st, 03:23 UTC) + on demand | Report-only |
 | `admin-ci.yml` | Admin typecheck/lint/build + feature-flag parity | Every admin PR + push to `main` | **Blocking** |
+| `check-storage-rules.sh`, `check-csv-exports.sh` | Fail-closed regression guardrails — Storage-rules→Firestore-read detection; CSV/formula-injection export sinks (F-10) | Every PR + `firebase.json` predeploy | **Blocking** |
 
 This satisfies the "scan on every deployment and at least monthly" expectation:
 the dependency audit and rules/regression suites run on **every PR** (per-deploy)

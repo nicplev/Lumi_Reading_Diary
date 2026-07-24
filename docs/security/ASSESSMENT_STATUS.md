@@ -1,6 +1,6 @@
 # Lumi Security Assessment — Live Status Board
 
-**Last updated:** 2026-07-23 · **Branch:** `sec/security-assessment` · **Worktree:** `/Users/nicplev/lumi_reading_tracker-security-assessment`
+**Last updated:** 2026-07-24 · **Branch:** `sec/security-assessment` · **Worktree:** `/Users/nicplev/lumi_reading_tracker-security-assessment`
 **Companion:** `docs/security/SECURITY_ASSESSMENT_ORCHESTRATION_PLAN.md` (the plan) · `docs/ST4S_REMEDIATION_PLAN_2026-07-22.md` (the ST4S tracker, in the main checkout)
 
 Status markers: ☐ not started · ◐ in progress · 🔍 under test / awaiting verification · ☑ done (verified + evidenced)
@@ -9,9 +9,9 @@ Status markers: ☐ not started · ◐ in progress · 🔍 under test / awaiting
 
 ## ▶ Where we're up to (one glance)
 
-- **Now:** **All code-security findings fixed + deployed** (F-01/02/03, A2, SAST-01, F-07, F-04); **S1/S3/S5 verified** (Wave 3 TLS scan); **EV11 report** produced; portal security headers deployed. **15 technical/policy evidence docs drafted** in the `docs/st4s-evidence-pack` worktree (pending review + sign-off). The security-code assessment is complete; what remains is document sign-off + your real-world tasks (GO1/GO2 officer letters, WWCC, access register, restore drill, external pen test EV10).
+- **Now:** **All code-security findings fixed + deployed** (F-01/02/03, A2, SAST-01, F-07, F-04, plus **F-10/F-11** — the assessment scope was **extended to the roster-import (SIS/CSV) feature** that shipped after the original waves closed); **S1/S3/S5 verified** (Wave 3 TLS scan); **EV11 report** produced (VAR **v1.1**, Addendum A); portal security headers deployed. The **evidence pack is drafted, rendered to A4 PDFs and merged** (#587); **D3 restore drill, HR1 WWCC, HR2 training and A7 access register are done** this cycle. What remains is document sign-off (GO1/GO2 officer letters + record signatures) + the independent external pen test (EV10).
 - **Boundary held:** no active production testing; Wave 3 (passive prod TLS scan) stays parked for an explicit hostname exception. Prod deploys (rules, portal, function) were done under explicit user authorisation.
-- **Left:** the documents/evidence-pack workstream (running in the `docs/st4s-evidence-pack` worktree; first 3 technical docs drafted); the independent external pen test (EV10 — needs booking, scoping pack ready); F-05 App Check (launch-gated). **All code-security findings fixed + deployed; Wave 3 TLS scan done (S1/S3/S5 ✔).** (F-06/F-08 accept-as-designed; cross-tenant CG-sweep proven in #520.)
+- **Left:** document sign-off (evidence pack merged via #587; GO1/GO2 letters + record signatures pending); the independent external pen test (EV10 — needs booking, scoping pack ready); F-05 App Check (launch-gated); INT7 DPA console-proof capture. **All code-security findings fixed + deployed, now incl. F-10/F-11; Wave 3 TLS scan done (S1/S3/S5 ✔).** (F-06/F-08 accept-as-designed; cross-tenant CG-sweep proven in #520.)
 
 ## How to track progress (3 ways)
 
