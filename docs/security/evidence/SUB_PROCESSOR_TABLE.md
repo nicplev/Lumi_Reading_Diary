@@ -49,7 +49,7 @@ for that party's own purposes — see `DATA_SHARING_AUDIT.md` (PR10).
 | **Open Library / Internet Archive** | openlibrary.org | **ISBN / title / work ID only** — no identity data | Look up public book metadata, descriptions and cover images | Service operation — **no personal information sent** | Overseas public service |
 | **Apple App Store** (Apple Inc.) | apple.com/legal | Adult/device account, purchase and store-diagnostic data governed by the platform | App distribution and platform account management | Platform/contract necessity — governed by Apple developer + platform terms | Platform-defined **global** processing |
 | **Google Play** (Google LLC) | play.google.com | Adult/device account, purchase and store-diagnostic data governed by the platform | App distribution and platform account management | Platform/contract necessity — governed by Google Play developer terms | Platform-defined **global** processing |
-| **Support mailbox provider** *(provider not yet named — see gaps)* | Public contact: `support@lumi-reading.com` | Privacy, access, correction, deletion and incident reports (potentially any record type a requester includes) | Receive and action privacy and support requests | Service operation — processor | **Not yet recorded** — provider identity and location to be captured |
+| **Google Workspace** (Google LLC) — support mailbox `support@lumi-reading.com` | workspace.google.com · cloud.google.com/terms/data-processing-addendum | Privacy, access, correction, deletion and incident reports (potentially any record type a requester includes in an email) | Receive and action privacy and support requests | Service operation — processor under the Google Workspace Data Processing Amendment | Google Workspace mail — **global** (Google-managed regions) |
 
 ## 3. Sub-processors configured but prohibited for production personal data
 
@@ -92,9 +92,9 @@ APP 6 primary-purpose vs consent) before this column is published.
   marks Firestore, Storage, Functions, Logging, Firebase Auth, FCM/APNs and
   SendGrid as `Conditional` pending DPA/support-access/APP 8 review. This table
   must not be published in a way that implies those reviews are complete.
-- **Support mailbox provider is not named.** The provider identity, delegate
-  list and mailbox retention are still open (register: "Open release action").
-  Fill this row before publication.
+- **Support mailbox provider — named (2026-07-24): Google Workspace** (Google LLC).
+  Its Workspace Data Processing Amendment applies. Still to record: the delegate
+  list and mailbox retention, and capture the Workspace DPA + admin proof for INT7.
 - **Cloudflare is not in the vendor register.** A Cloudflare Worker serves the
   in-app status banner (`lumistatus.*.workers.dev`) and the marketing/portal
   sites may transit Cloudflare. If Cloudflare processes any personal information
