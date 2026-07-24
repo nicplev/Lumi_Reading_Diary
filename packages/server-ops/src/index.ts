@@ -21,3 +21,4 @@ export * from "./demoSchool/plan";
 export * from "./demoSchool/reseed";
 export * from "./aiEvaluation";
 export * from "./coverOcr";
+export * from "./parentBackdating";
