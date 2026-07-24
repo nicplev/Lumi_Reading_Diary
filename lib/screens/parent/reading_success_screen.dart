@@ -28,6 +28,8 @@ import '../../services/reading_log_service.dart';
 import '../../services/platform_config_service.dart';
 import '../../services/logging_engagement_service.dart';
 import 'widgets/comprehension_recording_step.dart';
+import 'widgets/edit_reading_log_sheet.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 
 /// Celebration screen shown after a reading log is successfully saved.
 /// Displays confetti, night count, streak info, and badge notifications.
@@ -308,6 +310,53 @@ class _ReadingSuccessScreenState extends ConsumerState<ReadingSuccessScreen>
     _goHome();
   }
 
+  /// Post-save Edit — pauses the auto-return and opens the same owner
+  /// edit sheet as the review layer, targeting exactly this session.
+  Future<void> _editThisLog() async {
+    _autoNavigateTimer?.cancel();
+    _autoNavigateTimer = null;
+    await showEditReadingLogSheet(context, widget.readingLog);
+    if (mounted) _goHome();
+  }
+
+  /// Post-save Remove — the celebration must never block recovery (§5.3).
+  Future<void> _removeThisLog() async {
+    _autoNavigateTimer?.cancel();
+    _autoNavigateTimer = null;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove this session?'),
+        content: Text('This removes just the session you saved '
+            '(${widget.readingLog.minutesRead} min).'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Keep it'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: LumiTokens.red),
+            child: const Text('Remove my session'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await ReadingLogService.instance.deleteOwnLog(widget.readingLog);
+      if (!mounted) return;
+      showLumiToast(message: 'Log removed', type: LumiToastType.info);
+      _goHome();
+    } catch (_) {
+      if (!mounted) return;
+      showLumiToast(
+        message: "Couldn't remove the session. Please try again.",
+        type: LumiToastType.error,
+      );
+    }
+  }
+
   void _goHome() {
     _autoNavigateTimer?.cancel();
     _autoNavigateTimer = null;
@@ -566,11 +615,29 @@ class _ReadingSuccessScreenState extends ConsumerState<ReadingSuccessScreen>
                           const SizedBox(height: 16),
                         ],
                         // From a multi-child reminder: nudge to the next child
-                        // rather than auto-returning home. Otherwise show the
-                        // usual auto-returning indicator (tappable to skip).
+                        // rather than auto-returning home. Otherwise the
+                        // durable recovery layer stays one tap away even
+                        // after the celebration (§5/§3.4): Done returns
+                        // home, Edit/Remove target exactly this session.
                         if (_nextReminderChildId != null)
                           _buildNextChildCta().animate().fadeIn(delay: 600.ms)
-                        else
+                        else ...[
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _DetailedAction(
+                                label: 'Edit this log',
+                                onPressed: _editThisLog,
+                              ),
+                              const SizedBox(width: 16),
+                              _DetailedAction(
+                                label: 'Remove my session',
+                                destructive: true,
+                                onPressed: _removeThisLog,
+                              ),
+                            ],
+                          ).animate().fadeIn(delay: 900.ms),
+                          const SizedBox(height: 8),
                           GestureDetector(
                             onTap: _goHome,
                             child: Row(
@@ -585,11 +652,12 @@ class _ReadingSuccessScreenState extends ConsumerState<ReadingSuccessScreen>
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                Text('Returning home…',
+                                Text('Done — returning home…',
                                     style: LumiType.caption),
                               ],
                             ),
                           ).animate().fadeIn(delay: 1200.ms),
+                        ],
                       ],
                     ],
                   ),
@@ -735,6 +803,16 @@ class _ReadingSuccessScreenState extends ConsumerState<ReadingSuccessScreen>
                 ],
               ),
             ),
+        ],
+        // Audience disclosure — mirrors the detailed flow's line.
+        if (_commentSettings?.enabled == true || _comprehensionEnabled) ...[
+          const SizedBox(height: 10),
+          Text(
+            "Notes and recordings are shared with "
+            "${widget.student.firstName}'s teacher.",
+            style: LumiType.caption.copyWith(color: LumiTokens.muted),
+            textAlign: TextAlign.center,
+          ),
         ],
         const SizedBox(height: 20),
         // From a multi-child reminder, "Done" saves this child and advances to
@@ -962,4 +1040,47 @@ class _ConfettiParticle {
     required this.color,
     required this.wobble,
   });
+}
+
+/// Small underlined text action on the detailed success screen — the
+/// durable Edit/Remove layer stays reachable from the celebration (§3.4).
+class _DetailedAction extends StatelessWidget {
+  const _DetailedAction({
+    required this.label,
+    required this.onPressed,
+    this.destructive = false,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(8),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
+          child: Align(
+            widthFactor: 1,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Text(
+                label,
+                style: LumiType.caption.copyWith(
+                  color: destructive ? LumiTokens.red : LumiTokens.ink,
+                  fontWeight: FontWeight.w700,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
