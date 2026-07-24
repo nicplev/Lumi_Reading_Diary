@@ -19,6 +19,7 @@ import '../../core/models/decodable_grading.dart';
 import '../../core/services/demo_session_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/lumi/lumi_toast.dart';
+import '../../core/widgets/lumi/scan_reticle.dart';
 import '../../data/models/book_model.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
@@ -27,6 +28,22 @@ import '../../services/book_cover_ocr_service.dart';
 import '../../services/book_lookup_service.dart';
 import '../../services/community_book_service.dart';
 import '../../services/isbn_assignment_service.dart';
+
+const Size _kCoverScannerReticleSize = Size(260, 180);
+
+/// Rect the cover scanner both draws its reticle in and hands to
+/// `MobileScanner.scanWindow`, so detection is limited to the framed box.
+/// Shrinks to fit a camera surface smaller than the reticle.
+@visibleForTesting
+Rect coverScannerScanWindowFor(Size surface) {
+  final width = _kCoverScannerReticleSize.width.clamp(0.0, surface.width);
+  final height = _kCoverScannerReticleSize.height.clamp(0.0, surface.height);
+  return Rect.fromCenter(
+    center: Offset(surface.width / 2, surface.height / 2),
+    width: width,
+    height: height,
+  );
+}
 
 class CoverCaptureFailure {
   const CoverCaptureFailure({
@@ -1811,95 +1828,109 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
   // ── ISBN Scan View ────────────────────────────────────────────────
 
   Widget _buildIsbnScanView() {
-    return Stack(
-      children: [
-        // Camera
-        if (_scannerController != null)
-          MobileScanner(
-            controller: _scannerController!,
-            onDetect: _onBarcodeDetected,
-          ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final scanWindow = coverScannerScanWindowFor(constraints.biggest);
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            // Camera
+            if (_scannerController != null)
+              MobileScanner(
+                controller: _scannerController!,
+                scanWindow: scanWindow,
+                onDetect: _onBarcodeDetected,
+              ),
 
-        // Cover thumbnail in top-left corner
-        if (_coverImage != null)
-          Positioned(
-            top: 16,
-            left: 16,
-            child: Container(
-              width: 80,
-              height: 110,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.white, width: 2),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black38,
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
-                  ),
-                ],
+            // Reticle — the only area barcodes are detected in.
+            if (_scannerController != null)
+              Positioned.fromRect(
+                rect: scanWindow,
+                child: ScanReticle(size: scanWindow.size),
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: Image.file(_coverImage!, fit: BoxFit.cover),
-              ),
-            ),
-          ),
 
-        // Scanning overlay
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-                colors: [
-                  Colors.black.withValues(alpha: 0.85),
-                  Colors.transparent,
-                ],
+            // Cover thumbnail in top-left corner
+            if (_coverImage != null)
+              Positioned(
+                top: 16,
+                left: 16,
+                child: Container(
+                  width: 80,
+                  height: 110,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white, width: 2),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black38,
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: Image.file(_coverImage!, fit: BoxFit.cover),
+                  ),
+                ),
+              ),
+
+            // Scanning overlay
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.85),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.qr_code_scanner_rounded,
+                      color: Colors.white70,
+                      size: 32,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Line up the barcode inside the frame',
+                      style: LumiType.bodyL.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Usually found on the back cover',
+                      style: LumiType.caption.copyWith(
+                        color: Colors.white.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextButton.icon(
+                      onPressed: _onManualIsbnEntry,
+                      icon: const Icon(Icons.keyboard, color: Colors.white70),
+                      label: const Text(
+                        'Enter ISBN manually',
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.qr_code_scanner_rounded,
-                  color: Colors.white70,
-                  size: 32,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Point camera at the ISBN barcode',
-                  style: LumiType.bodyL.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Usually found on the back cover',
-                  style: LumiType.caption.copyWith(
-                    color: Colors.white.withValues(alpha: 0.7),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextButton.icon(
-                  onPressed: _onManualIsbnEntry,
-                  icon: const Icon(Icons.keyboard, color: Colors.white70),
-                  label: const Text(
-                    'Enter ISBN manually',
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 
