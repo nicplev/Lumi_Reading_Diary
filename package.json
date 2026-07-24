@@ -14,7 +14,7 @@
     "test:demo-controls": "tsx --test admin/test/demo-control-model.test.ts admin/test/demo-reprovision-contract.test.ts",
     "test:demo-plan": "tsx --test packages/server-ops/test/demoSchool.plan.test.ts",
     "test:audio-authority": "tsx --test packages/server-ops/test/comprehensionRetention.parity.test.ts packages/server-ops/test/retentionRunStats.test.ts",
-    "test:flag-parity": "tsx --test packages/server-ops/test/aiEvalAuthority.parity.test.ts test/cover_ocr_flag.parity.test.ts",
+    "test:flag-parity": "tsx --test packages/server-ops/test/aiEvalAuthority.parity.test.ts packages/server-ops/test/authority.parity.test.ts test/cover_ocr_flag.parity.test.ts",
     "test:book-deletion-cascade": "tsx --test packages/server-ops/test/communityBookDeletionCascade.test.ts packages/server-ops/test/allocationCascade.parity.test.ts packages/server-ops/test/concurrency.test.ts",
     "test:domain-associations": "node --test test/domain_associations.test.mjs",
     "test:audio-retention:integration": "scripts/with-jdk21.sh functions/node_modules/.bin/firebase emulators:exec --config firebase.deletion.json --only firestore --project demo-lumi-server-ops-audio \"pnpm exec tsx --test packages/server-ops/test/comprehensionRetention.integration.test.ts\"",

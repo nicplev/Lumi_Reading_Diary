@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import type { Firestore } from "firebase-admin/firestore";
 import { z } from "zod";
 import { logAuditEvent, ServerOpsValidationError, type Actor } from "./audit";
+import { assertSuperAdmin } from "./authority";
 
 const paramsSchema = z.object({
   email: z.string().email("A valid email is required").trim().toLowerCase(),
@@ -45,6 +46,7 @@ export async function grantDevAccess(
   actor: Actor,
   params: GrantDevAccessParams
 ): Promise<GrantDevAccessResult> {
+  await assertSuperAdmin(db, actor.uid);
   const parsed = paramsSchema.safeParse(params);
   if (!parsed.success) {
     throw new ServerOpsValidationError(

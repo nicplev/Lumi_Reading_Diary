@@ -2,6 +2,7 @@ import type { Auth } from "firebase-admin/auth";
 import type { Firestore } from "firebase-admin/firestore";
 import { z } from "zod";
 import { logAuditEvent, ServerOpsValidationError, type Actor } from "./audit";
+import { assertSuperAdmin } from "./authority";
 
 const paramsSchema = z.object({
   schoolId: z.string().min(1, "schoolId is required"),
@@ -29,6 +30,7 @@ export async function manageSchoolUserAuth(
   actor: Actor,
   params: ManageSchoolUserAuthParams
 ): Promise<ManageSchoolUserAuthResult> {
+  await assertSuperAdmin(db, actor.uid);
   const parsed = paramsSchema.safeParse(params);
   if (!parsed.success) {
     throw new ServerOpsValidationError(
