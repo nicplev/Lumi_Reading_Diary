@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
+import '../../../services/analytics_service.dart';
 
 import '../../../core/widgets/lumi/lumi_toast.dart';
 import '../../../data/models/reading_log_model.dart';
@@ -153,6 +157,8 @@ Future<void> showQuickSlotConflictDialog(
     logId: pendingLogId,
     keepMine: choice,
   );
+  unawaited(
+      AnalyticsService.instance.logSlotConflictResolved(keptMine: choice));
   showLumiToast(
     message: choice
         ? 'Added as a separate session — syncing now.'

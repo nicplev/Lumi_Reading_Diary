@@ -91,6 +91,52 @@ class AnalyticsService {
     }
   }
 
+  // ─── Parent-logging redesign counters (plan Phase 3) ──────────────
+  // Pure occurrence counters in the house privacy idiom: event name only,
+  // never child identity, titles, durations or content. They exist to
+  // answer the §9 evidence questions — how often duplicates are actually
+  // suppressed, whether undo/edit see real use, how often the chooser and
+  // unresolved-title paths fire, and how much Yesterday backdating is used
+  // (feeds Nic's parentBackdating on/off decision).
+
+  /// A quick log lost the day's home slot — a duplicate default session
+  /// was suppressed (the loser wrote nothing).
+  Future<void> logQuickSlotRejected() => _counter('quick_slot_rejected');
+
+  /// The immediate post-save "Undo my quick log" was used.
+  Future<void> logQuickLogUndone() => _counter('quick_log_undone');
+
+  /// An owner content-edit of an existing session was saved.
+  Future<void> logSessionEdited() => _counter('session_edited');
+
+  /// "Remove my session" deleted exactly one session.
+  Future<void> logSessionRemoved() => _counter('session_removed');
+
+  /// The Choose-book picker resolved a book (no-current-book path).
+  Future<void> logBookChooserUsed() => _counter('book_chooser_used');
+
+  /// A session was saved with `titleUnresolved` (title to add later).
+  Future<void> logUnresolvedTitle() => _counter('unresolved_title_logged');
+
+  /// A detailed-flow session was saved for Yesterday (D1 backdating).
+  Future<void> logBackdatedSession() => _counter('backdated_session');
+
+  /// An offline quick-slot conflict prompt was resolved by the guardian.
+  /// [keptMine] only distinguishes the two allowed outcomes — no content.
+  Future<void> logSlotConflictResolved({required bool keptMine}) =>
+      _counter(keptMine
+          ? 'slot_conflict_kept_mine'
+          : 'slot_conflict_discarded_mine');
+
+  Future<void> _counter(String name) async {
+    if (_shouldSuppress) return;
+    try {
+      await _analytics.logEvent(name: name);
+    } catch (e) {
+      debugPrint('Error logging $name event: $e');
+    }
+  }
+
   /// Logged when a student earns a new badge
   Future<void> logBadgeEarned({required String badgeType}) async {
     if (_shouldSuppress) return;

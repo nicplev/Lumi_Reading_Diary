@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
+import '../../../services/analytics_service.dart';
 
 import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../core/widgets/lumi/lumi_toast.dart';
@@ -101,6 +105,7 @@ class _EditReadingLogSheetState extends State<_EditReadingLogSheet> {
           bookTitles: _titles,
           notes: _notesController.text,
         );
+        unawaited(AnalyticsService.instance.logSessionEdited());
       }
       if (!mounted) return;
       Navigator.of(context).pop(updated);

@@ -22,6 +22,7 @@ import '../../data/models/comprehension_recording_settings.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../data/models/school_model.dart';
 import '../../data/models/parent_comment_settings.dart';
+import '../../services/analytics_service.dart';
 import '../../services/firebase_service.dart';
 import '../../services/guardian_quick_log_prefs_service.dart';
 import '../../services/isbn_assignment_service.dart';
@@ -624,6 +625,9 @@ class _LogReadingScreenState extends State<LogReadingScreen>
 
       // Rec 5a: a completed log supersedes any saved draft.
       await OfflineService.instance.clearLogDraft(widget.student.id);
+      if (_isYesterday) {
+        unawaited(AnalyticsService.instance.logBackdatedSession());
+      }
 
       // Recognise the richer logging path (powers the occasional nudge +
       // positive recognition). Best-effort — never blocks the success screen.

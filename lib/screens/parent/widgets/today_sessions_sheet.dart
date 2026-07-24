@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../../../services/analytics_service.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -138,6 +142,7 @@ class _TodaySessionsSheetState extends State<_TodaySessionsSheet> {
     setState(() => _busy = true);
     try {
       await ReadingLogService.instance.deleteOwnLog(log);
+      unawaited(AnalyticsService.instance.logSessionRemoved());
       if (!mounted) return;
       setState(() => _busy = false);
       showLumiToast(

@@ -357,7 +357,16 @@ Gate: full `flutter test` demo-readiness suite (pinned 3.44.6) + rules tests (Ja
 
 ### Phase 3 — P2 refinement
 
-Canonical title matching + household aliases · optional barcode/voice title entry · correction-request flow for another guardian's entry · shared-device app-lock option · neutral opt-in co-parent notifications ("Reading was logged for Lily") · analytics: slot-rejection count, undo rate, edit rate, chooser usage, unresolved-title rate, legacy-title tail.
+| Item | Status |
+|---|---|
+| **Analytics** — privacy-idiom occurrence counters (event name only, never child data): `quick_slot_rejected`, `quick_log_undone`, `session_edited`, `session_removed`, `book_chooser_used`, `unresolved_title_logged`, `backdated_session`, `slot_conflict_kept_mine/discarded_mine`; server-side `legacy_fabricated_title_log` shipped in PR-B. These are the evidence base for the `parentBackdating` on/off call and the D2/D3 revisits. | ✅ merged 2026-07-24 |
+| Canonical title matching + household aliases | ⏸ **Deliberately deferred** — needs a matching-strategy mini-spec (per-school vs per-household alias store, merge semantics) and real title data from the beta to design against. |
+| Optional barcode/voice title entry | ⏸ Deferred — camera scanning is deliberately mobile-teacher-only today ([[school-portal-teacher-parity]] boundary); extending to parents is its own feature. |
+| Correction-request flow for another guardian's entry | ⏸ Deferred — needs notification/consent design (interacts with the "no out-of-hours push" beta boundary). |
+| Shared-device privacy / app-lock | ⏸ Deferred — security surface; design with the ST4S consent/access work rather than ad hoc. |
+| Neutral opt-in co-parent notifications | ⏸ Deferred — new notification surface needing opt-in placement + quiet-hours design; revisit with `quick_slot_rejected` data (if duplicates are rare, the notification may be unnecessary). |
+
+The deferred items are P2 by definition; each needs either a product mini-spec or beta evidence the new analytics now collect. Ship the app, gather a few weeks of counters, then spec them against real behaviour.
 
 ---
 
