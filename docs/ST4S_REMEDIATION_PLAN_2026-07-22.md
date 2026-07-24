@@ -375,6 +375,7 @@ Not needed for a Ready outcome; each removes a "medium risk" note in the Full As
 | 2026-07-24 | A5/S4/A13 | F-04 defence-in-depth: fail-closed `assertSuperAdmin` guard added inside the 5 destructive super-admin server-ops (were single-layer, gated only by the portal route). Deployed via admin-deploy. | #561 | ☑ |
 | 2026-07-24 | EV11 / EV10 | Vulnerability Assessment Report produced (`docs/security/VULNERABILITY_ASSESSMENT_REPORT_2026-07-24.md`) — full findings, remediation + verification, ST4S mapping. Satisfies EV11; interim input to EV10 (independent external pen test still outstanding). | — | ☑ (EV11) |
 | 2026-07-24 | S1/S3/S5 (Phase 3) | Authorised passive TLS scan of all 6 public endpoints: TLS 1.2+ only (1.0/1.1 rejected), TLS 1.3 + AES-GCM, valid CA certs (Google Trust Services / Let's Encrypt), HSTS. Crypto profile: `docs/security/TLS_CRYPTO_PROFILE_2026-07-24.md`. S1/S3/S5 can take the strong TLS option. | — | ☑ |
+| 2026-07-24 | S11 / Phase 4 | Portal security headers (nosniff / X-Frame-Options / Referrer-Policy) deployed to both portals + marketing (#569). Five technical evidence docs **drafted** in the evidence-pack worktree (pending sign-off): EV13 SSDLC, Monitoring Plan (T1), Access Control Policy (A6/A7/A13), EV12 Patch Management (T2/T3), EV9 Incident Response (T6/T7). | #569 | ◐ drafts |
 
 ---
 

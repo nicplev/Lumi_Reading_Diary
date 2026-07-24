@@ -82,8 +82,8 @@ Owner tags: **[SEC]** this security orchestration · **[DOC]** separate document
 | A5 | MFA for privileged accounts | Not Ready | [NIC]+[SEC] | ☐ verify portal enforcement | 2.2 |
 | A13 | Deny-by-default access | Ready | [SEC] | 🔍 validating (W1/W2) | — |
 | A7 | Access review/revocation | Not Ready | [NIC]+[DOC] | ☐ | 2.4 / 4 |
-| T1 | Monitoring + annual pen test | Not Ready | [SEC]+[DOC]+[NIC] | ◐ | 0.2 / 5 |
-| T2 | Centrally managed patching | Not Ready | [SEC]+[DOC] | ☐ (Wave 5 Dependabot) | 4 / 5 |
+| T1 | Monitoring + annual pen test | Not Ready | [SEC]+[DOC]+[NIC] | ◐ Monitoring Plan drafted; scans live; external pen test (EV10) outstanding | 0.2 / 5 |
+| T2 | Centrally managed patching | Not Ready | [SEC]+[DOC] | ◐ Dependabot live + EV12 patch process drafted | 4 / 5 |
 | T3 | Patch deadlines 14d/48h | Ready (see honesty list) | [DOC] | ☐ | 4 / 5 |
 | Q5 | Security testing per framework | Ready (med risk) | [SEC] | ◐ | 0.2 / 5 |
 | AP1 | Scan every deploy + monthly | Not Ready | [SEC] | ☐ (Wave 5) | 5 |
@@ -92,7 +92,7 @@ Owner tags: **[SEC]** this security orchestration · **[DOC]** separate document
 | EV10 | Penetration-test report | Not Ready | [SEC] interim + external final | ◐ interim assessment report done; independent external test still outstanding | 4 |
 | EV11 | Vulnerability-assessment reports | Not Ready | [SEC] | ☑ report produced (`VULNERABILITY_ASSESSMENT_REPORT_2026-07-24.md`) | 4 / 5 |
 | Privacy/T&C consent (web portals) | Not captured in portals | [SEC] code + [DOC] policy | ☐ | 1.2 / 6.5 |
-| EV6–EV9, EV12, EV13 | Policy pack (InfoSec/BCP/DR/IRP/patch/SSDLC) | Not Ready | **[DOC]** | ☐ separate workstream | 4 |
+| EV6–EV9, EV12, EV13 | Policy pack (InfoSec/BCP/DR/IRP/patch/SSDLC) | Not Ready | **[DOC]** | ◐ EV13/EV12/EV9 + monitoring/access-control **drafted** (evidence-pack worktree), pending review+sign-off; EV6/EV7/EV8 pending | 4 |
 | HR1/HR2/HR3 | Screening / training / offboarding | Not Ready | [NIC]+[DOC] | ☐ separate | 0.1 / 4 |
 | GO1/GO2 | Named security & privacy officers | Not Ready | [NIC]+[DOC] | ☐ separate | 0.3 |
 | PR2 | Privacy policy content | Not Ready | **[DOC]** | ☐ separate | 6.1 |
@@ -133,3 +133,4 @@ A control-assertion document may only be written once the control is **true and 
 | 2026-07-24 | **SAST-01 + F-07 done** (one sync). SAST-01 MFA-crypto `authTagLength` pin + truncated-tag test (PR #557, admin-ci + regression-gate green). F-07 books/lookup: strict ISBN validation + 60/min per-user rate limit (F-07 PR, portal tsc clean). Both merged; deploy with their portals. |
 | 2026-07-24 | **F-04 done + deployed** (PR #561 / `6d5b795`): fail-closed `assertSuperAdmin` on the 5 destructive super-admin server-ops (offboard/grantDevAccess/manageParent/bulkDeleteParents/manageSchoolUserAuth); `authority.parity.test.ts` green in admin-ci; auto-deployed via admin-deploy. **This closes the last code-security finding — all are now fixed and deployed.** |
 | 2026-07-24 | **Wave 3 (passive prod TLS scan) done** (authorised). All 6 Lumi endpoints: TLS 1.0/1.1 rejected, 1.2/1.3 supported, TLS 1.3 negotiated with AES-GCM, valid CA certs, HSTS present → S1/S3/S5 ✔. Evidence: `TLS_CRYPTO_PROFILE_2026-07-24.md`. Also: evidence-pack worktree stood up; first 3 technical docs (EV13 / monitoring / access-control) drafted. |
+| 2026-07-24 | **Header hardening done + technical evidence docs drafted.** nosniff / X-Frame-Options / Referrer-Policy added to both portals (deployed + verified) + marketing config (PR #569). Evidence-pack now has **5 drafted technical docs** — EV13 SSDLC, Monitoring Plan (T1), Access Control Policy (A6/A7/A13), EV12 Patch Management (T2/T3), EV9 Incident Response (T6/T7) — pending review + sign-off (GO1/GO2 letters still needed). |
