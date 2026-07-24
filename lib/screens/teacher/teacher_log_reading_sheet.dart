@@ -56,6 +56,13 @@ class _TeacherLogReadingSheetState extends State<TeacherLogReadingSheet> {
   final Set<String> _selectedAssignedTitles = {};
   final List<String> _customTitles = [];
 
+  /// Where the reading happened. Defaults to HOME — this sheet's original
+  /// purpose (#39) is proxy-logging home reading for families who can't use
+  /// the app, and legacy proxy logs carry home semantics. 'Class reading'
+  /// must be an explicit choice: it displays on the family's Home screen as
+  /// school reading but never marks their home reading complete (plan §6.2).
+  bool _isClassroomContext = false;
+
   String? _selectedAllocationId;
   int? _selectedAllocationTargetMinutes;
 
@@ -184,6 +191,7 @@ class _TeacherLogReadingSheetState extends State<TeacherLogReadingSheet> {
         notes: _notesController.text,
         allocationId: _selectedAllocationId,
         targetMinutes: _selectedAllocationTargetMinutes ?? 20,
+        isClassroomContext: _isClassroomContext,
       );
 
       if (!mounted) return;
@@ -225,6 +233,8 @@ class _TeacherLogReadingSheetState extends State<TeacherLogReadingSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      _buildContextToggle(),
+                      const SizedBox(height: 16),
                       _buildDateRow(),
                       const SizedBox(height: 16),
                       _buildBookPicker(),
@@ -260,6 +270,45 @@ class _TeacherLogReadingSheetState extends State<TeacherLogReadingSheet> {
           const Spacer(),
         ],
       ),
+    );
+  }
+
+  Widget _buildContextToggle() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Where did the reading happen?',
+            style: LumiType.caption.copyWith(
+                fontWeight: FontWeight.w700, color: LumiTokens.muted)),
+        const SizedBox(height: 8),
+        SegmentedButton<bool>(
+          segments: const [
+            ButtonSegment(
+              value: false,
+              label: Text('Home reading'),
+              icon: Icon(Icons.home_outlined),
+            ),
+            ButtonSegment(
+              value: true,
+              label: Text('Class reading'),
+              icon: Icon(Icons.school_outlined),
+            ),
+          ],
+          selected: {_isClassroomContext},
+          onSelectionChanged: _isSaving
+              ? null
+              : (selection) =>
+                  setState(() => _isClassroomContext = selection.first),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _isClassroomContext
+              ? "Shows on the family's app as reading at school — it won't "
+                  'mark their home reading done.'
+              : 'Counts as home reading on behalf of the family.',
+          style: LumiType.caption.copyWith(color: LumiTokens.muted),
+        ),
+      ],
     );
   }
 
