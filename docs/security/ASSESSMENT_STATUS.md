@@ -11,7 +11,7 @@ Status markers: ☐ not started · ◐ in progress · 🔍 under test / awaiting
 
 - **Now:** **F-01/F-02/F-03 fixed + deployed** (rules live in prod, PR #520). **A2 passwords done + deployed** (PR #554, `2b29e9a`): the 3 temp-pw generators are 16-char/symbol, portal "Add Staff" enforces 14+/complexity (shared validator), and the Firebase console password policy is set to **Require / min 14 / all four classes** (confirmed by screenshot) — A2 is now true across every surface. Portal + `processStaffOnboardingEmail` deployed; app-side Dart validators ship with the next app release.
 - **Boundary held:** no active production testing; Wave 3 (passive prod TLS scan) stays parked for an explicit hostname exception. Prod deploys (rules, portal, function) were done under explicit user authorisation.
-- **Left:** SAST-01 (MFA-crypto authTagLength), F-07 (books/lookup rate-limit), F-04 (server-ops defense-in-depth), cross-tenant CG-sweep + callable App-Check-off PoCs, Wave 3 prod TLS scan, the documents workstream. (F-06 accept-as-designed; F-09 done.)
+- **Left:** F-04 (server-ops defense-in-depth), cross-tenant CG-sweep + callable App-Check-off PoCs, Wave 3 prod TLS scan (needs your hostname exception), the documents workstream. (F-06 accept-as-designed; F-01/02/03, A2/F-09, SAST-01, F-07 all done — SAST-01 + F-07 pending their portal deploys.)
 
 ## How to track progress (3 ways)
 
@@ -44,7 +44,7 @@ Status markers: ☐ not started · ◐ in progress · 🔍 under test / awaiting
 | F-04 | `server-ops` single-layer authz (gate currently present) | Med (def-in-depth) | ◐ prove gate completeness in W1 | A5, S4, A13 | Route-gate proof |
 | F-05 | App Check OFF on all callables | Low-Med | ☐ known launch gate | A13, S7 | Staged-rollout evidence |
 | F-06 | Storage cover first-claim open to any authed non-demo user | Low | ⓘ accept-as-designed (`storage.rules.test.js:373`) | S4, PF51 | Intended tradeoff; enforced: uploaderUid=caller, no overwrite of others |
-| F-07 | `books/lookup` external-API amplification + param injection | Low | ☐ verify W1 | Q5 | Rate-limit fix |
+| F-07 | `books/lookup` external-API amplification + param injection | Low | ☑ **fixed** (F-07 PR); deploys with portal | Q5 | ISBN validation + 60/min rate limit |
 | F-08 | CSRF on portal mutations rests on SameSite=Lax | Low | ☐ note | A13 | Decision note |
 | F-09 | `createUser` password min-6 → 14+/complexity | Low | ☑ **fixed + deployed** (PR #554); part of A2 | **A2** | shared portal validator + console policy |
 
@@ -130,3 +130,4 @@ A control-assertion document may only be written once the control is **true and 
 | 2026-07-23 (overnight) | Wave 2: F-01/F-02/F-03 confirmed in emulator, fixed in `firestore.rules`, regression-tested (`security_poc.rules.test.js`, wired into `test:rules`); full suite 172/172 green (commit `0d31809`). Wave 4 mobile AP2 static review completed (M-01..M-08). |
 | 2026-07-24 | F-01/F-02/F-03 **merged (PR #520 → `66339f0`, regression-gate green) and DEPLOYED to prod** (`firestore:rules` → `lumi-ninc-au`). Client-flow safety verified pre-deploy. Rules compiled with only pre-existing warnings (unused `demoAdminReadOnly`, lines 186-190 — hygiene, not from this change). |
 | 2026-07-24 | **A2 passwords done + deployed** (PR #554 → `2b29e9a`, regression-gate green): 3 temp-pw generators 12→16+symbol; portal Add-Staff min-6→14/complexity (shared validator, API+modal); shared Dart validator in the 3 signup screens. Portal + `processStaffOnboardingEmail` deployed. Firebase console password policy set to Require / min 14 / all four classes (screenshot evidence → `~/lumi-security-evidence/A2-passwords/`, to be filed in the master pack). App validators ship next app release. A2 true across all surfaces. |
+| 2026-07-24 | **SAST-01 + F-07 done** (one sync). SAST-01 MFA-crypto `authTagLength` pin + truncated-tag test (PR #557, admin-ci + regression-gate green). F-07 books/lookup: strict ISBN validation + 60/min per-user rate limit (F-07 PR, portal tsc clean). Both merged; deploy with their portals. |
