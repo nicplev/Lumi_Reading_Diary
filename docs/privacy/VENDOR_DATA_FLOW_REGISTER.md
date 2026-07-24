@@ -1,6 +1,6 @@
 # Lumi Vendor and Data-Flow Register
 
-**Version:** 1.0 · **Reviewed:** 17 July 2026
+**Version:** 1.1 · **Reviewed:** 17 July 2026 · **Updated:** 24 July 2026 (added Cloudflare; named support mailbox = Google Workspace)
 **Owner:** Privacy lead (approval pending)
 
 This register distinguishes a configured service from an approved disclosure.
@@ -25,7 +25,8 @@ listed gate is closed.
 | Google Books API | ISBN/title search and public book metadata | Google public API; may process globally | No identity data intended | Request includes only ISBN/title; API-key target restriction; manual entry fallback | Confirm privacy terms and remove/replace obsolete key if unnecessary | Low risk |
 | Open Library / Internet Archive | ISBN/title search, description and cover images | Overseas public service | No identity data intended | Request includes only ISBN/title/work ID; manual entry fallback | Record current privacy/retention terms | Low risk |
 | Apple App Store / Google Play | Distribution, purchase/account and store diagnostics governed by platform | Platform-defined global processing | Adult/device data; store age context may apply | No ad SDK; privacy disclosures prepared | Organisation enrolment, final questionnaires, agreements and signed artifact evidence | Store blocked |
-| Support mailbox provider | Privacy, access, correction, deletion and incident reports | Not recorded | Potentially yes | Stable `support@lumi-reading.com` address and public support page; owner confirmed daily monitoring and MFA on 17 July 2026 | Name provider, record/restrict delegates and define mailbox retention | Open release action |
+| Google Workspace (support mailbox) | Privacy, access, correction, deletion and incident reports to `support@lumi-reading.com` | Google Workspace mail — global (Google-managed regions) | Potentially yes | Stable `support@lumi-reading.com` address and public support page; daily monitoring and MFA confirmed 17 July 2026; Workspace Data Processing Amendment applies | Capture Workspace DPA + admin acceptance proof; record/restrict delegates and define mailbox retention | Conditional |
+| Cloudflare | Public in-app status banner via a Worker (`lumistatus.*.workers.dev`) and any edge/CDN in front of the public sites | Global Cloudflare edge network | No intended personal data (transient edge metadata such as IP/headers only) | Read-only public status payload; no Lumi account/child records at the edge | Capture Cloudflare DPA; adviser to confirm the edge-metadata characterisation | Low risk |
 
 ## Configured but prohibited for production personal data
 

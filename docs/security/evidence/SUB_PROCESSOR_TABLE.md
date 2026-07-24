@@ -50,6 +50,7 @@ for that party's own purposes — see `DATA_SHARING_AUDIT.md` (PR10).
 | **Apple App Store** (Apple Inc.) | apple.com/legal | Adult/device account, purchase and store-diagnostic data governed by the platform | App distribution and platform account management | Platform/contract necessity — governed by Apple developer + platform terms | Platform-defined **global** processing |
 | **Google Play** (Google LLC) | play.google.com | Adult/device account, purchase and store-diagnostic data governed by the platform | App distribution and platform account management | Platform/contract necessity — governed by Google Play developer terms | Platform-defined **global** processing |
 | **Google Workspace** (Google LLC) — support mailbox `support@lumi-reading.com` | workspace.google.com · cloud.google.com/terms/data-processing-addendum | Privacy, access, correction, deletion and incident reports (potentially any record type a requester includes in an email) | Receive and action privacy and support requests | Service operation — processor under the Google Workspace Data Processing Amendment | Google Workspace mail — **global** (Google-managed regions) |
+| **Cloudflare** (Cloudflare, Inc.) | cloudflare.com · cloudflare.com/cloudflare-customer-dpa | **No intended personal information** — serves the public in-app status banner via a Worker; standard edge request metadata (IP address, request headers) is transient network data at the edge, not Lumi account/child records | Edge delivery of the in-app status banner (`lumistatus.*.workers.dev`) and any CDN/proxy in front of the public sites | Service operation — processor under the Cloudflare DPA | **Global** — Cloudflare edge network |
 
 ## 3. Sub-processors configured but prohibited for production personal data
 
@@ -95,11 +96,13 @@ APP 6 primary-purpose vs consent) before this column is published.
 - **Support mailbox provider — named (2026-07-24): Google Workspace** (Google LLC).
   Its Workspace Data Processing Amendment applies. Still to record: the delegate
   list and mailbox retention, and capture the Workspace DPA + admin proof for INT7.
-- **Cloudflare is not in the vendor register.** A Cloudflare Worker serves the
-  in-app status banner (`lumistatus.*.workers.dev`) and the marketing/portal
-  sites may transit Cloudflare. If Cloudflare processes any personal information
-  (e.g. IP addresses at the edge), it belongs in this table and in the register.
-  Adviser to confirm scope; see `INT7_SUBPROCESSOR_AGREEMENTS_RECORD.md`.
+- **Cloudflare — added (2026-07-24).** Cloudflare (status-banner Worker + any
+  edge/CDN in front of the public sites) is now recorded in this table (§2) and in
+  the authoritative vendor register (`docs/privacy/VENDOR_DATA_FLOW_REGISTER.md`),
+  characterised as processing **no intended personal information** (public status
+  banner; only transient edge request metadata such as IP/headers). Remaining:
+  capture the Cloudflare DPA for INT7 and let the adviser confirm the edge-metadata
+  characterisation.
 - **Lawful-basis / controller determination pending counsel** (see §4).
 - **Legal-entity naming.** The public table should name the Lumi contracting
   entity (and ABN) once confirmed; account-acceptance evidence proving which

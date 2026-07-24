@@ -49,7 +49,7 @@ Nic still files in the access-controlled legal folder before a row is complete.
 | 1 | **Google Cloud** (Firestore, Storage, Functions/Run, Logging, Secret Manager) | Google Cloud **Data Processing Addendum** (+ service-specific terms) | ◑ In force — DPA auto-incorporated in accepted Cloud terms; **console proof to file** | On account/billing setup (capture exact) | Lumi Education Pty Ltd (ABN 45 700 349 015) | Public terms: `vendor-evidence/2026-07-17/raw/google-cloud-data-processing-addendum.txt`. Account-acceptance proof: *[legal folder]* |
 | 2 | **Firebase** (Authentication, FCM, App Check, Analytics, Crashlytics) | Firebase **Data Processing and Security Terms** | ◑ In force — incorporated in accepted Firebase terms; **console proof to file** | On project setup (capture exact) | Lumi Education Pty Ltd (ABN 45 700 349 015) | Public terms: `vendor-evidence/2026-07-17/raw/firebase-data-processing-security-terms.txt`. Account proof: *[legal folder]* |
 | 3 | **Twilio SendGrid** (email) | Twilio **Data Protection Addendum** | ◑ Confirm/accept in console — **proof to file** | — (capture on acceptance) | Lumi Education Pty Ltd (ABN 45 700 349 015) | Public terms: `vendor-evidence/2026-07-17/raw/twilio-data-protection-addendum.txt`. Account proof: *[legal folder]* |
-| 4 | **Cloudflare** (status-banner Worker; any CDN/edge in front of sites) | Cloudflare **Data Processing Addendum** | ☐ Accept in dash + **add to vendor register** — proof to file | — | Lumi Education Pty Ltd (ABN 45 700 349 015) | Public terms: *[capture to `vendor-evidence/`]*. Account proof: *[legal folder]* |
+| 4 | **Cloudflare** (status-banner Worker; any CDN/edge in front of sites) | Cloudflare **Data Processing Addendum** | ◑ Added to register + sub-processor table 2026-07-24; accept DPA in dash — **proof to file** | — (capture on acceptance) | Lumi Education Pty Ltd (ABN 45 700 349 015) | Public terms: *[capture to `vendor-evidence/`]*. Account proof: *[legal folder]* |
 | 5 | **Apple** (App Store distribution, APNs) | Apple **Developer Program License Agreement** (+ any Apple DPA/addendum) | ◑ In force — DPLA accepted (required to publish); **export to file** | On developer enrolment (capture exact) | Lumi Education Pty Ltd (ABN 45 700 349 015) | Enrolment/agreement export: *[legal folder]* |
 | 6 | **Google Play** (distribution) | Google Play **Developer Distribution Agreement** (+ Play data terms) | ◑ In force — DDA accepted (required to publish); **export to file** | On console enrolment (capture exact) | Lumi Education Pty Ltd (ABN 45 700 349 015) | Enrolment/agreement export: *[legal folder]* |
 | 7 | **Google Workspace** (support mailbox — `support@lumi-reading.com`) | Google Workspace **Data Processing Amendment** (Google Cloud/Workspace terms) | ◑ In force — incorporated in accepted Workspace terms; **admin-console proof to file** | On Workspace setup (capture exact) | Lumi Education Pty Ltd (ABN 45 700 349 015) | Public terms: capture Workspace DPA to `vendor-evidence/`. Admin proof: *[legal folder]* |
@@ -88,10 +88,11 @@ This mirrors data-flow rule 3 already in the vendor register
   are in force, but the *dated console export/screenshot* per vendor is not yet
   filed. Nic captures each and files it in the access-controlled legal folder, then
   sets the row to `Yes` with the exact date.
-- **Cloudflare is not yet in the vendor register.** A Cloudflare Worker serves the
-  in-app status banner and Cloudflare may sit in front of the sites; capture its
-  DPA and add it to the register (and to `SUB_PROCESSOR_TABLE.md`) — or record a
-  reasoned finding that it processes no personal information.
+- **Cloudflare — added to register (2026-07-24).** Cloudflare is now recorded in
+  `docs/privacy/VENDOR_DATA_FLOW_REGISTER.md` and `SUB_PROCESSOR_TABLE.md`,
+  characterised as processing **no intended personal information** (public status
+  banner; transient edge metadata only). Remaining: accept/capture its DPA in the
+  Cloudflare dash and file the proof.
 - **Support mailbox provider — named.** Confirmed 2026-07-24 as **Google Workspace**
   (Google LLC); capture its Workspace Data Processing Amendment + admin-console
   proof like the other Google services.
