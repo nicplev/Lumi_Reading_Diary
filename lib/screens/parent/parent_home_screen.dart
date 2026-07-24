@@ -47,6 +47,18 @@ import 'widgets/character_picker_sheet.dart';
 import 'widgets/parent_child_switcher.dart';
 import 'widgets/widget_undo_banner.dart';
 
+/// Copy for the "someone else won the day's default session" outcome. The
+/// loser's tap wrote NOTHING — this must say so plainly. Falls back to a
+/// nameless variant when the winning log isn't readable.
+String quickSlotTakenMessage(QuickSlotTakenException e) {
+  final winner = e.existingLog;
+  if (winner != null) {
+    return '${winner.loggedByDisplay} logged ${winner.minutesRead} min '
+        'moments ago. No new session was added.';
+  }
+  return 'Tonight is already logged. No new session was added.';
+}
+
 /// Vertical space the floating glass nav occupies above the safe-area inset.
 /// Scroll content reserves this so the last item clears the bar.
 const double _kNavBarClearance = 92;
@@ -1048,6 +1060,26 @@ class _TodayCardState extends State<_TodayCard> {
             'Quick log is turned off by your school. Use Log reading to add details.',
         type: LumiToastType.info,
       );
+    } on NoCurrentBookException {
+      // No resolvable book: never fabricate a title — send the parent to the
+      // detailed flow to choose one. (PR-D replaces this with the row-level
+      // "Choose book" state.)
+      if (!mounted) return;
+      setState(() => _isQuickLogging = false);
+      NavigationStateService().setTempData({
+        'parent': widget.parent,
+        'student': student,
+        'allocations': activeAllocations,
+      });
+      context.push('/parent/log-reading');
+    } on QuickSlotTakenException catch (e) {
+      // Someone else won the day's default session — nothing was written.
+      if (!mounted) return;
+      setState(() => _isQuickLogging = false);
+      showLumiToast(
+        message: quickSlotTakenMessage(e),
+        type: LumiToastType.info,
+      );
     } catch (_) {
       if (!mounted) return;
       setState(() => _isQuickLogging = false);
@@ -1891,6 +1923,20 @@ class _TonightRowState extends State<_TonightRow> {
       showLumiToast(
         message:
             'Quick log is turned off by your school. Tap the name to add details.',
+        type: LumiToastType.info,
+      );
+    } on NoCurrentBookException {
+      // No resolvable book: open the detailed flow to choose one — a title
+      // is never fabricated. (PR-D replaces this with "Choose book".)
+      if (!mounted) return;
+      setState(() => _isQuickLogging = false);
+      _openDetail(allocations);
+    } on QuickSlotTakenException catch (e) {
+      // Someone else won the day's default session — nothing was written.
+      if (!mounted) return;
+      setState(() => _isQuickLogging = false);
+      showLumiToast(
+        message: quickSlotTakenMessage(e),
         type: LumiToastType.info,
       );
     } catch (_) {
