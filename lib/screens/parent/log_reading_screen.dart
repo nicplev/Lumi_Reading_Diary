@@ -87,6 +87,25 @@ class _LogReadingScreenState extends State<LogReadingScreen>
   final List<String> _customBookTitles = [];
   int _selectedMinutes = 20;
 
+  // Session reading format (§4.2) — stored per book entry in `books[]`,
+  // never mixed into the title. 'print' is the unmarked default.
+  static const Map<String, String> _kFormats = {
+    'print': 'Print',
+    'ebook': 'eBook',
+    'audiobook': 'Audiobook',
+    'readAloud': 'Read aloud',
+  };
+  String _selectedFormat = 'print';
+
+  /// Structured book entries for the save: source provenance per title +
+  /// the session's format. bookTitles remains the denormalised projection.
+  List<Map<String, dynamic>> get _structuredBooks => [
+        for (final title in _selectedBookTitles)
+          {'title': title, 'source': 'assigned', 'format': _selectedFormat},
+        for (final title in _customBookTitles)
+          {'title': title, 'source': 'manual', 'format': _selectedFormat},
+      ];
+
   // A large class library is collapsed to the first few rows so it doesn't
   // push Reading time + feeling below the fold; expanded on demand.
   bool _showAllAssignedBooks = false;
@@ -549,6 +568,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
             previewOnly ? null : recording?.durationSec,
         schoolTimezone: _schoolTimezone,
         occurredOn: _occurredOn,
+        books: _structuredBooks,
       );
 
       // Hand the audio file off: directly online, or via the offline queue.
@@ -1073,6 +1093,26 @@ class _LogReadingScreenState extends State<LogReadingScreen>
                             ))
                         .toList(),
                   ),
+                ),
+                const SizedBox(height: 12),
+                // Format is stored separately from the title (§4.2): an
+                // audiobook or a read-aloud is legitimate reading. Applies
+                // to every book in the session; duration stays the session
+                // total either way.
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final entry in _kFormats.entries)
+                      ChoiceChip(
+                        label: Text(entry.value),
+                        selected: _selectedFormat == entry.key,
+                        selectedColor:
+                            LumiTokens.red.withValues(alpha: 0.12),
+                        onSelected: (_) =>
+                            setState(() => _selectedFormat = entry.key),
+                      ),
+                  ],
                 ),
               ],
             ),

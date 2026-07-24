@@ -755,7 +755,8 @@ service cloud.firestore {
               'syncedAt', 'allocationId', 'metadata', 'childFeeling',
               'parentComment', 'parentCommentSelections',
               'parentCommentFreeText', 'loggedByName', 'loggedByLabel',
-              'loggedByRole', 'occurredOn', 'context', 'titleUnresolved'
+              'loggedByRole', 'occurredOn', 'context', 'titleUnresolved',
+              'books'
             ]) &&
             data.schoolId == schoolId &&
             data.studentId is string && data.studentId.size() > 0 &&
@@ -818,7 +819,13 @@ service cloud.firestore {
             (data.get('titleUnresolved', null) == null ||
               data.titleUnresolved is bool) &&
             (data.get('titleUnresolved', false) == false ||
-              data.bookTitles.size() == 0);
+              data.bookTitles.size() == 0) &&
+            // Structured per-book entries ({title, source, format, bookId?}).
+            // bookTitles remains the denormalised projection stats count
+            // from; entry-level shape is validated by validateReadingLog
+            // (rules stay within the expression budget).
+            (data.get('books', null) == null ||
+              (data.books is list && data.books.size() <= 20));
         }
 
         function contentUpdateIsValid() {
@@ -828,7 +835,8 @@ service cloud.firestore {
               'minutesRead', 'targetMinutes', 'bookTitles', 'notes',
               'photoUrls', 'childFeeling', 'parentComment',
               'parentCommentSelections', 'parentCommentFreeText',
-              'syncedAt', 'isOfflineCreated', 'titleUnresolved', 'editedAt'
+              'syncedAt', 'isOfflineCreated', 'titleUnresolved', 'editedAt',
+              'books'
             ]) &&
             minutesInBounds() &&
             data.targetMinutes is int &&
@@ -856,6 +864,8 @@ service cloud.firestore {
               data.titleUnresolved is bool) &&
             (data.get('titleUnresolved', false) == false ||
               data.bookTitles.size() == 0) &&
+            (data.get('books', null) == null ||
+              (data.books is list && data.books.size() <= 20)) &&
             (!changed.hasAny(['editedAt']) ||
               data.editedAt == request.time);
         }

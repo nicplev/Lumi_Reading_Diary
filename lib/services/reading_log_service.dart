@@ -173,6 +173,7 @@ class ReadingLogService {
     int? comprehensionAudioDurationSec,
     String? schoolTimezone,
     String? occurredOn,
+    List<Map<String, dynamic>>? books,
   }) {
     final now = DateTime.now();
     final target = allocations.isNotEmpty
@@ -214,6 +215,7 @@ class ReadingLogService {
           occurredOn ?? SchoolTime.localDateString(now, schoolTimezone),
       // A parent session is home reading by definition (rules enforce it).
       context: 'home',
+      books: books,
       metadata: quickLog ? const {'quickLog': true} : null,
       comprehensionAudioPath: comprehensionAudioPath,
       comprehensionAudioDurationSec: comprehensionAudioDurationSec,
@@ -259,6 +261,7 @@ class ReadingLogService {
     String? schoolTimezone,
     String? occurredOn,
     bool? claimQuickSlot,
+    List<Map<String, dynamic>>? books,
   }) {
     final log = buildLog(
       student: student,
@@ -275,6 +278,7 @@ class ReadingLogService {
       comprehensionAudioDurationSec: comprehensionAudioDurationSec,
       schoolTimezone: schoolTimezone,
       occurredOn: occurredOn,
+      books: books,
     );
     return writeLog(log, student: student, claimQuickSlot: claimQuickSlot);
   }
