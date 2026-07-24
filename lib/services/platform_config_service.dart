@@ -37,9 +37,40 @@ class PlatformConfigService {
     }
   }
 
+  static bool? _cachedBackdatingEnabled;
+  static DateTime? _cachedBackdatingAt;
+
+  /// D1 kill-switch for parent Yesterday backdating
+  /// (`platformConfig/parentBackdating`). House convention for this flag:
+  /// a MISSING doc means ENABLED — it ships on for first-round school
+  /// testing and the super-admin Operations toggle can turn it off without
+  /// an app release, based on real evidence.
+  Future<bool> isParentBackdatingEnabled() async {
+    final cachedAt = _cachedBackdatingAt;
+    if (_cachedBackdatingEnabled != null &&
+        cachedAt != null &&
+        DateTime.now().difference(cachedAt) < _cacheTtl) {
+      return _cachedBackdatingEnabled!;
+    }
+    try {
+      final doc = await _firestore
+          .collection('platformConfig')
+          .doc('parentBackdating')
+          .get();
+      final enabled = !doc.exists || doc.data()?['enabled'] != false;
+      _cachedBackdatingEnabled = enabled;
+      _cachedBackdatingAt = DateTime.now();
+      return enabled;
+    } catch (_) {
+      return _cachedBackdatingEnabled ?? true;
+    }
+  }
+
   /// Test hook: clears the in-memory flag cache.
   static void debugResetCache() {
     _cachedComprehensionEnabled = null;
     _cachedAt = null;
+    _cachedBackdatingEnabled = null;
+    _cachedBackdatingAt = null;
   }
 }

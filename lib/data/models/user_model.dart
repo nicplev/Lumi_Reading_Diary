@@ -23,6 +23,31 @@ class UserModel {
   final DateTime createdAt;
   final DateTime? lastLoginAt;
   final Map<String, dynamic>? preferences;
+
+  /// Per-child quick-log preferences for THIS guardian
+  /// (`preferences.quickLog.{studentId}`), so separated households keep
+  /// independent routines (plan §6.4). Returns null when never set.
+  Map<String, dynamic>? quickLogPrefsFor(String studentId) {
+    final quickLog = preferences?['quickLog'];
+    if (quickLog is! Map) return null;
+    final child = quickLog[studentId];
+    return child is Map ? Map<String, dynamic>.from(child) : null;
+  }
+
+  /// This guardian's usual quick-log minutes for [studentId], or null to
+  /// fall back to the allocation target.
+  int? usualMinutesFor(String studentId) {
+    final value = quickLogPrefsFor(studentId)?['usualMinutes'];
+    return value is num ? value.toInt() : null;
+  }
+
+  /// This guardian's pinned current book for [studentId] — lets a family
+  /// quick-log a library book/comic/re-read independent of school
+  /// allocation. Null when nothing is pinned.
+  String? pinnedBookTitleFor(String studentId) {
+    final value = quickLogPrefsFor(studentId)?['pinnedBookTitle'];
+    return value is String && value.trim().isNotEmpty ? value.trim() : null;
+  }
   final String? fcmToken; // For notifications
   final String? phoneNumber; // E.164 format; populated when SMS MFA is enrolled
   final bool phoneVerified;

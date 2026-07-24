@@ -349,7 +349,11 @@ Gate: full `flutter test` demo-readiness suite (pinned 3.44.6) + rules tests (Ja
 
 ### Phase 2 — P1 usability
 
-Picker with Current/Recent/Assigned + source badges + auto-commit polish (§4.2) · guardian×child usual duration + pinned current book + "make usual?" prompt (§6.4) · Today/Yesterday in the detailed flow (§6.5, pending D1) · `books[]` with per-book source/format + multi-book sessions (§6.1) · `editedAt` provenance + edited display · detailed success screen with `Done / Edit this log / Remove my session` · notes-and-audio audience disclosure line (`Shared with {teacher}` — dovetails with ST4S consent work).
+| Batch | Scope | Status |
+|---|---|---|
+| P2-1 | **Yesterday backdating (D1)**: Today/Yesterday segmented control in the detailed flow (school-time day math), Review step gains a "Reading day" row with school-time disclosure; gated on `platformConfig/parentBackdating` (absent ⇒ ENABLED; super-admin portal toggle owed by Nic). **Guardian×child prefs (§6.4)**: `preferences.quickLog.{studentId}` (usualMinutes / pinnedBookTitle / divergence tracking) via new `GuardianQuickLogPrefsService`; row button uses guardian usual, status shows `School goal: N min · book` when differing, pinned book fills the no-allocation gap; quick-log payload passes the SAME resolved titles/minutes as the label (preview==payload); D5 "make usual?" prompt after 3 consecutive divergent detailed saves | ✅ merged 2026-07-24; suite 647/647 |
+| P2-2 | Picker with Current/Recent/Assigned + source badges + auto-commit polish (§4.2); `books[]` with per-book source/format + multi-book sessions (§6.1; rules `contentUpdate`+`hasOnly` extension — batch with the pending rules deploy) | ☐ |
+| P2-3 | `editedAt` provenance + edited display · detailed success screen with `Done / Edit this log / Remove my session` · notes-and-audio audience disclosure line (`Shared with {teacher}` — dovetails with ST4S consent work) | ☐ |
 
 ### Phase 3 — P2 refinement
 

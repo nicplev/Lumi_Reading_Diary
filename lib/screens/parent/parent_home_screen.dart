@@ -2108,7 +2108,11 @@ class _TonightRowState extends State<_TonightRow> {
     return result;
   }
 
-  Future<void> _quickLog(List<AllocationModel> allocations) async {
+  Future<void> _quickLog(
+    List<AllocationModel> allocations, {
+    List<String>? resolvedTitles,
+    int? usualMinutes,
+  }) async {
     if (_isQuickLogging) return;
     // Access gate — route to the log-reading gate (→ AccessLockedScreen) rather
     // than attempting a write the licence no longer permits (endless retry).
@@ -2119,10 +2123,14 @@ class _TonightRowState extends State<_TonightRow> {
     // Lock synchronously at the moment of the tap (§3.3 step 1).
     setState(() => _isQuickLogging = true);
     try {
+      // The button's label and the payload come from the SAME resolved
+      // values (guardian usual + pinned/union titles) — preview == payload.
       final result = await ReadingLogService.instance.logReading(
         student: widget.student,
         parent: widget.parent,
         allocations: allocations,
+        bookTitles: resolvedTitles,
+        minutesRead: usualMinutes,
         quickLog: true,
         schoolTimezone: widget.timezone,
       );
@@ -2218,10 +2226,22 @@ class _TonightRowState extends State<_TonightRow> {
               allocations,
               FirebaseService.instance.firestore,
             );
-            final titles = _resolvedTitles(allocations);
-            final usualMinutes = allocations.isNotEmpty
+            // Assigned union first; a guardian-pinned book fills in when
+            // school hasn't allocated anything (§4.1/§6.4).
+            var titles = _resolvedTitles(allocations);
+            final pinned =
+                widget.parent.pinnedBookTitleFor(widget.student.id);
+            if (titles.isEmpty && pinned != null) titles = [pinned];
+
+            // Guardian's usual duration wins the button; the allocation
+            // target surfaces separately as "School goal" when different.
+            final goalMinutes = allocations.isNotEmpty
                 ? allocations.first.targetMinutes
-                : 20;
+                : null;
+            final usualMinutes =
+                widget.parent.usualMinutesFor(widget.student.id) ??
+                    goalMinutes ??
+                    20;
 
             final state = deriveChildLogRowState(
               student: widget.student,
@@ -2234,6 +2254,8 @@ class _TonightRowState extends State<_TonightRow> {
               justCreatedLogId: _lastQuickLogId,
               pendingLogs: _pendingLogs,
               conflictLogId: _conflictLogId,
+              goalMinutes:
+                  goalMinutes == usualMinutes ? null : goalMinutes,
             );
 
             final undoable = state is RowJustCreatedByMe ? state.log : null;
@@ -2245,7 +2267,11 @@ class _TonightRowState extends State<_TonightRow> {
               onOpenDetail: () {
                 if (!_isQuickLogging) _openDetail(allocations);
               },
-              onQuickLog: () => _quickLog(allocations),
+              onQuickLog: () => _quickLog(
+                allocations,
+                resolvedTitles: titles,
+                usualMinutes: usualMinutes,
+              ),
               onChooseBook: () => _openDetail(allocations),
               onUndo:
                   undoable == null ? null : () => _undoQuickLog(undoable),
