@@ -7,6 +7,22 @@ import 'package:lumi_reading_tracker/services/book_cover_ocr_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 void main() {
+  group('coverScannerScanWindowFor', () {
+    test('is a centred 260×180 rectangle', () {
+      expect(
+        coverScannerScanWindowFor(const Size(400, 700)),
+        const Rect.fromLTWH(70, 260, 260, 180),
+      );
+    });
+
+    test('shrinks to fit a surface smaller than the reticle', () {
+      expect(
+        coverScannerScanWindowFor(const Size(200, 120)),
+        const Rect.fromLTWH(0, 0, 200, 120),
+      );
+    });
+  });
+
   group('useDirectIosDocumentScanner', () {
     test('uses the direct document scanner path on iOS', () {
       expect(

@@ -8,6 +8,7 @@ import '../../core/characters/lumi_character.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/persistent_cached_image.dart';
+import '../../core/widgets/lumi/scan_reticle.dart';
 import '../../data/models/book_model.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/student_model.dart';
@@ -17,6 +18,28 @@ import '../../services/isbn_assignment_service.dart';
 import '../../services/teacher_device_book_cache_service.dart';
 import 'cover_scanner_screen.dart';
 import '../../core/utils/image_decode.dart';
+
+const Size _kIsbnReticleSize = Size(260, 180);
+
+/// Vertical placement of the reticle within the camera surface, expressed as a
+/// fraction of the leftover height — mirrors the previous
+/// `Alignment(0, -0.12)` overlay: `(1 + -0.12) / 2`.
+const double _kIsbnReticleTopFraction = 0.44;
+
+/// Rect the batch scanner both draws its reticle in and hands to
+/// `MobileScanner.scanWindow`, so detection is limited to the framed box.
+/// Shrinks to fit a camera surface smaller than the reticle.
+@visibleForTesting
+Rect isbnCameraScanWindowFor(Size surface) {
+  final width = _kIsbnReticleSize.width.clamp(0.0, surface.width);
+  final height = _kIsbnReticleSize.height.clamp(0.0, surface.height);
+  return Rect.fromLTWH(
+    (surface.width - width) / 2,
+    (surface.height - height) * _kIsbnReticleTopFraction,
+    width,
+    height,
+  );
+}
 
 class IsbnScannerScreen extends StatefulWidget {
   const IsbnScannerScreen({
@@ -669,54 +692,67 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
           // Camera
           Expanded(
             flex: 13,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                MobileScanner(
-                  controller: _scannerController,
-                  onDetect: _onDetect,
-                  errorBuilder: (context, error) => _buildCameraError(),
-                ),
-                Positioned(
-                  top: LumiTokens.space4,
-                  left: LumiTokens.space4,
-                  right: LumiTokens.space4,
-                  child: _StudentIdentityOverlay(
-                    student: _currentStudent,
-                    position: _isBatchMode ? _currentQueueIndex + 1 : null,
-                    total: _isBatchMode ? _queue.length : null,
-                  ),
-                ),
-                Align(
-                  alignment: const Alignment(0, -0.12),
-                  child: _ReticleOverlay(flashTick: _scanFlashTick),
-                ),
-                Align(
-                  alignment: const Alignment(0, -0.12),
-                  child: _ScanSuccessTickOverlay(tick: _scanFlashTick),
-                ),
-                Positioned(
-                  left: 16,
-                  right: 16,
-                  bottom: 18,
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.55),
-                        borderRadius:
-                            BorderRadius.circular(LumiTokens.radiusPill),
-                      ),
-                      child: Text(
-                        'Point at ISBN/EAN barcodes — scan several in one frame.',
-                        style: LumiType.caption.copyWith(color: Colors.white),
-                        textAlign: TextAlign.center,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final scanWindow =
+                    isbnCameraScanWindowFor(constraints.biggest);
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    MobileScanner(
+                      controller: _scannerController,
+                      scanWindow: scanWindow,
+                      onDetect: _onDetect,
+                      errorBuilder: (context, error) => _buildCameraError(),
+                    ),
+                    Positioned(
+                      top: LumiTokens.space4,
+                      left: LumiTokens.space4,
+                      right: LumiTokens.space4,
+                      child: _StudentIdentityOverlay(
+                        student: _currentStudent,
+                        position: _isBatchMode ? _currentQueueIndex + 1 : null,
+                        total: _isBatchMode ? _queue.length : null,
                       ),
                     ),
-                  ),
-                ),
-              ],
+                    Positioned.fromRect(
+                      rect: scanWindow,
+                      child: ScanReticle(
+                        size: scanWindow.size,
+                        flashTick: _scanFlashTick,
+                      ),
+                    ),
+                    Positioned.fromRect(
+                      rect: scanWindow,
+                      child: Center(
+                        child: _ScanSuccessTickOverlay(tick: _scanFlashTick),
+                      ),
+                    ),
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: 18,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.55),
+                            borderRadius:
+                                BorderRadius.circular(LumiTokens.radiusPill),
+                          ),
+                          child: Text(
+                            'Hold each barcode inside the frame.',
+                            style:
+                                LumiType.caption.copyWith(color: Colors.white),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
 
@@ -1272,31 +1308,6 @@ class _InfoChip extends StatelessWidget {
   }
 }
 
-/// Scan reticle — green corner brackets that flash brighter on each accepted
-/// scan (driven by [flashTick]).
-class _ReticleOverlay extends StatelessWidget {
-  const _ReticleOverlay({required this.flashTick});
-
-  final int flashTick;
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      key: ValueKey(flashTick),
-      tween: Tween<double>(begin: flashTick == 0 ? 0.0 : 1.0, end: 0.0),
-      duration: const Duration(milliseconds: 500),
-      curve: Curves.easeOut,
-      builder: (context, flash, _) {
-        return SizedBox(
-          width: 260,
-          height: 180,
-          child: CustomPaint(painter: _ReticlePainter(flash: flash)),
-        );
-      },
-    );
-  }
-}
-
 class _ScanSuccessTickOverlay extends StatelessWidget {
   const _ScanSuccessTickOverlay({required this.tick});
 
@@ -1343,62 +1354,6 @@ class _ScanSuccessTickOverlay extends StatelessWidget {
       ),
     );
   }
-}
-
-class _ReticlePainter extends CustomPainter {
-  _ReticlePainter({required this.flash});
-
-  /// 0 = resting, 1 = just scanned.
-  final double flash;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const armLength = 28.0;
-    final rect = Offset.zero & size;
-    final color = Color.lerp(
-      LumiTokens.green.withValues(alpha: 0.9),
-      LumiTokens.paper,
-      flash,
-    )!;
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 3 + flash * 1.5
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..style = PaintingStyle.stroke;
-
-    _corner(canvas, paint, rect.topLeft, 1, 1, armLength);
-    _corner(canvas, paint, rect.topRight, -1, 1, armLength);
-    _corner(canvas, paint, rect.bottomLeft, 1, -1, armLength);
-    _corner(canvas, paint, rect.bottomRight, -1, -1, armLength);
-
-    if (flash > 0) {
-      final fill = Paint()
-        ..color = LumiTokens.green.withValues(alpha: 0.12 * flash);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, const Radius.circular(14)),
-        fill,
-      );
-    }
-  }
-
-  void _corner(
-    Canvas canvas,
-    Paint paint,
-    Offset corner,
-    int dx,
-    int dy,
-    double len,
-  ) {
-    final path = Path()
-      ..moveTo(corner.dx + dx * len, corner.dy)
-      ..lineTo(corner.dx, corner.dy)
-      ..lineTo(corner.dx, corner.dy + dy * len);
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(_ReticlePainter oldDelegate) => oldDelegate.flash != flash;
 }
 
 class _PreviouslyReadWarningSheet extends StatelessWidget {
