@@ -191,10 +191,11 @@ review to check for any action taken before revocation.
 
 ## 6. Known gaps / reviewer must confirm
 
-- **NIC — WWCC not yet evidenced.** The screening standard (§2) is written; the
-  actual **current WWCC** (and any NPC) must be obtained/verified and its
-  *outcome* recorded in the evidence pack (reference/expiry to the restricted HR
-  file only). Until then HR1 is a standard, not a met control.
+- **NIC — WWCC HELD (2026-07-24); just record the details.** Nic **holds a current
+  WWCC**, so HR1 screening for the director is met in substance. Remaining step:
+  record its type/reference/date/expiry in the **restricted HR file (not git)** and
+  add a one-line *outcome* to the evidence pack ("current WWCC held — verified
+  [date]"). Repeat for any contractor/adviser who later gains access to student data.
 - **NIC — training not yet completed.** §3 defines the program; the **dated
   completion record** for each person (starting with the director) must exist for
   HR2 to be evidenced.
