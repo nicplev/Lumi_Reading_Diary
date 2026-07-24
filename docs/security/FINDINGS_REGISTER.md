@@ -19,7 +19,7 @@ Status: ☐ open · ◐ in progress · 🔍 confirmed, unfixed · ☑ fixed+veri
 | F-06 | Storage cover first-claim open to any authed non-demo user (world-readable catalogue; content-type client-declared) | Low | S4, PF51 | ⓘ accept-as-designed | Documented, intended tradeoff (`storage.rules.test.js:373-378`): storage rules can't read Firestore for role, accounts are invite-only, covers are non-personal. Enforced protections stand: uploaderUid must equal the caller, and no overwrite of another user's cover. Optional uplift: callable-mediated upload with a server-side role check |
 | F-07 | `books/lookup` external-API amplification + ISBN param injection, no rate limit | Low | Q5 | ☐ | Add per-user rate limit + strict ISBN validation (portal) |
 | F-08 | CSRF on portal mutations rests on `SameSite=Lax` alone | Low | A13 | ⓘ | Accept-as-designed; revisit if a same-registrable-domain sibling is introduced |
-| F-09 | `createUser` password min-6 (portal) | Low | **A2** | ☐ | Fold into ST4S Phase 1.1 (14-char + complexity across all surfaces) |
+| F-09 | `createUser` password min-6 → 14+/complexity (portal) | Low | **A2** | ☑ | Fixed + deployed (PR #554): shared validator on Add-Staff route+modal; temp generators 16+symbol; Firebase console policy Require/14/all-classes set. A2 true across surfaces |
 
 ## Mobile (AP2 / MASVS) findings
 
@@ -51,3 +51,4 @@ Semgrep SAST baseline (`p/typescript`,`p/javascript`,`p/secrets`,`p/owasp-top-te
 | 2026-07-23 | Register created. F-01/F-02/F-03 fixed+verified; AP2 review folded in; SCA baseline (SCA-01) recorded; Dependabot + osv-scanner + semgrep added to watch dependencies/SAST going forward. |
 | 2026-07-23 (overnight) | F-06 reclassified accept-as-designed (`storage.rules.test.js:373`). Semgrep SAST baseline run — 1 finding (SAST-01, low), otherwise clean. S4 cross-tenant isolation assurance test added + passing (4/4 in `security_poc.rules.test.js`). |
 | 2026-07-24 | **F-01/F-02/F-03 DEPLOYED to production** (`firestore:rules` → `lumi-ninc-au`, PR #520 / `66339f0`) — now live-fixed. New hygiene note (HY-01, info): pre-existing unused `demoAdminReadOnly` function + invalid `request` var refs at `firestore.rules:186-190` (dead code, cleanup candidate; not a security issue). |
+| 2026-07-24 | **A2 (F-09) done + deployed** (PR #554 / `2b29e9a`): temp-pw generators 16+symbol, portal Add-Staff 14+/complexity shared validator, Dart app validators; portal + `processStaffOnboardingEmail` deployed; Firebase console password policy set to Require/14/all-4-classes (evidence: password-policy screenshot → `~/lumi-security-evidence/A2-passwords/`, to be filed in the master pack by Nic). |

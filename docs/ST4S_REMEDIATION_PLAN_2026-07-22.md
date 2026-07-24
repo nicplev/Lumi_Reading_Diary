@@ -68,7 +68,7 @@ This is the index. Each row points at the phase that fixes it. Claude keeps the 
 | S11 | Perimeter controls (firewall/WAF/DDoS…) | Ready (medium risk) | Later-uplift | ☐ |
 | S13 | Production data used in dev/test | Ready ("No") | — | ☑ |
 | A1 | Unique accounts for all users | Ready (note: extra review later) | — | ☑ |
-| A2 | Password strength & storage | **Answered Yes, not true yet** | **Phase 1.1** | ☐ |
+| A2 | Password strength & storage | **Answered Yes, not true yet** | **Phase 1.1** | ☑ |
 | A5 | MFA for admins/support/privileged accounts | Not Ready | Phase 2.2 | ☐ |
 | A6 | Role-based access, documented for all systems | Ready (medium risk) | Later-uplift | ☐ |
 | A7 | Regular review/revocation of staff & contractor access | Not Ready | Phase 2.4 + Phase 4 | ☐ |
@@ -369,6 +369,8 @@ Not needed for a Ready outcome; each removes a "medium risk" note in the Full As
 | Date | Phase/Item | Change | PR | Status |
 |---|---|---|---|---|
 | 2026-07-23 | — | Plan v2: rewritten against verified codebase state; master table + phased checklist created | — | ☑ |
+| 2026-07-24 | S4/A13 | F-01/F-02/F-03 create-time field-forgery rules gaps found, fixed + deployed to prod (`firestore:rules`); emulator regression tests added (`security_poc.rules.test.js`). Strengthens S4/A13. | #520 | ☑ |
+| 2026-07-24 | A2 (Phase 1.1) | Passwords enforced at 14+/complexity everywhere: temp-pw generators 12→16+symbol, portal Add-Staff min-6→14, shared app+portal validators; Firebase console password policy set to Require/min-14/all-4-classes. Portal + `processStaffOnboardingEmail` deployed. A2 now true across all surfaces. | #554 | ☑ |
 
 ---
 
