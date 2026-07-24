@@ -260,6 +260,8 @@ class _SessionCard extends StatelessWidget {
           ? 'Class reading'
           : (isMine ? 'Logged by you' : 'Logged by ${session.loggedByDisplay}'),
       DateFormat('h:mm a').format(session.date),
+      if (session.editedAt != null)
+        'Edited ${DateFormat('h:mm a').format(session.editedAt!)}',
     ].join(' · ');
 
     return Container(

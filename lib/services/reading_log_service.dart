@@ -737,6 +737,8 @@ class ReadingLogService {
       titleUnresolved: (cleanedTitles != null && cleanedTitles.isNotEmpty)
           ? false
           : null,
+      // Local approximation of the server-pinned value, for instant display.
+      editedAt: DateTime.now(),
     );
     await OfflineService.instance.saveReadingLogCacheOnly(updated);
     return updated;

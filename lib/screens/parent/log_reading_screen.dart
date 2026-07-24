@@ -1307,6 +1307,16 @@ class _LogReadingScreenState extends State<LogReadingScreen>
             const SizedBox(height: 8),
             _buildNotesField(),
           ],
+          // Audience disclosure (§ Phase 2): notes and recordings are not a
+          // private diary — say who reads them before they're written.
+          if (_hasOptionalDetail) ...[
+            const SizedBox(height: 8),
+            Text(
+              "Notes and recordings are shared with "
+              "${widget.student.firstName}'s teacher.",
+              style: LumiTextStyles.bodySmall(color: LumiTokens.muted),
+            ),
+          ],
         ],
       ),
     ).animate().fadeIn();

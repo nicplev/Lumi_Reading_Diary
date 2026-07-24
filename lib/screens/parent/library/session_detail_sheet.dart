@@ -176,6 +176,9 @@ class _SessionDetailSheetState extends ConsumerState<_SessionDetailSheet> {
                             '${log.minutesRead} min',
                             if (log.loggedByName != null)
                               'Logged by ${log.loggedByDisplay}',
+                            if (log.editedAt != null)
+                              'Edited '
+                                  '${DateFormat('d MMM, h:mm a').format(log.editedAt!)}',
                           ].join('  ·  '),
                           style: LumiType.caption,
                         ),

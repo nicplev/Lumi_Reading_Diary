@@ -103,6 +103,10 @@ class ReadingLogModel {
   // session's duration contributes once regardless of book count.
   final List<Map<String, dynamic>>? books;
 
+  // Server-pinned timestamp of the owner's last content edit (rules force
+  // request.time). Null = never edited. Read-only provenance for display.
+  final DateTime? editedAt;
+
   // Comprehension voice recording fields. The path is the Storage object key
   // (NOT a download URL — resolved on demand). `uploaded` gates the teacher
   // playback UI; the log is created with `uploaded: false`, then patched to
@@ -158,6 +162,7 @@ class ReadingLogModel {
     this.context,
     this.titleUnresolved = false,
     this.books,
+    this.editedAt,
     this.comprehensionAudioPath,
     this.comprehensionAudioDurationSec,
     this.comprehensionAudioUploaded = false,
@@ -289,6 +294,7 @@ class ReadingLogModel {
           ?.whereType<Map>()
           .map((entry) => Map<String, dynamic>.from(entry))
           .toList(),
+      editedAt: (data['editedAt'] as Timestamp?)?.toDate(),
       comprehensionAudioPath: data['comprehensionAudioPath'] as String?,
       comprehensionAudioDurationSec:
           (data['comprehensionAudioDurationSec'] as num?)?.toInt(),
@@ -400,6 +406,7 @@ class ReadingLogModel {
     String? context,
     bool? titleUnresolved,
     List<Map<String, dynamic>>? books,
+    DateTime? editedAt,
     String? comprehensionAudioPath,
     int? comprehensionAudioDurationSec,
     bool? comprehensionAudioUploaded,
@@ -448,6 +455,7 @@ class ReadingLogModel {
       context: context ?? this.context,
       titleUnresolved: titleUnresolved ?? this.titleUnresolved,
       books: books ?? this.books,
+      editedAt: editedAt ?? this.editedAt,
       comprehensionAudioPath:
           comprehensionAudioPath ?? this.comprehensionAudioPath,
       comprehensionAudioDurationSec:
@@ -509,6 +517,7 @@ class ReadingLogModel {
       'context': context,
       'titleUnresolved': titleUnresolved,
       'books': books,
+      'editedAt': editedAt?.toIso8601String(),
       'comprehensionAudioPath': comprehensionAudioPath,
       'comprehensionAudioDurationSec': comprehensionAudioDurationSec,
       'comprehensionAudioUploaded': comprehensionAudioUploaded,
@@ -598,6 +607,9 @@ class ReadingLogModel {
           ?.whereType<Map>()
           .map((entry) => Map<String, dynamic>.from(entry))
           .toList(),
+      editedAt: map['editedAt'] != null
+          ? DateTime.tryParse(map['editedAt'] as String)
+          : null,
       comprehensionAudioPath: map['comprehensionAudioPath'] as String?,
       comprehensionAudioDurationSec:
           (map['comprehensionAudioDurationSec'] as num?)?.toInt(),
