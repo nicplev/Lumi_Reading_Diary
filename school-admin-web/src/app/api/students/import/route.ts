@@ -3,14 +3,23 @@ import { getSession } from '@/lib/auth/session';
 import { importStudents, type CSVRow } from '@/lib/firestore/students';
 import { z } from 'zod';
 
+// Field-length caps bound what a single import can store: the row cap alone
+// still allowed 500 rows of arbitrarily long strings. Mirrors the rollover
+// routes — keep the three in sync.
 const rowSchema = z.object({
-  studentId: z.string().optional(),
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
-  className: z.string().min(1),
-  yearLevel: z.string().optional(),
-  parentEmail: z.string().optional(),
-  readingLevel: z.string().optional(),
+  studentId: z.string().max(64).optional(),
+  firstName: z.string().min(1).max(100),
+  lastName: z.string().min(1).max(100),
+  className: z.string().min(1).max(100),
+  yearLevel: z.string().max(32).optional(),
+  // Same format guard as the rollover commit route: this value is stored as
+  // additionalInfo.pendingParentEmail and later used as an email recipient.
+  parentEmail: z
+    .string()
+    .max(254)
+    .optional()
+    .refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), 'Invalid parent email'),
+  readingLevel: z.string().max(64).optional(),
 });
 
 const importSchema = z.object({

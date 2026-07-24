@@ -115,7 +115,13 @@ interface EntryCardParams {
 }
 
 export function renderEntryCard(params: EntryCardParams): string {
-  const {studentName, linkCode, qrSrc} = params;
+  const {linkCode, qrSrc} = params;
+  // Student names reach us from the school roster — including a bulk SIS/CSV
+  // import, where an attacker-supplied file could smuggle markup into a name.
+  // This email goes to parents from the school's trusted sender, so an
+  // unescaped name would be a ready-made phishing surface. Escaped at the leaf,
+  // matching renderSchoolNoteBlock. linkCode/qrSrc are server-generated.
+  const studentName = escapeHtml(params.studentName);
   return `
       <tr>
         <td style="padding: 0 24px 20px 24px;">
@@ -199,8 +205,11 @@ export function renderSchoolNoteBlock(customMessage?: string): string {
 }
 
 export function renderEmailShell(params: EmailShellParams): string {
-  const {schoolName, customMessage, appStoreUrl, playStoreUrl, entryCards, mascotSrc} =
+  const {customMessage, appStoreUrl, playStoreUrl, entryCards, mascotSrc} =
     params;
+  // School display names are admin-editable, so escape before splicing.
+  // entryCards is already-rendered (and escaped) HTML from renderEntryCard.
+  const schoolName = escapeHtml(params.schoolName);
 
   const customMessageBlock = renderSchoolNoteBlock(customMessage);
 
@@ -375,10 +384,7 @@ export function buildStaffOnboardingEmail(params: {
   customMessage?: string;
 }): string {
   const {
-    schoolName,
-    staffName,
     role,
-    loginEmail,
     tempPassword,
     schoolCode,
     portalUrl,
@@ -386,6 +392,12 @@ export function buildStaffOnboardingEmail(params: {
     playStoreUrl = "#",
     customMessage,
   } = params;
+  // Roster-supplied values — a staff CSV import can carry markup in a name or
+  // address — so escape before splicing into the HTML body. tempPassword,
+  // schoolCode and portalUrl are server-generated.
+  const schoolName = escapeHtml(params.schoolName);
+  const staffName = escapeHtml(params.staffName);
+  const loginEmail = escapeHtml(params.loginEmail);
 
   const isAdmin = role === "schoolAdmin";
   const roleLabel = isAdmin ? "Administrator" : "Teacher";

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toCsv } from '@/lib/csv-export';
 import { Badge } from '@/components/lumi/badge';
 import { Button } from '@/components/lumi/button';
 import { Card } from '@/components/lumi/card';
@@ -136,8 +137,7 @@ export function ComprehensionEvalTab({
 
   function downloadCsv() {
     // Levels + flags only — never any numeric score.
-    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
-    const rows: string[][] = [
+    const rows: Array<Array<string | null>> = [
       ['Student', 'Date', 'Level', 'Confidence', 'Flags', 'Summary'],
       ...filtered.map((e) => [
         studentNames[e.studentId] ?? e.studentId,
@@ -148,7 +148,7 @@ export function ComprehensionEvalTab({
         e.summary ?? '',
       ]),
     ];
-    const csv = rows.map((r) => r.map(esc).join(',')).join('\r\n');
+    const csv = toCsv(rows);
     const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
