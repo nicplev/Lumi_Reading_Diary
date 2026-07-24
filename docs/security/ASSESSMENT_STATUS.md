@@ -89,8 +89,8 @@ Owner tags: **[SEC]** this security orchestration · **[DOC]** separate document
 | AP1 | Scan every deploy + monthly | Not Ready | [SEC] | ☐ (Wave 5) | 5 |
 | AP2 | Mobile tested per MASTG | Not Ready | [SEC] | ☐ (Wave 4) | 5.4 |
 | PF51 | File-upload protections incl. AV | Ready (see honesty list) | [SEC]+[NIC] | 🔍 F-06 | 7 |
-| EV10 | Penetration-test report | Not Ready | [SEC] interim + external final | ◐ | 4 |
-| EV11 | Vulnerability-assessment reports | Not Ready | [SEC] | ◐ | 4 / 5 |
+| EV10 | Penetration-test report | Not Ready | [SEC] interim + external final | ◐ interim assessment report done; independent external test still outstanding | 4 |
+| EV11 | Vulnerability-assessment reports | Not Ready | [SEC] | ☑ report produced (`VULNERABILITY_ASSESSMENT_REPORT_2026-07-24.md`) | 4 / 5 |
 | Privacy/T&C consent (web portals) | Not captured in portals | [SEC] code + [DOC] policy | ☐ | 1.2 / 6.5 |
 | EV6–EV9, EV12, EV13 | Policy pack (InfoSec/BCP/DR/IRP/patch/SSDLC) | Not Ready | **[DOC]** | ☐ separate workstream | 4 |
 | HR1/HR2/HR3 | Screening / training / offboarding | Not Ready | [NIC]+[DOC] | ☐ separate | 0.1 / 4 |
