@@ -5,9 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:intl/intl.dart';
+
 import '../../theme/lumi_tokens.dart';
 import '../../core/theme/lumi_text_styles.dart';
 import '../../core/utils/responsive.dart';
+import '../../core/utils/school_time.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/blob_selector.dart';
 import '../../core/widgets/lumi/comment_chips.dart';
@@ -20,6 +23,7 @@ import '../../data/models/reading_log_model.dart';
 import '../../data/models/school_model.dart';
 import '../../data/models/parent_comment_settings.dart';
 import '../../services/firebase_service.dart';
+import '../../services/guardian_quick_log_prefs_service.dart';
 import '../../services/isbn_assignment_service.dart';
 import '../../services/offline_service.dart';
 import '../../services/platform_config_service.dart';
@@ -126,6 +130,20 @@ class _LogReadingScreenState extends State<LogReadingScreen>
   // Soft, non-blocking notice when another guardian already logged today.
   String? _alreadyLoggedNotice;
 
+  // ---- Occurrence day (D1: Yesterday backdating) --------------------------
+  // The detailed flow may record Today or Yesterday — nothing further back
+  // (accountability decision). Gated on platformConfig/parentBackdating so
+  // it can be turned off without an app release. All day math is in the
+  // SCHOOL's timezone.
+  bool _backdatingEnabled = false;
+  bool _isYesterday = false;
+  String _schoolTimezone = SchoolTime.defaultTimezone;
+
+  String get _occurredOn {
+    final today = SchoolTime.todayFor(_schoolTimezone);
+    return _isYesterday ? SchoolTime.shiftDays(today, -1) : today;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -151,6 +169,11 @@ class _LogReadingScreenState extends State<LogReadingScreen>
 
     _loadCommentSettings();
     _checkAlreadyLoggedToday();
+    PlatformConfigService().isParentBackdatingEnabled().then((enabled) {
+      if (mounted && enabled != _backdatingEnabled) {
+        setState(() => _backdatingEnabled = enabled);
+      }
+    });
   }
 
   @override
@@ -350,6 +373,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
         if (schoolDoc.exists) {
           final school = SchoolModel.fromFirestore(schoolDoc);
           final schoolAudio = school.comprehensionRecordingSettings;
+          _schoolTimezone = school.timezone;
           _commentSettings = school.parentCommentSettings;
           _comprehensionSettings = ComprehensionRecordingSettings(
             enabled: platformEnabled && schoolAudio.enabled,
@@ -523,6 +547,8 @@ class _LogReadingScreenState extends State<LogReadingScreen>
         comprehensionAudioPath: storagePath,
         comprehensionAudioDurationSec:
             previewOnly ? null : recording?.durationSec,
+        schoolTimezone: _schoolTimezone,
+        occurredOn: _occurredOn,
       );
 
       // Hand the audio file off: directly online, or via the offline queue.
@@ -582,6 +608,56 @@ class _LogReadingScreenState extends State<LogReadingScreen>
       // Recognise the richer logging path (powers the occasional nudge +
       // positive recognition). Best-effort — never blocks the success screen.
       await LoggingEngagementService.instance.recordDetailedLog();
+
+      // D5: the usual duration never changes silently. Track this session's
+      // minutes against the guardian's usual; only after 3 consecutive
+      // sessions at the same different value does the app ASK (§6.4).
+      final currentUsual =
+          widget.parent.usualMinutesFor(widget.student.id) ??
+              (widget.allocations.isNotEmpty
+                  ? widget.allocations.first.targetMinutes
+                  : 20);
+      // Guardian prefs live on the parent doc — schoolId is always present
+      // for a linked parent, but the model keeps it nullable.
+      final prefsSchoolId = widget.parent.schoolId ?? widget.student.schoolId;
+      final shouldAskUsual =
+          await GuardianQuickLogPrefsService.instance.recordSessionMinutes(
+        schoolId: prefsSchoolId,
+        parentId: widget.parent.id,
+        studentId: widget.student.id,
+        minutes: _selectedMinutes,
+        currentUsual: currentUsual,
+      );
+      if (shouldAskUsual && mounted) {
+        final make = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Make $_selectedMinutes minutes '
+                "${widget.student.firstName}'s usual quick-log time?"),
+            content: const Text(
+                "You've logged this length a few times in a row. The quick "
+                'log button can use it as the default.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Keep current'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Make it usual'),
+              ),
+            ],
+          ),
+        );
+        if (make == true) {
+          await GuardianQuickLogPrefsService.instance.setUsualMinutes(
+            schoolId: prefsSchoolId,
+            parentId: widget.parent.id,
+            studentId: widget.student.id,
+            minutes: _selectedMinutes,
+          );
+        }
+      }
 
       if (mounted) {
         context.go('/parent/reading-success', extra: {
@@ -783,8 +859,28 @@ class _LogReadingScreenState extends State<LogReadingScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Tonight\'s reading', style: LumiTextStyles.h2()),
+          Text(
+            _isYesterday ? 'Last night\'s reading' : 'Tonight\'s reading',
+            style: LumiTextStyles.h2(),
+          ),
           const SizedBox(height: 16),
+
+          // D1: bounded backdating — Today or Yesterday only, school time,
+          // and only while platformConfig/parentBackdating allows it.
+          if (_backdatingEnabled) ...[
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: false, label: Text('Today')),
+                ButtonSegment(value: true, label: Text('Yesterday')),
+              ],
+              selected: {_isYesterday},
+              onSelectionChanged: _isLoading
+                  ? null
+                  : (selection) =>
+                      setState(() => _isYesterday = selection.first),
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // Assigned books — collapsed to the first few so a large class
           // library doesn't bury Reading time + feeling. Any selected title
@@ -1204,6 +1300,16 @@ class _LogReadingScreenState extends State<LogReadingScreen>
 
   // ─── Step 4: Confirmation ────────────────────────────────
 
+  /// Human description of the day being saved, flagged with '(school time)'
+  /// whenever the device's calendar date disagrees with the school's.
+  String _describeOccurredOn() {
+    final label = DateFormat('EEE d MMM')
+        .format(DateTime.parse('${_occurredOn}T12:00:00'));
+    final dayWord = _isYesterday ? 'Yesterday' : 'Today';
+    final mismatch = SchoolTime.deviceDayDiffers(_schoolTimezone);
+    return mismatch ? '$dayWord · $label (school time)' : '$dayWord · $label';
+  }
+
   Widget _buildStep4Confirmation() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -1212,18 +1318,28 @@ class _LogReadingScreenState extends State<LogReadingScreen>
           Text('Review reading', style: LumiTextStyles.h2()),
           const SizedBox(height: 8),
           Text(
-            'Check the details, then save tonight\'s reading',
+            _isYesterday
+                ? 'Check the details, then save last night\'s reading'
+                : 'Check the details, then save tonight\'s reading',
             style: LumiTextStyles.bodySmall(
               color: LumiTokens.ink.withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(height: 24),
 
-          // Summary card
+          // Summary card — the exact payload the save writes. The date row
+          // states the school-local occurrence day so a backdated or
+          // travelling save can never be a surprise (§6.5).
           _bentoCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _buildSummaryRow(
+                  Icons.event,
+                  'Reading day',
+                  _describeOccurredOn(),
+                ),
+                const Divider(height: 24),
                 _buildSummaryRow(
                   Icons.menu_book,
                   _finalBookTitles.length == 1 ? 'Book' : 'Books',

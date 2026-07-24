@@ -296,11 +296,16 @@ class _RowInfo extends StatelessWidget {
     Widget? statusExtra;
     switch (s) {
       case RowReady():
-        status = s.bookTitles.length > 1
-            ? ParentLoggingCopy.readyStatusMulti(
-                s.bookTitles.first, s.bookTitles.length - 1, s.usualMinutes)
-            : ParentLoggingCopy.readyStatus(
-                s.bookTitles.first, s.usualMinutes);
+        // When the guardian's usual differs from the allocation target, the
+        // usual lives on the button and the school's goal is disclosed here
+        // — teacher target and parent-reported time never conflate (§6.4).
+        status = s.goalMinutes != null
+            ? ParentLoggingCopy.schoolGoal(s.goalMinutes!, s.bookTitles.first)
+            : s.bookTitles.length > 1
+                ? ParentLoggingCopy.readyStatusMulti(s.bookTitles.first,
+                    s.bookTitles.length - 1, s.usualMinutes)
+                : ParentLoggingCopy.readyStatus(
+                    s.bookTitles.first, s.usualMinutes);
       case RowNeedsBook():
         status = ParentLoggingCopy.needsBookStatus;
       case RowSubmitting():
