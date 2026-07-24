@@ -250,7 +250,10 @@ export async function lookupBookByIsbn(
   options: { cache?: boolean } = {},
 ): Promise<Book | null> {
   const normalized = normalizeIsbn(isbn);
-  if (!normalized) return null;
+  // Only a well-formed ISBN-10/13 may proceed; anything else (query-string
+  // injection, junk) is rejected here so it never lands in a Google Books /
+  // Open Library lookup URL (finding F-07).
+  if (!normalized || !isValidIsbn(normalized)) return null;
 
   // 1. Check Firestore cache
   const snap = await adminDb
@@ -372,6 +375,13 @@ export async function lookupBookByIsbn(
 
 function normalizeIsbn(isbn: string): string {
   return isbn.replace(/[-\s]/g, '').trim();
+}
+
+// A normalized ISBN is 13 digits (ISBN-13) or 9 digits + a check char (ISBN-10,
+// whose last char may be X). Anything else — letters, `&`, `=`, `#`, `/` — is
+// rejected before it can be interpolated into an external lookup URL (F-07).
+function isValidIsbn(isbn: string): boolean {
+  return /^[0-9]{13}$/.test(isbn) || /^[0-9]{9}[0-9Xx]$/.test(isbn);
 }
 
 interface LookupResult {
