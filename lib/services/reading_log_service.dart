@@ -97,6 +97,16 @@ class StudentAccessInactiveException implements Exception {
   String toString() => 'Student access is not active';
 }
 
+/// Editing an existing session needs a live connection (the offline drain's
+/// create-once policy would silently drop a queued edit). The UI shows
+/// "reconnect to edit" copy instead of failing quietly.
+class ReadingLogEditOfflineException implements Exception {
+  const ReadingLogEditOfflineException();
+
+  @override
+  String toString() => 'Editing a session requires a connection';
+}
+
 /// Internal result of the stats preview.
 class _StatsUpdate {
   const _StatsUpdate(this.stats, this.restDayApplied);
@@ -671,6 +681,91 @@ class ReadingLogService {
       existingLogId: existingLogId,
       existingLog: existingLog,
     );
+  }
+
+  /// Content-edits a session the CALLER created (owner-scoped by rules).
+  ///
+  /// The editable field set mirrors `contentUpdateIsValid` in
+  /// firestore.rules: minutes, books, notes, feeling, parent comments —
+  /// never the date (`occurredOn`/`date` are immutable; a wrong-day fix is
+  /// remove + re-log). `editedAt` is stamped server-side for provenance.
+  ///
+  /// Online-only for now: the offline drain treats an existing doc as a
+  /// create-once receipt, so a queued edit would be silently dropped —
+  /// callers surface "reconnect to edit" instead (PR-F extends the drain).
+  Future<ReadingLogModel> updateOwnLog(
+    ReadingLogModel log, {
+    int? minutesRead,
+    List<String>? bookTitles,
+    String? notes,
+    ReadingFeeling? feeling,
+  }) async {
+    if (!ServiceStatusController.instance.current.canWriteToFirebase) {
+      throw const ReadingLogEditOfflineException();
+    }
+    final cleanedTitles = bookTitles
+        ?.map((t) => t.trim())
+        .where((t) => t.isNotEmpty)
+        .toList();
+    final trimmedNotes = notes?.trim();
+
+    final updates = <String, dynamic>{
+      if (minutesRead != null) 'minutesRead': minutesRead,
+      if (cleanedTitles != null) 'bookTitles': cleanedTitles,
+      if (cleanedTitles != null && cleanedTitles.isNotEmpty)
+        'titleUnresolved': false,
+      if (notes != null)
+        'notes': trimmedNotes!.isEmpty ? FieldValue.delete() : trimmedNotes,
+      if (feeling != null)
+        'childFeeling': feeling.toString().split('.').last,
+      'editedAt': FieldValue.serverTimestamp(),
+    };
+    await _logRef(log).update(updates).timeout(_onlineWriteAckTimeout);
+
+    final updated = log.copyWith(
+      minutesRead: minutesRead,
+      bookTitles: cleanedTitles,
+      notes: notes == null ? null : (trimmedNotes!.isEmpty ? null : trimmedNotes),
+      childFeeling: feeling,
+      titleUnresolved: (cleanedTitles != null && cleanedTitles.isNotEmpty)
+          ? false
+          : null,
+    );
+    await OfflineService.instance.saveReadingLogCacheOnly(updated);
+    return updated;
+  }
+
+  /// Counts the student's HOME sessions on [occurredOn] (school-local day) —
+  /// powers the "removing the only qualifying session" warning (§5.3).
+  Future<int> countHomeSessionsOn({
+    required String schoolId,
+    required String studentId,
+    required String occurredOn,
+    required String timezone,
+  }) async {
+    final range = SchoolTime.utcRangeForLocalDay(occurredOn, timezone);
+    // ±1-day query window + client-side occurredOn bucketing, matching the
+    // Home row and the server's resolveOccurrenceDate.
+    final snap = await _firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('readingLogs')
+        .where('studentId', isEqualTo: studentId)
+        .where('date',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(
+                range.startInclusive.subtract(const Duration(days: 1))))
+        .where('date',
+            isLessThan: Timestamp.fromDate(
+                range.endExclusive.add(const Duration(days: 1))))
+        .get();
+    return snap.docs
+        .map(ReadingLogModel.fromFirestore)
+        .where((log) =>
+            log.isHomeContext &&
+            (log.occurredOn ??
+                    SchoolTime.localDateString(log.date, timezone)) ==
+                occurredOn)
+        .length;
   }
 
   /// Deletes a session the CALLER created — the undo / remove-my-session

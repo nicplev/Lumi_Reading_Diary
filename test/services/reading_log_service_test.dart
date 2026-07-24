@@ -512,6 +512,74 @@ void main() {
           reason: 'undo frees the day slot for the co-guardian');
     });
 
+    test('updateOwnLog edits content fields and stamps editedAt; date stays',
+        () async {
+      final result = await service.logReading(
+        student: student(),
+        parent: parentUser('parent_a'),
+        bookTitles: const ['The Bad Guys'],
+        minutesRead: 15,
+        quickLog: true,
+      );
+
+      final updated = await service.updateOwnLog(
+        result.log,
+        minutesRead: 25,
+        bookTitles: const ['Zog'],
+        notes: 'Read aloud together',
+      );
+
+      expect(updated.minutesRead, 25);
+      expect(updated.bookTitles, ['Zog']);
+      expect(updated.notes, 'Read aloud together');
+
+      final raw = (await firestore
+              .collection('schools')
+              .doc(schoolId)
+              .collection('readingLogs')
+              .doc(result.log.id)
+              .get())
+          .data()!;
+      expect(raw['minutesRead'], 25);
+      expect(raw['bookTitles'], ['Zog']);
+      expect(raw['editedAt'], isNotNull, reason: 'edit provenance stamped');
+      expect(raw['occurredOn'], result.log.occurredOn,
+          reason: 'the session date is immutable through edits');
+    });
+
+    test('countHomeSessionsOn counts only home-context sessions on that day',
+        () async {
+      final first = await service.logReading(
+        student: student(),
+        parent: parentUser('parent_a'),
+        bookTitles: const ['The Bad Guys'],
+        quickLog: true,
+      );
+      await service.logReading(
+        student: student(),
+        parent: parentUser('parent_b'),
+        bookTitles: const ['Zog'],
+        quickLog: true,
+        claimQuickSlot: false,
+      );
+
+      final count = await service.countHomeSessionsOn(
+        schoolId: schoolId,
+        studentId: studentId,
+        occurredOn: first.log.occurredOn!,
+        timezone: 'Australia/Sydney',
+      );
+      expect(count, 2);
+
+      final otherDay = await service.countHomeSessionsOn(
+        schoolId: schoolId,
+        studentId: studentId,
+        occurredOn: '2020-01-01',
+        timezone: 'Australia/Sydney',
+      );
+      expect(otherDay, 0);
+    });
+
     test("deleteOwnLog leaves a sibling session's slot alone", () async {
       final first = await service.logReading(
         student: student(),
