@@ -34,3 +34,12 @@ test("a wrong key fails to decrypt", () => {
   const wrong = deriveKey("a-different-secret-that-is-also-32-chars-plus!!");
   assert.throws(() => decryptSecret(enc, wrong));
 });
+
+test("a truncated auth tag is rejected (SAST-01 hardening)", () => {
+  const enc = encryptSecret("secret", KEY);
+  const truncated = {
+    ...enc,
+    tag: Buffer.from(enc.tag, "base64").subarray(0, 8).toString("base64"),
+  };
+  assert.throws(() => decryptSecret(truncated, KEY), /tag length/i);
+});

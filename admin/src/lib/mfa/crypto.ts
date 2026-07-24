@@ -30,7 +30,7 @@ export function getMfaKey(): Buffer {
 
 export function encryptSecret(plaintext: string, key: Buffer): EncryptedSecret {
   const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const cipher = createCipheriv("aes-256-gcm", key, iv, { authTagLength: 16 });
   const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
   return {
     ciphertext: ciphertext.toString("base64"),
@@ -41,8 +41,20 @@ export function encryptSecret(plaintext: string, key: Buffer): EncryptedSecret {
 
 // Throws if the ciphertext or tag has been tampered with (GCM auth failure).
 export function decryptSecret(enc: EncryptedSecret, key: Buffer): string {
-  const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(enc.iv, "base64"));
-  decipher.setAuthTag(Buffer.from(enc.tag, "base64"));
+  const tag = Buffer.from(enc.tag, "base64");
+  // GCM auth tags are 16 bytes. Reject a truncated tag explicitly — a short tag
+  // weakens integrity, and Admin-SDK writes to the deny-all secret doc bypass
+  // any client-side validation. `authTagLength` also pins the decipher to 16.
+  if (tag.length !== 16) {
+    throw new Error("Invalid authentication tag length");
+  }
+  const decipher = createDecipheriv(
+    "aes-256-gcm",
+    key,
+    Buffer.from(enc.iv, "base64"),
+    { authTagLength: 16 },
+  );
+  decipher.setAuthTag(tag);
   const plaintext = Buffer.concat([
     decipher.update(Buffer.from(enc.ciphertext, "base64")),
     decipher.final(),
