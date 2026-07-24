@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../core/widgets/lumi/lumi_toast.dart';
 import '../../../data/models/reading_log_model.dart';
+import '../../../services/offline_service.dart';
 import '../../../services/reading_log_service.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
@@ -12,22 +13,28 @@ import '../../../theme/lumi_typography.dart';
 /// deliberately not editable — occurredOn is immutable; a wrong-day fix is
 /// remove + re-log. Returns the updated log via the sheet's result, or null
 /// when nothing was saved.
+///
+/// [isPending] switches the save path to the offline outbox (Edit pending,
+/// §7.1): the queued payload is mutated in place under the SAME log ID, so
+/// the eventual replay still writes exactly one session.
 Future<ReadingLogModel?> showEditReadingLogSheet(
   BuildContext context,
-  ReadingLogModel log,
-) {
+  ReadingLogModel log, {
+  bool isPending = false,
+}) {
   return showModalBottomSheet<ReadingLogModel>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (context) => _EditReadingLogSheet(log: log),
+    builder: (context) => _EditReadingLogSheet(log: log, isPending: isPending),
   );
 }
 
 class _EditReadingLogSheet extends StatefulWidget {
-  const _EditReadingLogSheet({required this.log});
+  const _EditReadingLogSheet({required this.log, required this.isPending});
 
   final ReadingLogModel log;
+  final bool isPending;
 
   @override
   State<_EditReadingLogSheet> createState() => _EditReadingLogSheetState();
@@ -79,15 +86,28 @@ class _EditReadingLogSheetState extends State<_EditReadingLogSheet> {
     if (!_canSave) return;
     setState(() => _saving = true);
     try {
-      final updated = await ReadingLogService.instance.updateOwnLog(
-        widget.log,
-        minutesRead: _minutes,
-        bookTitles: _titles,
-        notes: _notesController.text,
-      );
+      final ReadingLogModel? updated;
+      if (widget.isPending) {
+        updated = await OfflineService.instance.editPendingReadingLog(
+          widget.log.id,
+          minutesRead: _minutes,
+          bookTitles: _titles,
+          notes: _notesController.text,
+        );
+      } else {
+        updated = await ReadingLogService.instance.updateOwnLog(
+          widget.log,
+          minutesRead: _minutes,
+          bookTitles: _titles,
+          notes: _notesController.text,
+        );
+      }
       if (!mounted) return;
       Navigator.of(context).pop(updated);
-      showLumiToast(message: 'Log updated', type: LumiToastType.success);
+      showLumiToast(
+        message: widget.isPending ? 'Pending log updated' : 'Log updated',
+        type: LumiToastType.success,
+      );
     } on ReadingLogEditOfflineException {
       if (!mounted) return;
       setState(() => _saving = false);

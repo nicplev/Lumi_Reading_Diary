@@ -37,6 +37,7 @@ import '../../data/providers/user_provider.dart';
 import '../../services/book_cover_cache_service.dart';
 import '../../services/firebase_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/offline_service.dart';
 import '../../services/reading_log_service.dart';
 import '../../services/widget_data_service.dart';
 import '../../services/isbn_assignment_service.dart';
@@ -50,6 +51,7 @@ import 'widgets/character_picker_sheet.dart';
 import 'widgets/parent_child_switcher.dart';
 import 'widgets/widget_undo_banner.dart';
 import 'widgets/child_log_row.dart';
+import 'widgets/pending_session_sheet.dart';
 import 'widgets/today_sessions_sheet.dart';
 import 'parent_logging_copy.dart';
 
@@ -1961,12 +1963,22 @@ class _TonightRowState extends State<_TonightRow> {
   /// undo layer targets exactly this session. Cleared on day rollover.
   String? _lastQuickLogId;
 
+  /// This child's queued (saved-on-this-phone) sessions and any parked
+  /// quick-slot conflict, live from the outbox (§7.1/§7.2).
+  StreamSubscription<List<PendingSync>>? _queueSub;
+  List<ReadingLogModel> _pendingLogs = const [];
+  String? _conflictLogId;
+  String? _conflictWinnerUid;
+
   @override
   void initState() {
     super.initState();
     final firestore = FirebaseService.instance.firestore;
     final schoolId = widget.parent.schoolId;
     _initTodayStream();
+    _refreshPendingFromQueue(OfflineService.instance.pendingSyncs);
+    _queueSub = OfflineService.instance.queueStream
+        .listen(_refreshPendingFromQueue);
 
     // Allocations targeting this student specifically. Whole-class
     // allocations arrive via widget.classAllocations (shared per class by
@@ -1979,6 +1991,35 @@ class _TonightRowState extends State<_TonightRow> {
         .where('isActive', isEqualTo: true)
         .snapshots()
         .asBroadcastStream();
+  }
+
+  void _refreshPendingFromQueue(List<PendingSync> queue) {
+    if (!mounted) return;
+    final mine = OfflineService.instance
+        .pendingReadingLogsFor(widget.student.id)
+        .where((log) =>
+            (log.occurredOn ??
+                SchoolTime.localDateString(log.date, widget.timezone)) ==
+            widget.schoolToday)
+        .toList();
+    final conflicts = OfflineService.instance
+        .quickSlotConflicts
+        .where((it) => it.data['studentId'] == widget.student.id)
+        .toList();
+    setState(() {
+      _pendingLogs = mine;
+      _conflictLogId = conflicts.isEmpty ? null : conflicts.first.id;
+      _conflictWinnerUid = conflicts.isEmpty
+          ? null
+          : (conflicts.first.data[quickSlotConflictKey]
+              as Map?)?['byUid'] as String?;
+    });
+  }
+
+  @override
+  void dispose() {
+    _queueSub?.cancel();
+    super.dispose();
   }
 
   /// Query window = the school-local day ±1 day, membership decided
@@ -2191,6 +2232,8 @@ class _TonightRowState extends State<_TonightRow> {
               submitting: _isQuickLogging,
               myUid: widget.parent.id,
               justCreatedLogId: _lastQuickLogId,
+              pendingLogs: _pendingLogs,
+              conflictLogId: _conflictLogId,
             );
 
             final undoable = state is RowJustCreatedByMe ? state.log : null;
@@ -2206,17 +2249,37 @@ class _TonightRowState extends State<_TonightRow> {
               onChooseBook: () => _openDetail(allocations),
               onUndo:
                   undoable == null ? null : () => _undoQuickLog(undoable),
-              // Review opens Tonight's sessions — the durable per-session
-              // recovery layer (owner-scoped Edit/Remove, §5.1). Full history
-              // stays reachable via the Library tab.
-              onReview: () => showTodaySessionsSheet(
-                context,
-                student: widget.student,
-                myUid: widget.parent.id,
-                timezone: widget.timezone,
-                schoolToday: widget.schoolToday,
-                onAddAnotherSession: () => _openDetail(allocations),
-              ),
+              // Review routes by state: a parked conflict gets the §7.2
+              // prompt, a pending session its Edit/Cancel sheet, and
+              // everything else Tonight's sessions — the durable
+              // per-session recovery layer (§5.1).
+              onReview: () {
+                if (state is RowConflict) {
+                  showQuickSlotConflictDialog(
+                    context,
+                    student: widget.student,
+                    pendingLogId: state.pendingLogId,
+                    winnerName: _conflictWinnerUid == widget.parent.id
+                        ? 'You (another device)'
+                        : null,
+                  );
+                } else if (state is RowOfflinePending) {
+                  showPendingSessionSheet(
+                    context,
+                    student: widget.student,
+                    pending: state.pending,
+                  );
+                } else {
+                  showTodaySessionsSheet(
+                    context,
+                    student: widget.student,
+                    myUid: widget.parent.id,
+                    timezone: widget.timezone,
+                    schoolToday: widget.schoolToday,
+                    onAddAnotherSession: () => _openDetail(allocations),
+                  );
+                }
+              },
               dateMismatchNote: SchoolTime.deviceDayDiffers(widget.timezone)
                   ? ParentLoggingCopy.dateMismatchNote(
                       DateFormat('EEE d MMM').format(

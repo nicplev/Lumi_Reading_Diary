@@ -159,6 +159,51 @@ void main() {
         isA<RowLoggedByOther>(),
       );
     });
+
+    test('a saved-on-this-phone session shows pending, not Ready', () {
+      final state = deriveChildLogRowState(
+        student: student(),
+        todayLogs: const [],
+        resolvedBookTitles: const ['The Bad Guys'],
+        usualMinutes: 15,
+        quickLoggingEnabled: true,
+        submitting: false,
+        myUid: myUid,
+        pendingLogs: [log(id: 'queued')],
+      );
+      expect(state, isA<RowOfflinePending>());
+      expect((state as RowOfflinePending).pending.id, 'queued');
+    });
+
+    test('a parked slot conflict outranks everything except access', () {
+      final state = deriveChildLogRowState(
+        student: student(),
+        todayLogs: [log(parentId: otherUid)],
+        resolvedBookTitles: const ['The Bad Guys'],
+        usualMinutes: 15,
+        quickLoggingEnabled: true,
+        submitting: false,
+        myUid: myUid,
+        pendingLogs: [log(id: 'queued')],
+        conflictLogId: 'queued',
+      );
+      expect(state, isA<RowConflict>());
+      expect((state as RowConflict).pendingLogId, 'queued');
+    });
+
+    test('a server-confirmed home session outranks a stale pending copy', () {
+      final state = deriveChildLogRowState(
+        student: student(),
+        todayLogs: [log(parentId: otherUid)],
+        resolvedBookTitles: const ['The Bad Guys'],
+        usualMinutes: 15,
+        quickLoggingEnabled: true,
+        submitting: false,
+        myUid: myUid,
+        pendingLogs: [log(id: 'queued')],
+      );
+      expect(state, isA<RowLoggedByOther>());
+    });
   });
 
   Widget host(Widget child, {double textScale = 1.0}) => MaterialApp(

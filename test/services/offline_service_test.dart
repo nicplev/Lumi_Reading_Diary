@@ -1002,6 +1002,213 @@ void main() {
         offlineService.reloadPendingFromDiskForTest();
         expect(offlineService.pendingSyncs, isEmpty);
       });
+
+      // ── Quick-slot claims and conflicts (§7.1–7.2) ──────────────────
+
+      ReadingLogModel slotLog(String id, {String parentId = 'parent-1'}) =>
+          _log(id).copyWith(occurredOn: '2026-07-24', context: 'home');
+
+      DocumentReference<Map<String, dynamic>> slotRef(
+              FakeFirebaseFirestore fake) =>
+          fake
+              .collection('schools')
+              .doc('school-1')
+              .collection('students')
+              .doc('student-1')
+              .collection('quickSlots')
+              .doc('2026-07-24');
+
+      test('queued quick-slot claim replays as one atomic batch (log + slot)',
+          () async {
+        final fake = FakeFirebaseFirestore();
+        offlineService.firestoreForTest = fake;
+        goHealthy();
+
+        await offlineService.saveReadingLogLocally(slotLog('rl-slot'),
+            claimQuickSlot: true);
+        await offlineService.triggerSync();
+
+        expect(offlineService.pendingSyncs, isEmpty);
+        final slot = await slotRef(fake).get();
+        expect(slot.exists, isTrue);
+        expect(slot.data()!['logId'], 'rl-slot');
+        expect(slot.data()!['byUid'], 'parent-1');
+      });
+
+      test('slot taken while offline parks the item as an explicit conflict '
+          'and writes NOTHING', () async {
+        final fake = FakeFirebaseFirestore();
+        offlineService.firestoreForTest = fake;
+        goHealthy();
+
+        // The co-guardian's session won the slot while we were offline.
+        await slotRef(fake).set({
+          'logId': 'their-log',
+          'byUid': 'parent-2',
+          'createdAt': Timestamp.now(),
+        });
+
+        await offlineService.saveReadingLogLocally(slotLog('rl-lost'),
+            claimQuickSlot: true);
+        await offlineService.triggerSync();
+
+        final item = offlineService.pendingSyncs.single;
+        expect(item.needsAttention, isTrue);
+        expect(item.lastError, quickSlotConflictError);
+        expect(offlineService.quickSlotConflicts, hasLength(1));
+        expect(
+            (item.data[quickSlotConflictKey] as Map)['byUid'], 'parent-2');
+
+        // Nothing was written; the winner's slot is untouched.
+        final myLog = await fake
+            .collection('schools')
+            .doc('school-1')
+            .collection('readingLogs')
+            .doc('rl-lost')
+            .get();
+        expect(myLog.exists, isFalse);
+        expect((await slotRef(fake).get()).data()!['logId'], 'their-log');
+      });
+
+      test('conflict resolution: discard mine drops the item without any '
+          'write', () async {
+        final fake = FakeFirebaseFirestore();
+        offlineService.firestoreForTest = fake;
+        goHealthy();
+        await slotRef(fake).set({
+          'logId': 'their-log',
+          'byUid': 'parent-2',
+          'createdAt': Timestamp.now(),
+        });
+        await offlineService.saveReadingLogLocally(slotLog('rl-discard'),
+            claimQuickSlot: true);
+        await offlineService.triggerSync();
+        expect(offlineService.quickSlotConflicts, hasLength(1));
+
+        await offlineService.resolveQuickSlotConflict(
+            logId: 'rl-discard', keepMine: false);
+
+        expect(offlineService.pendingSyncs, isEmpty);
+        expect(await offlineService.getLocalReadingLogs('student-1'),
+            isEmpty);
+        final doc = await fake
+            .collection('schools')
+            .doc('school-1')
+            .collection('readingLogs')
+            .doc('rl-discard')
+            .get();
+        expect(doc.exists, isFalse);
+      });
+
+      test('conflict resolution: add mine replays as a separate session '
+          "without touching the winner's slot", () async {
+        final fake = FakeFirebaseFirestore();
+        offlineService.firestoreForTest = fake;
+        goHealthy();
+        await slotRef(fake).set({
+          'logId': 'their-log',
+          'byUid': 'parent-2',
+          'createdAt': Timestamp.now(),
+        });
+        await offlineService.saveReadingLogLocally(slotLog('rl-keep'),
+            claimQuickSlot: true);
+        await offlineService.triggerSync();
+        expect(offlineService.quickSlotConflicts, hasLength(1));
+
+        await offlineService.resolveQuickSlotConflict(
+            logId: 'rl-keep', keepMine: true);
+        // resolve fires its own unawaited sync; poll until the drain (either
+        // invocation — the _isSyncing guard coalesces them) confirms it.
+        // The earlier failed drain force-probed the (fake-less) status
+        // controller unhealthy, so re-pin health before each attempt.
+        for (var i = 0; i < 20 && offlineService.pendingSyncs.isNotEmpty; i++) {
+          goHealthy();
+          await offlineService.triggerSync();
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        }
+
+        expect(offlineService.pendingSyncs, isEmpty);
+        final myLog = await fake
+            .collection('schools')
+            .doc('school-1')
+            .collection('readingLogs')
+            .doc('rl-keep')
+            .get();
+        expect(myLog.exists, isTrue, reason: 'a genuinely separate session');
+        expect((await slotRef(fake).get()).data()!['logId'], 'their-log',
+            reason: "the winner's slot must never be rebound");
+      });
+
+      // ── Pending edit / cancel (§7.1) ────────────────────────────────
+
+      test('editPendingReadingLog mutates the queued payload in place, '
+          'preserving the slot claim and the log ID', () async {
+        await offlineService.saveReadingLogLocally(slotLog('rl-edit'),
+            claimQuickSlot: true);
+
+        final updated = await offlineService.editPendingReadingLog(
+          'rl-edit',
+          minutesRead: 35,
+          bookTitles: const ['Zog'],
+          notes: 'Bedtime reading',
+        );
+
+        expect(updated!.minutesRead, 35);
+        final item = offlineService.pendingSyncs.single;
+        expect(item.id, 'rl-edit', reason: 'same mutation ID');
+        expect(item.data['minutesRead'], 35);
+        expect(item.data['bookTitles'], ['Zog']);
+        expect(item.data[quickSlotClaimKey], isTrue,
+            reason: 'the slot claim must survive the edit');
+        // Integrity hash re-stamped — the drain must not quarantine it.
+        expect(item.contentHash,
+            PendingSync.computeContentHash(item.data));
+        final cached =
+            await offlineService.getLocalReadingLogs('student-1');
+        expect(cached.single.minutesRead, 35);
+      });
+
+      test('cancelPendingReadingLog removes the queue entry AND the local '
+          'optimistic copy — nothing ever reaches the server', () async {
+        await offlineService.saveReadingLogLocally(slotLog('rl-cancel'),
+            claimQuickSlot: true);
+
+        await offlineService.cancelPendingReadingLog('rl-cancel');
+
+        expect(offlineService.pendingSyncs, isEmpty);
+        expect(await offlineService.getLocalReadingLogs('student-1'),
+            isEmpty);
+      });
+
+      test('pendingReadingLogsFor scopes to one child and excludes parked '
+          'conflicts', () async {
+        await offlineService.saveReadingLogLocally(slotLog('rl-mine'));
+        await offlineService.saveReadingLogLocally(
+            _log('rl-other', studentId: 'student-2'));
+
+        final mine = offlineService.pendingReadingLogsFor('student-1');
+        expect(mine.map((l) => l.id), ['rl-mine']);
+      });
+
+      // ── Revocation hygiene (§7.4) ───────────────────────────────────
+
+      test('purgeChildData clears one child\'s cache and queued writes only',
+          () async {
+        await offlineService.saveReadingLogLocally(slotLog('rl-purge-a'));
+        await offlineService.saveReadingLogLocally(
+            _log('rl-purge-b', studentId: 'student-2'));
+
+        await offlineService.purgeChildData('student-1');
+
+        expect(await offlineService.getLocalReadingLogs('student-1'),
+            isEmpty);
+        expect(offlineService.pendingReadingLogsFor('student-1'), isEmpty);
+        // The sibling's data is untouched.
+        expect(offlineService.pendingReadingLogsFor('student-2'),
+            hasLength(1));
+        expect(await offlineService.getLocalReadingLogs('student-2'),
+            isNotEmpty);
+      });
     });
 
     tearDown(() async {
