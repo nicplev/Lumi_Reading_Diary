@@ -341,6 +341,7 @@ class ReadingLogService {
     String? notes,
     String? allocationId,
     int targetMinutes = _defaultTargetMinutes,
+    bool isClassroomContext = false,
   }) {
     final now = DateTime.now();
     final cleanedTitles =
@@ -378,8 +379,10 @@ class ReadingLogService {
       loggedByLabel: 'Logged by ${teacher.fullName}',
       loggedByRole: LoggedByRole.teacher,
       occurredOn: occurredOn,
-      // Context stays null until the teacher sheet gains its explicit
-      // home/classroom toggle (PR-G); legacy semantics = home.
+      // Explicit teacher choice: 'classroom' shows on the family's Home as
+      // school reading without satisfying the home slot; 'home' is the
+      // original proxy semantics (#39).
+      context: isClassroomContext ? 'classroom' : 'home',
     );
     return writeLog(log, student: student);
   }

@@ -580,6 +580,41 @@ void main() {
       expect(otherDay, 0);
     });
 
+    test('teacher log stamps the chosen context; classroom leaves the home '
+        'slot free', () async {
+      final teacher = UserModel(
+        id: 'teacher_1',
+        email: 't@example.com',
+        fullName: 'Ms Lee',
+        role: UserRole.teacher,
+        schoolId: schoolId,
+        createdAt: DateTime(2026, 1, 1),
+      );
+
+      final classroom = await service.logReadingAsTeacher(
+        teacher: teacher,
+        student: student(),
+        date: DateTime(2026, 7, 24),
+        minutesRead: 10,
+        bookTitles: const ['Class novel'],
+        isClassroomContext: true,
+      );
+      expect(classroom.log.context, 'classroom');
+      expect(classroom.log.occurredOn, '2026-07-24');
+      // Classroom reading never claims the family's home quick slot.
+      expect((await slotRef('2026-07-24').get()).exists, isFalse);
+
+      final proxy = await service.logReadingAsTeacher(
+        teacher: teacher,
+        student: student(),
+        date: DateTime(2026, 7, 24),
+        minutesRead: 15,
+        bookTitles: const ['The Bad Guys'],
+      );
+      expect(proxy.log.context, 'home',
+          reason: 'default preserves the #39 home-proxy semantics');
+    });
+
     test("deleteOwnLog leaves a sibling session's slot alone", () async {
       final first = await service.logReading(
         student: student(),
